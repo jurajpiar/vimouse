@@ -18,12 +18,18 @@ final class AXLineProvider: LineProvider {
     var probeReach: Double = 300
 
     private let systemWide = AXUIElementCreateSystemWide()
+    /// `VIMOUSE_DEBUG=1` in the environment logs each lookup to the console.
+    private let debug = ProcessInfo.processInfo.environment["VIMOUSE_DEBUG"] != nil
+    private func log(_ s: @autoclosure () -> String) { if debug { NSLog("vimouse ruler: %@", s()) } }
 
     private struct Found {
         var element: AXUIElement
         /// The line's index within the element, when the element exposes lines.
         var line: Int?
         var rect: Rect
+        /// The element answers RangeForPosition / BoundsForRange (a text node), as opposed
+        /// to a plain single-line element matched by role.
+        var textAPI = true
     }
     /// The last line handed out, so a move from it needs no fresh hit test.
     private var last: Found?
@@ -43,28 +49,48 @@ final class AXLineProvider: LineProvider {
         }
         if direction == 0 {
             last = current
+            log("at (\(Int(x)),\(Int(y))): \(current.map { "\($0.rect) line \($0.line.map(String.init) ?? "?")" } ?? "no text")")
             return current?.rect
         }
         let sign = Double(direction)
         if let cur = current {
-            // Inside the element: the neighbouring line by index, skipping blank lines.
+            // Inside an element that exposes lines: the neighbouring line by index, skipping blank ones.
             if let li = cur.line {
                 var i = li + direction
                 for _ in 0..<4 {
                     guard Date() < deadline, let r = lineBounds(of: cur.element, line: i) else { break }
                     if r.width > 0, r.height > 0, sign > 0 ? r.midY > cur.rect.midY : r.midY < cur.rect.midY {
                         last = Found(element: cur.element, line: i, rect: r)
+                        log("line \(i): \(r)")
                         return r
                     }
                     i += direction
+                }
+            } else if cur.textAPI {
+                // Lines not indexed (Chromium text nodes): ask the same element for the
+                // position just past the current line, staying inside its frame.
+                let edge = frame(of: cur.element) ?? cur.rect
+                var py = sign > 0 ? cur.rect.maxY + 1 : cur.rect.y - 1
+                for _ in 0..<6 {
+                    guard Date() < deadline, py >= edge.y - 1, py <= edge.maxY + 1 else { break }
+                    if let f = lineFromTextElement(cur.element, x: x, y: py), sign > 0 ? f.rect.midY > cur.rect.midY : f.rect.midY < cur.rect.midY {
+                        last = f
+                        log("next by position (\(Int(py))): \(f.rect)")
+                        return f.rect
+                    }
+                    py += sign * max(4, cur.rect.height / 2)
                 }
             }
             // At the element's edge: look just beyond its frame for the next one.
             let edge = frame(of: cur.element) ?? cur.rect
             let start = sign > 0 ? max(edge.maxY, cur.rect.maxY) : min(edge.y, cur.rect.y)
-            return probe(x: x, from: start, sign: sign, avoiding: cur.rect, on: screen, deadline: deadline)
+            let r = probe(x: x, from: start, sign: sign, avoiding: cur.rect, on: screen, deadline: deadline)
+            log("past element edge (\(Int(start))): \(r.map { "\($0)" } ?? "nothing (fallback step)")")
+            return r
         }
-        return probe(x: x, from: y, sign: sign, avoiding: nil, on: screen, deadline: deadline)
+        let r = probe(x: x, from: y, sign: sign, avoiding: nil, on: screen, deadline: deadline)
+        log("no current line at (\(Int(x)),\(Int(y))); probe: \(r.map { "\($0)" } ?? "nothing (fallback step)")")
+        return r
     }
 
     func window(at x: Double, y: Double) -> Rect? {
@@ -109,7 +135,7 @@ final class AXLineProvider: LineProvider {
         let role: String = attribute(hit, kAXRoleAttribute) ?? ""
         if ["AXStaticText", "AXMenuItem", "AXLink", "AXCell", "AXRow"].contains(role),
            let f = frame(of: hit), f.height > 0, f.height <= 40, f.contains(Point(x: x, y: y)) {
-            return Found(element: hit, line: nil, rect: f)
+            return Found(element: hit, line: nil, rect: f, textAPI: false)
         }
         return nil
     }
@@ -134,10 +160,12 @@ final class AXLineProvider: LineProvider {
             range = lineRange
             lineNo = n
         }
-        guard let r = bounds(of: element, range: range), r.width > 0 else { return nil }
+        guard var r = bounds(of: element, range: range), r.width > 0 else { return nil }
         // The view answered with a line; make sure it is the one under the point (some views
         // return the nearest line for a point in the margin, which is fine; a far one is not).
         guard abs(r.midY - y) <= r.height * 1.5 + 4 else { return nil }
+        // Without line indexing the bounds are one character's; take the element's width.
+        if lineNo == nil, let f = frame(of: element) { r.x = f.x; r.width = f.width }
         return Found(element: element, line: lineNo, rect: r)
     }
 
