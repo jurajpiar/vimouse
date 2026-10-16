@@ -55,11 +55,13 @@ tunable, each with a one-line comment and example values. Edit and save; the app
 reloads within a second. A parse error keeps the previous settings and turns the
 menu bar item into "vm!"; "Show config error" in the menu says why.
 
-On every start the file is brought up to date: settings added in a newer version
-are appended with their defaults and comments, renamed settings move with their
-values, and unknown or superseded settings are gathered into a short "Retired
-settings" block at the end (see `CHANGELOG.md` for what replaced them). Your
-values and comments are kept. Arrow keys, page up/down, home and end can be bound like any other key
+On every start the file is brought up to date (unless `[config] update = false`):
+settings added in a newer version are appended with their defaults and comments,
+renamed settings move with their values, and unknown or superseded settings are
+gathered into a short "Retired settings" block at the end. Your values and
+comments are kept. Next to it, `config.example.toml` (the current defaults) and
+`vimouse.1` (the manual, `man ~/.config/vimouse/vimouse.1`, or "Open manual" in
+the menu) are rewritten on every start. Arrow keys, page up/down, home and end can be bound like any other key
 (`down = ["j", "down"]`), and the legend and in-rectangle labels show whatever is
 bound.
 

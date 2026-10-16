@@ -11,6 +11,8 @@ final class ConfigStore {
     static let directory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".config/vimouse", isDirectory: true)
     static let file = directory.appendingPathComponent("config.toml")
+    static let exampleFile = directory.appendingPathComponent("config.example.toml")
+    static let manualFile = directory.appendingPathComponent("vimouse.1")
 
     private(set) var config = Config()
     /// Last load error, shown in the menu bar; nil when the file parsed.
@@ -22,12 +24,30 @@ final class ConfigStore {
 
     func start() {
         ensureFile()
-        migrate()
+        writeReference()
+        if updateAllowed() { migrate() }
         load()
         watch()
     }
 
-    /// Append settings added since the file was written; comment out ones that went away.
+    /// The example config and the manual, always current. Overwritten on every start.
+    private func writeReference() {
+        do {
+            try Config.defaultTOML.write(to: ConfigStore.exampleFile, atomically: true, encoding: .utf8)
+            try Manual.roff().write(to: ConfigStore.manualFile, atomically: true, encoding: .utf8)
+        } catch {
+            NSLog("vimouse: could not write reference files: \(error)")
+        }
+    }
+
+    /// [config] update, read on its own so a file that fails to parse elsewhere can still say no.
+    private func updateAllowed() -> Bool {
+        guard let text = try? String(contentsOf: ConfigStore.file, encoding: .utf8),
+              let table = try? TOML.parse(text) else { return true }
+        return table["config"]?["update"]?.bool ?? true
+    }
+
+    /// Append settings added since the file was written; retire ones that went away.
     private func migrate() {
         guard let text = try? String(contentsOf: ConfigStore.file, encoding: .utf8) else { return }
         let (updated, changed) = ConfigSchema.migrate(text)

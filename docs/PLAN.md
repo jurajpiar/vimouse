@@ -112,6 +112,8 @@ Half-split navigation. Shan's proposal: show the rectangle split one way (top/bo
 
 Mode plugins. Modes behind a `Mode` protocol (keys handled, effects, hints, help, overlay contribution, own config section or `~/.config/vimouse/<mode>.toml`), a registry, `[modes] enabled = [...]`, and the config able to name a plugin. Caveat: runtime-loaded compiled Swift plugins need a stable ABI between app and plugin, which Swift only guarantees within one toolchain; realistic routes are modules compiled into the app and toggled in config, or a scripting layer (Lua) for user-written modes. The refactor towards the protocol is worth doing before Phase 6 (vim-mode foundations) regardless of loading mechanism.
 
+2026-10-16: config migration no longer annotates inline (renames silent, retired block at the end); `[config] update` switch; `config.example.toml` and a generated man page `vimouse.1` rewritten on every start. Before the v1 release: delete the pre-release renames and superseded entries from ConfigSchema (and the Deprecations section they feed), since no released config ever had them.
+
 Open: none.
 
 ## Sources

@@ -23,12 +23,16 @@ public enum ConfigSchema {
     # Modifiers cmd, shift, ctrl, alt are joined with "+", e.g. "cmd+shift+space".
     # A list binds several keys to one action, e.g. ["j", "down"].
     #
-    # On start, settings missing from this file are appended with their defaults;
-    # unknown or superseded ones are moved to a "Retired settings" block at the end.
+    # On start (unless [config] update = false) settings missing from this file are
+    # appended with their defaults and unknown or superseded ones are moved to a
+    # "Retired settings" block at the end. config.example.toml next to this file is
+    # always rewritten with the current defaults, and vimouse.1 is the manual:
+    #   man ~/.config/vimouse/vimouse.1
     """
 
     /// One line above each section header.
     public static let sectionComments: [String: String] = [
+        "config": "How this file itself is maintained.",
         "hotkey": "How Pointer mode is entered.",
         "global": "Bindings that work in every mode: leaving, help, switching displays.",
         "actions": "Clicking and dragging, available in every mode.",
@@ -37,10 +41,13 @@ public enum ConfigSchema {
         "ruler": "Ruler mode: the reading band that dims everything except the line being read.",
         "nudge": "Nudge mode: moving the pointer by a few pixels at a time for the final adjustment.",
         "drag": "Dragging: holding the left button while navigating, for text selection and drag-and-drop.",
+        "colours": "Overlay colours, as \"#RRGGBB\".",
         "snap": "Snapping the pointer to clickable UI elements read from the accessibility tree.",
     ]
 
     public static let entries: [ConfigEntry] = [
+        .init(section: "config", key: "update", defaultValue: "true", comment: "On start, add new settings to this file and retire old ones in place (true), or leave this file alone and only refresh config.example.toml (false)."),
+
         .init(section: "hotkey", key: "activate", defaultValue: "\"cmd+shift+space\"", comment: "Global hotkey that enters Pointer mode, e.g. \"cmd+shift+space\", \"ctrl+alt+m\"."),
 
         .init(section: "global", key: "exit", defaultValue: "\"escape\"", comment: "Leave Pointer mode (releases a drag; keeps a ruler), e.g. \"escape\", \"ctrl+c\"."),
@@ -94,6 +101,13 @@ public enum ConfigSchema {
         .init(section: "drag", key: "restart_search", defaultValue: "true", comment: "When a drag starts, restart the quadrant search from the whole screen (good for moving items far; set false to keep extending a selection from where you are): true or false."),
         .init(section: "drag", key: "ramp", defaultValue: "false", comment: "After pressing the button, wiggle the pointer a few pixels so apps that need movement before starting a drag-and-drop session do so. Breaks text drags in Chromium-based apps, so off unless an app needs it: true or false."),
 
+        .init(section: "colours", key: "pointer", defaultValue: "\"#0A84FF\"", comment: "Pointer mode (quadrants, strip)."),
+        .init(section: "colours", key: "drag", defaultValue: "\"#30D158\"", comment: "Drag badge, origin dot and line."),
+        .init(section: "colours", key: "nudge", defaultValue: "\"#40C8E0\"", comment: "Nudge mode."),
+        .init(section: "colours", key: "scroll", defaultValue: "\"#FF9F0A\"", comment: "Scroll mode."),
+        .init(section: "colours", key: "ruler", defaultValue: "\"#BF5AF2\"", comment: "Ruler mode and the band edges."),
+        .init(section: "colours", key: "snap", defaultValue: "\"#FF375F\"", comment: "Ring marking the snap target."),
+
         .init(section: "snap", key: "enabled", defaultValue: "true", comment: "Snap the pointer to the nearest clickable element in the chosen rectangle: true or false."),
     ]
 
@@ -121,13 +135,26 @@ public enum ConfigSchema {
         return seen
     }
 
+    /// Short comments go on the key's line, longer ones above it.
+    public static let inlineCommentLimit = 48
+
+    /// One setting as written to the file: a comment line above and the key, or the
+    /// key with the comment on the same line when it is short.
+    public static func render(_ e: ConfigEntry, value: String? = nil) -> [String] {
+        let v = value ?? e.defaultValue
+        if e.comment.count <= inlineCommentLimit {
+            return ["\(e.key) = \(v)   # \(e.comment)"]
+        }
+        return ["# \(e.comment)", "\(e.key) = \(v)"]
+    }
+
     /// The complete default file.
     public static func template() -> String {
         var out = header + "\n"
         for section in sections {
             out += "\n# \(sectionComments[section] ?? section)\n[\(section)]\n"
             for e in entries where e.section == section {
-                out += "# \(e.comment)\n\(e.key) = \(e.defaultValue)\n"
+                out += "\n" + render(e).joined(separator: "\n") + "\n"
             }
         }
         return out
@@ -208,11 +235,18 @@ public enum ConfigSchema {
             if !line.isEmpty { sections[sec]!.end = i }
             guard !line.isEmpty, !line.hasPrefix("#"), let eq = line.firstIndex(of: "=") else { continue }
             let key = line[..<eq].trimmingCharacters(in: .whitespaces)
-            let value = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+            let value = TOML.stripComment(String(line[line.index(after: eq)...])).trimmingCharacters(in: .whitespaces)
             if let entry = entries.first(where: { $0.section == sec && $0.key == key }) {
                 sections[sec]!.keys.insert(key)
                 sections[sec]!.keyLines += 1
-                if !hasComment("# \(entry.comment)", above: i) { commentsToInsert.append((before: i, text: "# \(entry.comment)")) }
+                let documented = hasComment("# \(entry.comment)", above: i) || line.hasSuffix("# \(entry.comment)")
+                if !documented {
+                    if entry.comment.count <= inlineCommentLimit {
+                        lines[i] = "\(raw)   # \(entry.comment)"
+                    } else {
+                        commentsToInsert.append((before: i, text: "# \(entry.comment)"))
+                    }
+                }
             } else if let target = renamed["\(sec).\(key)"] {
                 carried[target] = value
                 removals.insert(i)
@@ -231,7 +265,7 @@ public enum ConfigSchema {
         for section in self.sections {
             let missing = entries.filter { $0.section == section && !(sections[section]?.keys.contains($0.key) ?? false) }
             guard !missing.isEmpty else { continue }
-            let block = missing.flatMap { ["# \($0.comment)", "\($0.key) = \(carried["\($0.section).\($0.key)"] ?? $0.defaultValue)"] }
+            let block = missing.flatMap { [""] + render($0, value: carried["\($0.section).\($0.key)"]) }
             if let info = sections[section] {
                 insertions.append((after: info.end, text: block))
             } else {

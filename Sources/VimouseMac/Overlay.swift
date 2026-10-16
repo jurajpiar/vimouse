@@ -30,6 +30,7 @@ struct OverlayModel {
     /// nil when no mode is active (only a ruler is shown).
     var pointer: PointerModel?
     var ruler: RulerModel?
+    var colours: Colours
     /// All displays (CG coordinates) and the active one, for the screen-number badges.
     var screens: [Rect]
     var activeScreen: Int
@@ -91,13 +92,19 @@ final class OverlayView: NSView {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     private func tint(_ p: PointerModel) -> NSColor {
+        let c = model?.colours ?? Colours()
         switch p.mode {
-        case .scroll: return .systemOrange
-        case .ruler: return .systemPurple
-        case .nudge: return .systemTeal
-        case .pointer: return p.dragging ? .systemGreen : .systemBlue
+        case .scroll: return NSColor(hex: c.scroll)
+        case .ruler: return NSColor(hex: c.ruler)
+        case .nudge: return NSColor(hex: c.nudge)
+        case .pointer: return NSColor(hex: p.dragging ? c.drag : c.pointer)
         }
     }
+
+    private var dragColour: NSColor { NSColor(hex: model?.colours.drag ?? Colours().drag) }
+    private var snapColour: NSColor { NSColor(hex: model?.colours.snap ?? Colours().snap) }
+    private var rulerColour: NSColor { NSColor(hex: model?.colours.ruler ?? Colours().ruler) }
+    private var pointerColour: NSColor { NSColor(hex: model?.colours.pointer ?? Colours().pointer) }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let model, let windowFrame = window?.frame else { return }
@@ -153,7 +160,7 @@ final class OverlayView: NSView {
                 let t = toLocal(Rect(x: p.target.x - 7, y: p.target.y - 7, width: 14, height: 14))
                 let ring = NSBezierPath(ovalIn: t)
                 ring.lineWidth = 2
-                NSColor.systemPink.setStroke()
+                snapColour.setStroke()
                 ring.stroke()
             }
         case .scroll:
@@ -186,10 +193,10 @@ final class OverlayView: NSView {
                 line.move(to: a); line.line(to: b)
                 line.lineWidth = 1
                 line.setLineDash([4, 4], count: 2, phase: 0)
-                NSColor.systemGreen.withAlphaComponent(0.4).setStroke()
+                dragColour.withAlphaComponent(0.4).setStroke()
                 line.stroke()
             }
-            NSColor.systemGreen.withAlphaComponent(0.8).setFill()
+            dragColour.withAlphaComponent(0.8).setFill()
             NSBezierPath(ovalIn: NSRect(x: a.x - 4, y: a.y - 4, width: 8, height: 8)).fill()
         }
 
@@ -206,14 +213,14 @@ final class OverlayView: NSView {
         toLocal(below).fill()
         let edge = NSBezierPath(rect: toLocal(band))
         edge.lineWidth = adjusting ? 2 : 1
-        NSColor.systemPurple.withAlphaComponent(adjusting ? 0.9 : 0.5).setStroke()
+        rulerColour.withAlphaComponent(adjusting ? 0.9 : 0.5).setStroke()
         edge.stroke()
     }
 
     private func drawScreenBadge(_ number: Int, in rect: NSRect) {
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: min(rect.height * 0.3, 200), weight: .bold),
-            .foregroundColor: NSColor.systemBlue.withAlphaComponent(0.25),
+            .foregroundColor: pointerColour.withAlphaComponent(0.25),
         ]
         let s = NSAttributedString(string: "\(number)", attributes: attrs)
         let sz = s.size()
@@ -283,7 +290,7 @@ final class OverlayView: NSView {
         ]
         if p.dragging {
             text.append(NSAttributedString(string: dragBadge, attributes: [
-                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.systemGreen,
+                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: dragColour,
             ]))
         }
         text.append(NSAttributedString(string: modeName, attributes: keyAttrs))
@@ -310,6 +317,23 @@ final class OverlayView: NSView {
         colour.withAlphaComponent(0.85).setFill()
         bg.fill()
         text.draw(at: NSPoint(x: box.minX + pad, y: box.minY + pad / 2))
+    }
+}
+
+extension NSColor {
+    /// "#RRGGBB"; falls back to grey on bad input.
+    convenience init(hex: String) {
+        var v: UInt64 = 0
+        guard hex.count == 7, Scanner(string: String(hex.dropFirst())).scanHexInt64(&v) else {
+            self.init(white: 0.5, alpha: 1)
+            return
+        }
+        self.init(
+            red: CGFloat((v >> 16) & 0xFF) / 255,
+            green: CGFloat((v >> 8) & 0xFF) / 255,
+            blue: CGFloat(v & 0xFF) / 255,
+            alpha: 1
+        )
     }
 }
 #endif

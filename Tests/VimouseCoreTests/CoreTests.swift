@@ -104,7 +104,7 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(changed)
         XCTAssertTrue(text.contains("# my notes"))
         XCTAssertTrue(text.contains("# Pointer mode: narrowing down"))      // section description added
-        XCTAssertTrue(text.contains("# Pick the top-left quadrant, e.g. \"i\", \"up\".\ntop_left = \"q\"")) // comment for an existing key
+        XCTAssertTrue(text.contains("top_left = \"q\"   # Pick the top-left quadrant, e.g. \"i\", \"up\".")) // short comment inline on an existing key
         XCTAssertTrue(text.contains("top_left = \"q\""))                 // user value kept
         XCTAssertFalse(text.contains("mystery = 1\n[scroll]"))              // unknown key removed from its place
         XCTAssertTrue(text.hasSuffix("# Retired settings (see CHANGELOG.md in the vimouse repository):\n# [pointer] mystery = 1\n"))
@@ -140,6 +140,27 @@ final class ConfigTests: XCTestCase {
         XCTAssertFalse(ConfigSchema.migrate(text).changed)
         XCTAssertFalse(ConfigSchema.migrate(Config.defaultTOML).changed)
         XCTAssertTrue(ConfigSchema.migrate("").changed)
+    }
+
+    func testManualMentionsEverySetting() {
+        let m = Manual.roff()
+        XCTAssertTrue(m.hasPrefix(".TH VIMOUSE 1"))
+        for e in ConfigSchema.entries { XCTAssertTrue(m.contains(".B \(e.key)"), e.key) }
+        XCTAssertTrue(m.contains(".SH DEPRECATIONS"))
+        XCTAssertTrue(m.contains("now [actions] left_click"))
+    }
+
+    func testColours() throws {
+        let c = try Config.parse("[colours]\nscroll = \"#ff0000\"")
+        XCTAssertEqual(c.colours.scroll, "#FF0000")
+        XCTAssertEqual(c.colours.pointer, Colours().pointer)
+        XCTAssertThrowsError(try Config.parse("[colours]\nruler = \"red\""))
+    }
+
+    func testConfigUpdateSwitch() throws {
+        XCTAssertTrue(Config().autoUpdate)
+        XCTAssertFalse(try Config.parse("[config]\nupdate = false").autoUpdate)
+        XCTAssertThrowsError(try Config.parse("[config]\nupdate = 1"))
     }
 
     func testEverySettingAndSectionHasAComment() {

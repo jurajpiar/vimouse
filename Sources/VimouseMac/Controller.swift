@@ -9,6 +9,7 @@ final class Controller {
     private let tap = InputTap()
     private let overlay = Overlay()
     private var rulerDim: Double = Config().rulerDim
+    private var colours = Colours()
     private var dragRamp = false
     /// True while the help key is held.
     private var helpShown = false
@@ -21,6 +22,7 @@ final class Controller {
     func apply(_ config: Config) {
         engine.apply(config)
         rulerDim = config.rulerDim
+        colours = config.colours
         dragRamp = config.dragRamp
         overlay.render(model())
     }
@@ -122,7 +124,7 @@ final class Controller {
             )
         }
         let ruler = engine.ruler.map { RulerModel(screenIndex: $0.screenIndex, band: $0.band(on: engine.screens[$0.screenIndex]), dim: rulerDim) }
-        return OverlayModel(pointer: pointer, ruler: ruler, screens: engine.screens, activeScreen: engine.screenIndex)
+        return OverlayModel(pointer: pointer, ruler: ruler, colours: colours, screens: engine.screens, activeScreen: engine.screenIndex)
     }
 }
 #endif

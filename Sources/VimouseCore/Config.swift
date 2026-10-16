@@ -2,8 +2,27 @@ import Foundation
 
 /// User configuration: key bindings and tunables. Parsed from config.toml; every
 /// missing key keeps its default, so an empty file is a valid config.
+/// Overlay colours as "#RRGGBB".
+public struct Colours: Equatable {
+    public var pointer = "#0A84FF"
+    public var drag = "#30D158"
+    public var nudge = "#40C8E0"
+    public var scroll = "#FF9F0A"
+    public var ruler = "#BF5AF2"
+    public var snap = "#FF375F"
+
+    public init() {}
+
+    public static func isValid(_ hex: String) -> Bool {
+        hex.count == 7 && hex.hasPrefix("#") && hex.dropFirst().allSatisfy(\.isHexDigit)
+    }
+}
+
 public struct Config: Equatable {
     public var keymap: KeyMap = .default
+    public var colours = Colours()
+    /// Whether the app may rewrite config.toml on start (migration).
+    public var autoUpdate: Bool = true
     public var scrollStep: Double = 60
     public var rulerHeight: Double = 32
     /// 0 means move by the band's own height.
@@ -54,6 +73,10 @@ public struct Config: Equatable {
             return d
         }
 
+        if let v = t["config"]?["update"] {
+            guard let b = v.bool else { throw ParseError(description: "[config] update: expected true or false") }
+            c.autoUpdate = b
+        }
         if let p = try one("hotkey", "activate") { k.activate = p }
 
         var quadrants: [KeyPress: Quadrant] = [:]
@@ -115,6 +138,18 @@ public struct Config: Equatable {
             guard let b = v.bool else { throw ParseError(description: "[drag] ramp: expected true or false") }
             c.dragRamp = b
         }
+        func colour(_ name: String, _ set: (inout Colours, String) -> Void) throws {
+            guard let v = t["colours"]?[name] else { return }
+            guard let hex = v.string, Colours.isValid(hex) else { throw ParseError(description: "[colours] \(name): expected \"#RRGGBB\"") }
+            set(&c.colours, hex.uppercased())
+        }
+        try colour("pointer") { $0.pointer = $1 }
+        try colour("drag") { $0.drag = $1 }
+        try colour("nudge") { $0.nudge = $1 }
+        try colour("scroll") { $0.scroll = $1 }
+        try colour("ruler") { $0.ruler = $1 }
+        try colour("snap") { $0.snap = $1 }
+
         if let v = t["snap"]?["enabled"] {
             guard let b = v.bool else { throw ParseError(description: "[snap] enabled: expected true or false") }
             c.snapEnabled = b

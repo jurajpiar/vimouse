@@ -62,7 +62,7 @@ public enum TOML {
         return table
     }
 
-    private static func stripComment(_ line: String) -> String {
+    static func stripComment(_ line: String) -> String {
         var inString = false
         var out = ""
         var prev: Character = " "
