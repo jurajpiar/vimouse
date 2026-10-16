@@ -116,6 +116,10 @@ Mode plugins. Modes behind a `Mode` protocol (keys handled, effects, hints, help
 
 Trackpad-like convenience (discussed 2026-10-16). What a trackpad has: modeless, analogue, inertial. Planned, in order: (1) trackpad-style scrolling: continuous scroll events with scroll and momentum phases, acceleration while a key is held, momentum tail on release (technique used by Mos and LinearMouse); (2) quasi-mode: hold a modifier (`[hotkey] hold`) to be in Pointer mode, release to leave, its modifier bit stripped from typed keys; (3) nudge acceleration while a key is held; (4) optional passthrough of system shortcuts (Spaces, Mission Control, zoom) from inside Pointer mode. Not attempted: synthesising multitouch gestures or magnify/swipe events (private APIs only). Shan's extension idea for the quasi-mode: a reverse quadrant search, or a non-linear expanding step in a chosen direction (2, 4, 8, 16 px or a doubling rectangle), as a navigation plugin alongside the half-split.
 
+2026-10-16 (evening): quasi-mode (`[hotkey] hold`: one key or a chord, sided modifiers, both-sides rule, pin via the hotkey into `activate_mode`); start modes for hotkey and hold; activation leaves the pointer in place; trackpad-style scrolling (continuous events with phases, tap/hold/coast, brake, double-tap or `flick_with` flick, `friction`); sided modifier names in all key specs; `[colours.modes]` and `[colours.markers]`; config: inline comments, `[config] update`, example file and generated man page, silent renames with a retired block. Drag ramp off by default.
+
+Next candidates, in suggested order: (1) Phase 2 robustness: permission-revocation handling (poll CGEventTapCreate, tear down), secure-input detection with a badge; (2) a standalone .app bundle with launch at login and a stable signing identity, so the app no longer needs a terminal and the Accessibility grant stops resetting (part of Phase 5, pulled forward); (3) nudge acceleration while a key is held; (4) parked: ruler polish (AX line snapping), half-split keys, expanding-step navigation, mode plugin refactor, system-shortcut passthrough.
+
 Open: none.
 
 ## Sources
