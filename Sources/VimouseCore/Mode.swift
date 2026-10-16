@@ -56,8 +56,10 @@ public protocol Mode: AnyObject {
     /// must work everywhere, such as removing a band). Return nil to pass.
     func handleAnywhere(_ key: KeyPress, count: Int?, _ ctx: ModeContext) -> [Effect]?
 
-    /// Status strip entries while active: ("key", "action"), bindings first.
-    func hints(_ ctx: ModeContext) -> [(key: String, action: String)]
+    /// Status strip entries while active, bindings first.
+    func hints(_ ctx: ModeContext) -> [Hint]
+    /// One glyph standing for the mode in the strip (its toggle's action), e.g. "⊞".
+    var symbol: String { get }
     /// Help panel rows: ("keys", "what it does").
     func help(_ ctx: ModeContext) -> [(keys: String, action: String)]
     /// What to draw. Called for the active mode, and for idle modes that `drawsWhileIdle`.
@@ -81,8 +83,22 @@ public extension ModeSettings where Self: Equatable {
     func isEqual(to other: ModeSettings) -> Bool { (other as? Self) == self }
 }
 
+/// One status strip entry: the key, what it does in words, and a glyph for it when
+/// one is clear enough (the strip shows glyphs by default, words on request).
+public struct Hint: Equatable, Sendable {
+    public var key: String
+    public var action: String
+    public var symbol: String?
+    public init(_ key: String, _ action: String, _ symbol: String? = nil) {
+        self.key = key
+        self.action = action
+        self.symbol = symbol
+    }
+}
+
 public extension Mode {
     var enabledByDefault: Bool { true }
+    var symbol: String { String(name.prefix(1)) }
     var acceptsKeyRepeat: Bool { true }
     var showsDragLine: Bool { false }
     var drawsWhileIdle: Bool { false }
@@ -236,12 +252,13 @@ public struct Scene: Equatable {
     public var pendingCount: Int?
     /// Where the pointer is; the status strip keeps away from it.
     public var focus: Point
-    public var hints: [HintEntry]
+    public var hints: [Hint]
+    /// Show each hint's glyph instead of its words when it has one.
+    public var legendSymbols: Bool
     public var help: [HelpGroup]?
     public var drawables: [Drawable]
     public var colours: Colours
 
-    public struct HintEntry: Equatable { public var key: String; public var action: String }
     public struct HelpRow: Equatable { public var keys: String; public var action: String }
     public struct HelpGroup: Equatable { public var title: String; public var rows: [HelpRow] }
 }

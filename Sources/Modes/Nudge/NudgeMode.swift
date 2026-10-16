@@ -96,11 +96,13 @@ public final class NudgeMode: Mode {
         return .nudgeStart(dx: dx, dy: dy, multiplier: multiplier)
     }
 
-    public func hints(_ ctx: ModeContext) -> [(key: String, action: String)] {
+    public let symbol = "✛"
+
+    public func hints(_ ctx: ModeContext) -> [Hint] {
         let s = settings
         return [
-            (KeyMap.label(of: s.left) + KeyMap.label(of: s.down) + KeyMap.label(of: s.up) + KeyMap.label(of: s.right), "move (hold: faster, two: diagonal)"),
-            ("⇧", "1px"),
+            Hint(KeyMap.label(of: s.left) + KeyMap.label(of: s.down) + KeyMap.label(of: s.up) + KeyMap.label(of: s.right), "move (hold: faster, two: diagonal)", "✛"),
+            Hint("⇧", "1px", "1px"),
         ]
     }
 

@@ -135,14 +135,16 @@ public final class PointerMode: Mode {
         return nil
     }
 
-    public func hints(_ ctx: ModeContext) -> [(key: String, action: String)] {
+    public let symbol = "⊞"
+
+    public func hints(_ ctx: ModeContext) -> [Hint] {
         let quads = [Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { settings.label(for: $0) }.joined()
-        var h: [(key: String, action: String)] = [(quads, "pick")]
+        var h = [Hint(quads, "pick", "⊞")]
         if let s = session, s.depth > 0 {
-            h.append((KeyMap.label(of: settings.up), "up"))
-            h.append((KeyMap.label(of: settings.top), "top"))
+            h.append(Hint(KeyMap.label(of: settings.up), "up", "↰"))
+            h.append(Hint(KeyMap.label(of: settings.top), "top", "⇈"))
         }
-        if ctx.services.snap != nil { h.append((KeyMap.label(of: settings.snapToggle), snapping ? "snap on" : "snap off")) }
+        if ctx.services.snap != nil { h.append(Hint(KeyMap.label(of: settings.snapToggle), snapping ? "snap on" : "snap off", snapping ? "⌖ on" : "⌖ off")) }
         return h
     }
 

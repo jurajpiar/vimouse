@@ -239,16 +239,18 @@ public final class RulerMode: Mode {
         return (line.midY, line.height + 2 * settings.pad, line)
     }
 
-    public func hints(_ ctx: ModeContext) -> [(key: String, action: String)] {
+    public let symbol = "☰"
+
+    public func hints(_ ctx: ModeContext) -> [Hint] {
         let s = settings
         func l(_ set: Set<KeyPress>) -> String { KeyMap.label(of: set) }
-        var h: [(key: String, action: String)] = [
-            (l(s.down) + l(s.up), "move"),
-            (l(s.shrink) + " " + l(s.grow), "height"),
-            ("⇧", "fine"),
+        var h = [
+            Hint(l(s.down) + l(s.up), "move", "↕"),
+            Hint(l(s.shrink) + " " + l(s.grow), "height", "⬍"),
+            Hint("⇧", "fine", "1px"),
         ]
-        if ctx.services.lines != nil { h.append((l(s.snapToggle), snapping ? "lines on" : "lines off")) }
-        h.append((l(s.remove), "remove"))
+        if ctx.services.lines != nil { h.append(Hint(l(s.snapToggle), snapping ? "lines on" : "lines off", snapping ? "☰ on" : "☰ off")) }
+        h.append(Hint(l(s.remove), "remove", "☰✕"))
         return h
     }
 

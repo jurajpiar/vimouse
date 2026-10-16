@@ -771,7 +771,11 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(s.focus, Point(x: 250, y: 150))
         XCTAssertTrue(s.drawables.contains(.outline(Rect(x: 0, y: 0, width: 500, height: 300), colour: s.modeColour, alpha: 1, width: 2)))
         XCTAssertTrue(s.drawables.contains { if case .label("i", _, _, _) = $0 { return true } else { return false } })
-        XCTAssertTrue(s.hints.contains { $0.action == "nudge" })
+        XCTAssertTrue(s.hints.contains { $0.action == "nudge" && $0.symbol == "✛" })
+        XCTAssertTrue(s.legendSymbols)
+        e.apply(try! Config.parse("[global]\nlegend = \"words\""))
+        XCTAssertFalse(e.scene()!.legendSymbols)
+        XCTAssertThrowsError(try Config.parse("[global]\nlegend = \"icons\""))
         XCTAssertNil(s.help)
         XCTAssertEqual(e.scene(showHelp: true)?.help?.first?.title, "POINTER")
         // A ruler stays in the scene after the engine goes idle, dimming its screen.

@@ -207,7 +207,8 @@ final class OverlayView: NSView {
         text.append(NSAttributedString(string: "   ", attributes: keyAttrs))
         for (i, h) in m.hints.enumerated() {
             text.append(NSAttributedString(string: h.key + " ", attributes: keyAttrs))
-            text.append(NSAttributedString(string: h.action + (i == m.hints.count - 1 ? "" : "   "), attributes: actionAttrs))
+            let shown = m.legendSymbols ? (h.symbol ?? h.action) : h.action
+            text.append(NSAttributedString(string: shown + (i == m.hints.count - 1 ? "" : "   "), attributes: actionAttrs))
         }
 
         let sz = text.size()

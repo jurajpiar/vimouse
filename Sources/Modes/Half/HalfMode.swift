@@ -99,12 +99,14 @@ public final class HalfMode: Mode {
         return nil
     }
 
-    public func hints(_ ctx: ModeContext) -> [(key: String, action: String)] {
+    public let symbol = "◫"
+
+    public func hints(_ ctx: ModeContext) -> [Hint] {
         let order: [Half] = [.left, .bottom, .top, .right]
-        var h: [(key: String, action: String)] = [(order.map { KeyMap.label(of: settings.halves[$0] ?? []) }.joined(), "halve")]
+        var h = [Hint(order.map { KeyMap.label(of: settings.halves[$0] ?? []) }.joined(), "halve", "◫")]
         if let s = session, s.depth > 0 {
-            h.append((KeyMap.label(of: settings.up), "back"))
-            h.append((KeyMap.label(of: settings.top), "top"))
+            h.append(Hint(KeyMap.label(of: settings.up), "back", "↰"))
+            h.append(Hint(KeyMap.label(of: settings.top), "top", "⇈"))
         }
         return h
     }

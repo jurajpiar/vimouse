@@ -123,14 +123,16 @@ public final class ScrollMode: Mode {
         return keys.has(bare) || keys.has(key) ? [.scrollStop] : []
     }
 
-    public func hints(_ ctx: ModeContext) -> [(key: String, action: String)] {
+    public let symbol = "⇅"
+
+    public func hints(_ ctx: ModeContext) -> [Hint] {
         let s = settings
         func l(_ set: Set<KeyPress>) -> String { KeyMap.label(of: set) }
-        var h: [(key: String, action: String)] = [
-            (l(s.down) + l(s.up) + " " + l(s.left) + l(s.right), "scroll"),
-            (l(s.halfDown) + " " + l(s.halfUp), "half page"),
+        var h = [
+            Hint(l(s.down) + l(s.up) + " " + l(s.left) + l(s.right), "scroll", "⇅"),
+            Hint(l(s.halfDown) + " " + l(s.halfUp), "half page", "⇟⇞"),
         ]
-        if let fm = s.flickWith { h.append((KeyPress(.space, fm).label.replacingOccurrences(of: "␣", with: "") + "+" + l(s.down), "flick")) }
+        if let fm = s.flickWith { h.append(Hint(KeyPress(.space, fm).label.replacingOccurrences(of: "␣", with: "") + "+" + l(s.down), "flick", "⇊")) }
         return h
     }
 

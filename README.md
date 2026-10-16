@@ -54,7 +54,9 @@ release coasts, a double tap flicks the page at speed, a tap during a coast
 stops it),
 d/u half a page, s back to Pointer.
 
-Hold ? in any mode for the full key map; release to hide.
+Hold ? in any mode for the full key map; release to hide. The strip shows actions
+as glyphs (● click, ⤒ drag, ⇅ scroll, ✕ exit); `[global] legend = "words"` spells
+them out instead.
 
 A marker is drawn at the pointer while a mode is active: `[cursor] style` picks
 `ring` (default), `crosshair`, `dot` or `""` for none; `size` and `colour` tune it.

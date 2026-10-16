@@ -24,7 +24,7 @@ public struct Config: Equatable {
     public static func == (a: Config, b: Config) -> Bool {
         a.keymap == b.keymap && a.activateMode == b.activateMode && a.holdMode == b.holdMode
             && a.colours == b.colours && a.enabledModes == b.enabledModes && a.autoUpdate == b.autoUpdate
-            && a.dragRamp == b.dragRamp && a.cursor == b.cursor && Set(a.modeSettings.keys) == Set(b.modeSettings.keys)
+            && a.dragRamp == b.dragRamp && a.cursor == b.cursor && a.legendSymbols == b.legendSymbols && Set(a.modeSettings.keys) == Set(b.modeSettings.keys)
             && a.modeSettings.allSatisfy { id, s in b.modeSettings[id].map(s.isEqual(to:)) ?? false }
     }
 
@@ -39,6 +39,8 @@ public struct Config: Equatable {
     public var autoUpdate: Bool = true
     public var dragRamp: Bool = false
     public var cursor = CursorConfig()
+    /// Status strip shows glyphs (true) or words (false) for actions.
+    public var legendSymbols = true
     /// Each mode's settings, keyed by mode id, as parsed by the mode.
     public var modeSettings: [String: ModeSettings] = [:]
 
@@ -109,6 +111,13 @@ public struct Config: Equatable {
         if let v = try global.keys("next_screen") { k.nextScreen = v }
         if let v = try global.keys("previous_screen") { k.previousScreen = v }
         if let v = try global.keys("help") { k.help = v }
+        if let v = try global.string("legend") {
+            switch v.lowercased() {
+            case "symbols": c.legendSymbols = true
+            case "words": c.legendSymbols = false
+            default: throw global.fail("legend", "expected \"symbols\" or \"words\"")
+            }
+        }
 
         let actions = ConfigReader(t, section: "actions")
         if let v = try actions.keys("left_click") { k.leftClick = v }

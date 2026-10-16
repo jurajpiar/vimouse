@@ -42,6 +42,7 @@ public final class PointerEngine {
     public let context = ModeContext()
     public private(set) var cursors: [CursorStyle]
     public private(set) var cursor = CursorConfig()
+    public private(set) var legendSymbols = true
 
     /// vi-style count prefix typed so far; nil when none. Consumed by the next command.
     public private(set) var pendingCount: Int?
@@ -66,6 +67,7 @@ public final class PointerEngine {
         keymap = c.keymap
         context.colours = c.colours
         cursor = c.cursor
+        legendSymbols = c.legendSymbols
         if let e = c.enabledModes { enabled = e.filter { id in modes.contains { $0.id == id } } }
         if enabled.isEmpty { enabled = [modes[0].id] }
         for m in modes {
@@ -272,26 +274,27 @@ public final class PointerEngine {
 
     /// The keys valid right now, for the status strip. Labels come from the bindings,
     /// so a rebind (j -> down arrow) shows as "↓" here and inside the rectangles.
-    public var hints: [(key: String, action: String)] {
+    public var hints: [Hint] {
         guard let m = activeMode else { return [] }
         let k = keymap
         func l(_ set: Set<KeyPress>) -> String { KeyMap.label(of: set) }
         var h = m.hints(context)
-        h.append((l(k.leftClick), "click"))
-        h.append((l(k.clickStay), "click+stay"))
-        h.append((l(k.dragToggle), context.dragging ? "drop" : "drag"))
+        h.append(Hint(l(k.leftClick), "click", "●"))
+        h.append(Hint(l(k.clickStay), "click+stay", "●…"))
+        h.append(context.dragging ? Hint(l(k.dragToggle), "drop", "⤓") : Hint(l(k.dragToggle), "drag", "⤒"))
         for id in enabled where id != m.id {
             guard let other = mode(id), !other.toggle.isEmpty else { continue }
-            h.append((l(other.toggle), other.id))
+            h.append(Hint(l(other.toggle), other.id, other.symbol))
         }
-        if context.screens.count > 1 { h.append((l(k.nextScreen) + " / n" + l(k.nextScreen), "screen")) }
-        h.append((l(k.help), "help"))
-        let exitAction = pendingCount != nil ? "cancel count" : (context.dragging ? "cancel drag" : "exit")
+        if context.screens.count > 1 { h.append(Hint(l(k.nextScreen) + " / n" + l(k.nextScreen), "screen", "▭▭")) }
+        h.append(Hint(l(k.help), "help", "?"))
+        let exit: Hint = pendingCount != nil ? Hint(l(k.exit), "cancel count", "⌫#")
+            : (context.dragging ? Hint(l(k.exit), "cancel drag", "⤓✕") : Hint(l(k.exit), "exit", "✕"))
         if let hold = k.hold, heldActivation {
-            h.append(("release " + hold.label, context.dragging ? "drop+exit" : "exit"))
-            h.append((k.activate.label, "pin"))
+            h.append(Hint("release " + hold.label, context.dragging ? "drop+exit" : "exit", context.dragging ? "⤓✕" : "✕"))
+            h.append(Hint(k.activate.label, "pin", "📌"))
         }
-        h.append((l(k.exit), exitAction))
+        h.append(exit)
         return h
     }
 
@@ -354,7 +357,8 @@ public final class PointerEngine {
             dragging: context.dragging,
             pendingCount: pendingCount,
             focus: context.target,
-            hints: active == nil ? [] : hints.map { Scene.HintEntry(key: $0.key, action: $0.action) },
+            hints: active == nil ? [] : hints,
+            legendSymbols: legendSymbols,
             help: showHelp && active != nil ? help.map { Scene.HelpGroup(title: $0.title, rows: $0.rows.map { Scene.HelpRow(keys: $0.keys, action: $0.action) }) } : nil,
             drawables: drawables,
             colours: context.colours

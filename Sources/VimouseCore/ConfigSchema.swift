@@ -81,6 +81,7 @@ public struct ConfigSchema {
             .init(section: "global", key: "next_screen", defaultValue: "\"tab\"", comment: "Next display; with a count, that display (2 then tab = display 2), e.g. \"tab\"."),
             .init(section: "global", key: "previous_screen", defaultValue: "\"shift+tab\"", comment: "Previous display, e.g. \"shift+tab\"."),
             .init(section: "global", key: "help", defaultValue: "\"shift+slash\"", comment: "Hold to show every binding of the current mode; release to hide, e.g. \"shift+slash\" (the ? key)."),
+            .init(section: "global", key: "legend", defaultValue: "\"symbols\"", comment: "Status strip actions as glyphs (\"symbols\": ● click, ⤒ drag, ✕ exit; the help panel spells them out) or as \"words\"."),
 
             .init(section: "actions", key: "left_click", defaultValue: "[\"return\", \"m\"]", comment: "Left-click and exit; a count sets the click count (3 = triple), modifiers held pass through."),
             .init(section: "actions", key: "click_stay", defaultValue: "\"space\"", comment: "Left-click and stay in the mode, e.g. \"space\"."),
