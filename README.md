@@ -2,8 +2,9 @@
 
 Keyboard-driven mouse for macOS. Divide the screen into quadrants, pick one with
 i/o/j/k, repeat until the pointer is where you want it, then click. See
-`docs/PLAN.md` for the design and roadmap and `docs/PLUGINS.md` for how modes are
-built as plugins.
+`docs/PLAN.md` for the design and roadmap, `docs/PLUGINS.md` for how modes are
+built as plugins, and `docs/PLATFORM-NOTES.md` for what the macOS APIs turned out
+to do.
 
 Status: pre-release. Expect rough edges.
 
