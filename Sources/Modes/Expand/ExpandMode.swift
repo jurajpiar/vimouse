@@ -1,9 +1,10 @@
 import VimouseCore
 
-/// Non-linear stepping: a press moves the pointer; the next press in the same direction
-/// moves twice as far, the opposite direction half as far, so a target is reached by
-/// overshooting and homing in (a one-dimensional bisection). A perpendicular direction
-/// starts again from the base step. Experimental.
+/// Non-linear stepping: a press moves the pointer; each further press the same way
+/// moves twice as far (expanding), and from the first reversal on every press moves
+/// half as far as the last (refining), so a target is reached by overshooting and
+/// homing in, a one-dimensional bisection. A perpendicular direction starts again from
+/// the base step. Experimental.
 public final class ExpandMode: Mode {
     public struct Settings: ModeSettings, Equatable {
         public var toggle: Set<KeyPress> = [KeyPress(.e)]
@@ -24,6 +25,7 @@ public final class ExpandMode: Mode {
     public let enabledByDefault = false
     public var settings = Settings()
     private var last: (dx: Double, dy: Double, step: Double)?
+    private var refining = false
 
     public init() {}
 
@@ -61,8 +63,8 @@ public final class ExpandMode: Mode {
     public var toggle: Set<KeyPress> { settings.toggle }
     public let symbol = "⤼"
 
-    public func activate(_ ctx: ModeContext) { last = nil }
-    public func deactivate(_ ctx: ModeContext, reason: LeaveReason) { last = nil }
+    public func activate(_ ctx: ModeContext) { last = nil; refining = false }
+    public func deactivate(_ ctx: ModeContext, reason: LeaveReason) { last = nil; refining = false }
 
     public func handle(_ key: KeyPress, count: Int?, _ ctx: ModeContext) -> [Effect]? {
         var dir = (dx: 0.0, dy: 0.0)
@@ -72,11 +74,15 @@ public final class ExpandMode: Mode {
         else if settings.down.has(key) { dir.dy = 1 }
         else { return nil }
         let step: Double
-        if let l = last {
-            if l.dx == dir.dx, l.dy == dir.dy { step = min(settings.max, l.step * settings.factor) }
-            else if l.dx == -dir.dx, l.dy == -dir.dy, (dir.dx != 0 || dir.dy != 0) { step = max(1, (l.step / settings.factor).rounded()) }
-            else { step = settings.base }
+        if let l = last, l.dx == dir.dx, l.dy == dir.dy, !refining {
+            step = min(settings.max, l.step * settings.factor)           // expanding
+        } else if let l = last, l.dx == -dir.dx, l.dy == -dir.dy {
+            refining = true                                              // overshot: home in
+            step = max(1, (l.step / settings.factor).rounded())
+        } else if let l = last, refining, l.dx == dir.dx, l.dy == dir.dy {
+            step = max(1, (l.step / settings.factor).rounded())          // still refining
         } else {
+            refining = false                                             // new axis: start over
             step = settings.base
         }
         last = (dir.dx, dir.dy, step)
@@ -87,7 +93,7 @@ public final class ExpandMode: Mode {
 
     public func hints(_ ctx: ModeContext) -> [Hint] {
         let s = settings
-        let next = last.map { Int(min(s.max, $0.step * s.factor)) } ?? Int(s.base)
+        let next = last.map { Int(refining ? max(1, ($0.step / s.factor).rounded()) : min(s.max, $0.step * s.factor)) } ?? Int(s.base)
         return [
             Hint(KeyMap.label(of: s.left) + KeyMap.label(of: s.down) + KeyMap.label(of: s.up) + KeyMap.label(of: s.right), "move, same way: ×\(Int(s.factor)), back: ÷\(Int(s.factor))", "⤼ \(next)px"),
         ]
@@ -105,7 +111,7 @@ public final class ExpandMode: Mode {
     public func draw(_ ctx: ModeContext, active: Bool) -> [Drawable] {
         guard active, let l = last else { return [] }
         // Where the next press in the same direction would land.
-        let next = min(settings.max, l.step * settings.factor)
+        let next = refining ? max(1, (l.step / settings.factor).rounded()) : min(settings.max, l.step * settings.factor)
         let p = ctx.clamped(Point(x: ctx.target.x + l.dx * next, y: ctx.target.y + l.dy * next))
         let c = ctx.colour(of: id)
         return [
