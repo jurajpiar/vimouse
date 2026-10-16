@@ -529,6 +529,12 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.l)), [.nudgeStart(dx: 1, dy: 0, multiplier: 1)])
         XCTAssertEqual(e.handleRelease(KeyPress(.l)), [.nudgeStop])
         XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.nudgeStart(dx: 0, dy: 1, multiplier: 1)])
+        // A second key held with the first steers diagonally at the same speed.
+        let r = 1 / 2.0.squareRoot()
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.nudgeStart(dx: r, dy: r, multiplier: 1)])
+        XCTAssertEqual(e.handleRelease(KeyPress(.downArrow)), [.nudgeStart(dx: 1, dy: 0, multiplier: 1)])
+        XCTAssertEqual(e.handleRelease(KeyPress(.l)), [.nudgeStop])
+        XCTAssertEqual(e.handleRelease(KeyPress(.l)), []) // not held: nothing
         e.pointerMoved(to: Point(x: 255, y: 155)) // the platform moved it
         XCTAssertEqual(e.handle(KeyPress(.h, [.shift])), [.warp(Point(x: 254, y: 155)), .redraw]) // fine: one pixel
         _ = e.handle(KeyPress(.four))

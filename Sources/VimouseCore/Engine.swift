@@ -23,8 +23,10 @@ public enum Effect: Equatable, Sendable {
     case scrollStop
     /// Flick: launch a coast in this direction without a hold.
     case scrollFlick(dx: Double, dy: Double, multiplier: Double)
-    /// A nudge key went down: unit direction and count multiplier. The platform moves
-    /// one step, accelerates while held and stops on release.
+    /// The held nudge keys changed: the combined unit direction (diagonal when a horizontal
+    /// and a vertical key are both down) and count multiplier. The platform moves one step
+    /// on the first press, accelerates while any key is held, steers on later changes and
+    /// stops on `nudgeStop`.
     case nudgeStart(dx: Double, dy: Double, multiplier: Double)
     case nudgeStop
 }
@@ -99,6 +101,8 @@ public final class PointerEngine {
     public weak var snapProvider: SnapProvider?
     /// Where the pointer was last sent (the snap target or the rectangle centre).
     public private(set) var target: Point = Point(x: 0, y: 0)
+    /// Nudge keys currently held, by key code, with the direction each contributes.
+    private var heldNudges: [KeyCode: (dx: Double, dy: Double)] = [:]
 
     public init(keymap: KeyMap = .default, snapping: Bool = true, snapProvider: SnapProvider? = nil) {
         self.keymap = keymap
@@ -169,6 +173,7 @@ public final class PointerEngine {
             ruler = Ruler(screenIndex: screenIndex, y: target.y, height: rulerDefaultHeight)
         }
         state = .active(mode: mode, session: s)
+        heldNudges = [:]
         return [.redraw]
     }
 
@@ -176,6 +181,7 @@ public final class PointerEngine {
     public func deactivate() -> [Effect] {
         state = .idle
         pendingCount = nil
+        heldNudges = [:]
         var fx: [Effect] = []
         if dragging {
             dragging = false
@@ -333,7 +339,8 @@ public final class PointerEngine {
                 target = p
                 return [.warp(p), .redraw]
             }
-            return [.nudgeStart(dx: dir.dx, dy: dir.dy, multiplier: n)]
+            heldNudges[key.code] = dir
+            return [nudgeEffect(multiplier: n)]
         case .ruler:
             guard var r = ruler else { break }
             let screen = screens[r.screenIndex]
@@ -363,11 +370,20 @@ public final class PointerEngine {
             let keys = keymap.scrollDown.union(keymap.scrollUp).union(keymap.scrollLeft).union(keymap.scrollRight)
             return keys.has(bare) || keys.has(key) ? [.scrollStop] : []
         case .active(.nudge, _):
-            let keys = keymap.nudgeDown.union(keymap.nudgeUp).union(keymap.nudgeLeft).union(keymap.nudgeRight)
-            return keys.has(bare) || keys.has(key) ? [.nudgeStop] : []
+            guard heldNudges.removeValue(forKey: key.code) != nil else { return [] }
+            return [heldNudges.isEmpty ? .nudgeStop : nudgeEffect(multiplier: 1)]
         default:
             return []
         }
+    }
+
+    /// Combined direction of the held nudge keys, normalised so a diagonal is no faster.
+    private func nudgeEffect(multiplier: Double) -> Effect {
+        var dx = 0.0, dy = 0.0
+        for d in heldNudges.values { dx += d.dx; dy += d.dy }
+        let len = (dx * dx + dy * dy).squareRoot()
+        if len > 0 { dx /= len; dy /= len }
+        return .nudgeStart(dx: dx, dy: dy, multiplier: multiplier)
     }
 
     /// The platform moved the pointer on its own (a held nudge); keep the target in step.
@@ -438,7 +454,7 @@ public final class PointerEngine {
             h.append((l(k.rulerToggle), "ruler"))
             if snapProvider != nil { h.append((l(k.snapToggle), snapping ? "snap on" : "snap off")) }
         case .nudge:
-            h.append((l(k.nudgeLeft) + l(k.nudgeDown) + l(k.nudgeUp) + l(k.nudgeRight), "move (hold: faster)"))
+            h.append((l(k.nudgeLeft) + l(k.nudgeDown) + l(k.nudgeUp) + l(k.nudgeRight), "move (hold: faster, two: diagonal)"))
             h.append(("⇧", "1px"))
             h.append((l(k.leftClick), "click"))
             h.append((l(k.clickStay), "click+stay"))

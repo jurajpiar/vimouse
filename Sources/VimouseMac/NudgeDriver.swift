@@ -26,7 +26,12 @@ final class NudgeDriver {
     var isHeld: Bool { timer != nil }
 
     func start(dx: Double, dy: Double, multiplier: Double, from p: Point, within screen: Rect, dragging: Bool) {
-        stop()
+        if isHeld {
+            // Another key joined or left: change course, keep the ramp going.
+            direction = (dx, dy)
+            self.multiplier = max(self.multiplier, multiplier)
+            return
+        }
         direction = (dx, dy)
         self.multiplier = multiplier
         pressedAt = Date()
