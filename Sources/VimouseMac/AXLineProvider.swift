@@ -34,6 +34,10 @@ final class AXLineProvider: LineProvider {
         /// element that answers marker queries.
         var markerRange: AnyObject?
         var markerHost: AXUIElement?
+        /// Line number within the web area (Chromium), for stepping by index.
+        var webLine: Int?
+        /// Whether the web area's marker bounds come flipped (Cocoa) or not.
+        var flipped = true
     }
 
     /// Text-marker parameterised attributes (WebKit and Chromium web content).
@@ -41,6 +45,10 @@ final class AXLineProvider: LineProvider {
         static let forPosition = "AXTextMarkerForPosition"
         static let lineRange = "AXLineTextMarkerRangeForTextMarker"
         static let bounds = "AXBoundsForTextMarkerRange"
+        static let indexForChild = "AXIndexForChildUIElement"
+        static let forIndex = "AXTextMarkerForIndex"
+        static let lineForMarker = "AXLineForTextMarker"
+        static let rangeForLine = "AXTextMarkerRangeForLine"
     }
     /// The last line handed out, so a move from it needs no fresh hit test.
     private var last: Found?
@@ -76,6 +84,18 @@ final class AXLineProvider: LineProvider {
                         last = Found(element: cur.element, line: i, rect: r)
                         log("line \(i): \(r)")
                         return r
+                    }
+                    i += direction
+                }
+            } else if let host = cur.markerHost, let n = cur.webLine {
+                // Chromium: lines are numbered across the web area; take the neighbour.
+                var i = n + direction
+                for _ in 0..<6 {
+                    guard Date() < deadline, i >= 0, let b = webLineBounds(host, line: i, flipped: cur.flipped) else { break }
+                    if b.width > 0, sign > 0 ? b.midY > cur.rect.midY : b.midY < cur.rect.midY {
+                        last = Found(element: cur.element, line: nil, rect: b, markerHost: host, webLine: i, flipped: cur.flipped)
+                        log("web line \(i): \(b)")
+                        return b
                     }
                     i += direction
                 }
@@ -176,6 +196,7 @@ final class AXLineProvider: LineProvider {
         }
         if let wa = webArea {
             if let f = lineFromMarkers(wa.element, x: x, y: y) { return f }
+            if let f = lineFromWebIndex(wa.element, hit: hit, x: x, y: y, deadline: deadline) { return f }
             log("web area answered no line at (\(Int(x)),\(Int(y)))")
         } else if debug {
             dump(hit)
@@ -245,6 +266,48 @@ final class AXLineProvider: LineProvider {
         guard let b = markerBounds(element, range), b.width > 0 else { log("no bounds for the line range"); return nil }
         guard abs(b.midY - y) <= b.height * 1.5 + 4 else { log("marker line \(b) is not under y \(Int(y))"); return nil }
         return Found(element: element, line: nil, rect: b, markerRange: range, markerHost: element)
+    }
+
+    /// Chromium: the hit element's start as a text index, its line number, then the
+    /// numbered lines from there until the one under the point.
+    private func lineFromWebIndex(_ wa: AXUIElement, hit: AXUIElement, x: Double, y: Double, deadline: Date) -> Found? {
+        guard let hitFrame = frame(of: hit) else { return nil }
+        guard let idx = markerValue(wa, Marker.indexForChild, hit) as? Int else { log("no text index for the hit element"); return nil }
+        guard let marker = markerValue(wa, Marker.forIndex, idx as CFNumber) else { log("no marker for index \(idx)"); return nil }
+        guard let first = markerValue(wa, Marker.lineForMarker, marker) as? Int else { log("no line for the marker"); return nil }
+        // Which way the bounds come: the reading that lands inside the hit element's frame.
+        var flipped = true
+        if let raw = rawMarkerBounds(wa, line: first) {
+            let asCocoa = Coordinates.cgRect(fromAppKit: raw)
+            let asCG = Rect(x: raw.minX, y: raw.minY, width: raw.width, height: raw.height)
+            flipped = hitFrame.intersects(asCocoa) || !hitFrame.intersects(asCG)
+            log("web lines from \(first) at index \(idx); bounds \(flipped ? "flipped" : "unflipped")")
+        }
+        for n in first..<(first + 60) {
+            guard Date() < deadline, let b = webLineBounds(wa, line: n, flipped: flipped) else { break }
+            if b.y > hitFrame.maxY + 2 { break }
+            if y >= b.y - 2, y < b.maxY + 2, b.width > 0 {
+                return Found(element: hit, line: nil, rect: b, markerHost: wa, webLine: n, flipped: flipped)
+            }
+        }
+        log("no numbered web line under y \(Int(y)) from line \(first)")
+        return nil
+    }
+
+    private func rawMarkerBounds(_ wa: AXUIElement, line n: Int) -> NSRect? {
+        guard let range = markerValue(wa, Marker.rangeForLine, n as CFNumber) else { return nil }
+        var out: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(wa, Marker.bounds as CFString, range, &out) == .success,
+              let v = out, CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
+        var r = CGRect.zero
+        // swiftlint:disable:next force_cast
+        guard AXValueGetValue(v as! AXValue, .cgRect, &r), r.height > 0, r.height <= 120 else { return nil }
+        return NSRect(x: r.minX, y: r.minY, width: r.width, height: r.height)
+    }
+
+    private func webLineBounds(_ wa: AXUIElement, line n: Int, flipped: Bool) -> Rect? {
+        guard let raw = rawMarkerBounds(wa, line: n) else { return nil }
+        return flipped ? Coordinates.cgRect(fromAppKit: raw) : Rect(x: raw.minX, y: raw.minY, width: raw.width, height: raw.height)
     }
 
     /// A parameterised attribute whose value is an opaque text marker or marker range.
