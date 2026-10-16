@@ -85,6 +85,16 @@ public struct KeyMap: Sendable {
     public var previousScreen: Set<KeyPress>
     /// Direct jump: key -> 0-based screen index.
     public var screens: [KeyPress: Int]
+    public var clickStay: Set<KeyPress>
+    public var doubleClick: Set<KeyPress>
+    public var dragToggle: Set<KeyPress>
+    public var scrollToggle: Set<KeyPress>
+    public var scrollDown: Set<KeyPress>
+    public var scrollUp: Set<KeyPress>
+    public var scrollLeft: Set<KeyPress>
+    public var scrollRight: Set<KeyPress>
+    public var scrollHalfDown: Set<KeyPress>
+    public var scrollHalfUp: Set<KeyPress>
 
     public init(
         activate: KeyPress,
@@ -96,7 +106,17 @@ public struct KeyMap: Sendable {
         exit: Set<KeyPress>,
         nextScreen: Set<KeyPress> = [],
         previousScreen: Set<KeyPress> = [],
-        screens: [KeyPress: Int] = [:]
+        screens: [KeyPress: Int] = [:],
+        clickStay: Set<KeyPress> = [],
+        doubleClick: Set<KeyPress> = [],
+        dragToggle: Set<KeyPress> = [],
+        scrollToggle: Set<KeyPress> = [],
+        scrollDown: Set<KeyPress> = [],
+        scrollUp: Set<KeyPress> = [],
+        scrollLeft: Set<KeyPress> = [],
+        scrollRight: Set<KeyPress> = [],
+        scrollHalfDown: Set<KeyPress> = [],
+        scrollHalfUp: Set<KeyPress> = []
     ) {
         self.activate = activate
         self.quadrants = quadrants
@@ -108,6 +128,16 @@ public struct KeyMap: Sendable {
         self.nextScreen = nextScreen
         self.previousScreen = previousScreen
         self.screens = screens
+        self.clickStay = clickStay
+        self.doubleClick = doubleClick
+        self.dragToggle = dragToggle
+        self.scrollToggle = scrollToggle
+        self.scrollDown = scrollDown
+        self.scrollUp = scrollUp
+        self.scrollLeft = scrollLeft
+        self.scrollRight = scrollRight
+        self.scrollHalfDown = scrollHalfDown
+        self.scrollHalfUp = scrollHalfUp
     }
 
     public static let `default` = KeyMap(
@@ -128,7 +158,17 @@ public struct KeyMap: Sendable {
         screens: [
             KeyPress(.one): 0, KeyPress(.two): 1, KeyPress(.three): 2, KeyPress(.four): 3, KeyPress(.five): 4,
             KeyPress(.six): 5, KeyPress(.seven): 6, KeyPress(.eight): 7, KeyPress(.nine): 8,
-        ]
+        ],
+        clickStay: [KeyPress(.space)],
+        doubleClick: [KeyPress(.x)],
+        dragToggle: [KeyPress(.v)],
+        scrollToggle: [KeyPress(.s)],
+        scrollDown: [KeyPress(.j)],
+        scrollUp: [KeyPress(.k)],
+        scrollLeft: [KeyPress(.h)],
+        scrollRight: [KeyPress(.l)],
+        scrollHalfDown: [KeyPress(.d)],
+        scrollHalfUp: [KeyPress(.u)]
     )
 
     /// Label shown inside each quadrant. Derived from the ANSI key name for now;

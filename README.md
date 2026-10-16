@@ -14,8 +14,17 @@ swift test            # VimouseCore unit tests
 swift run vimouse     # menu bar item "vm" appears
 ```
 
-Press ⌘⇧Space to enter Pointer mode. i/o/j/k pick a quadrant, Backspace or u goes
-up a level, Return or m left-clicks, . right-clicks, , middle-clicks, Escape exits.
+Press ⌘⇧Space to enter Pointer mode. The status strip at the screen edge lists the
+keys valid at any moment. Defaults:
+
+Pointer: i/o/j/k pick a quadrant, Backspace or u goes up a level. Return or m
+left-clicks and exits, Space clicks and stays, x double-clicks, . right-clicks,
+, middle-clicks. Hold Shift, Cmd or Option with any click key to pass the modifier
+into the click. v presses the left button (drag or select); navigate, then v again
+releases. s enters Scroll mode. Escape exits (releasing any drag).
+
+Scroll: j/k/h/l scroll at the pointer, d/u half a page, s back to Pointer.
+
 With several displays, Tab / Shift+Tab cycle screens and 1–9 jump to one directly.
 
 ## Accessibility permission

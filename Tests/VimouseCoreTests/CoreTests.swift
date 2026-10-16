@@ -48,7 +48,7 @@ final class EngineTests: XCTestCase {
         _ = e.activate(screen: screen)
         XCTAssertEqual(e.handle(KeyPress(.i)), [.warp(Point(x: 250, y: 150)), .redraw])
         XCTAssertEqual(e.handle(KeyPress(.k)), [.warp(Point(x: 375, y: 225)), .redraw])
-        XCTAssertEqual(e.handle(KeyPress(.return)), [.click(.left, count: 1), .hideOverlay])
+        XCTAssertEqual(e.handle(KeyPress(.return)), [.click(.left, count: 1, modifiers: []), .hideOverlay])
         XCTAssertFalse(e.isActive)
     }
 
@@ -78,6 +78,60 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.two)), []) // already there
         XCTAssertEqual(e.handle(KeyPress(.nine)), []) // no such screen
         XCTAssertEqual(e.handle(KeyPress(.one)), [.warp(Point(x: 500, y: 300)), .redraw])
+    }
+
+    func testModifierClickAndClickStay() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        XCTAssertEqual(e.handle(KeyPress(.space, [.shift])), [.click(.left, count: 1, modifiers: [.shift])])
+        XCTAssertTrue(e.isActive)
+        XCTAssertEqual(e.handle(KeyPress(.x, [.command])), [.click(.left, count: 2, modifiers: [.command]), .hideOverlay])
+        XCTAssertFalse(e.isActive)
+    }
+
+    func testDragThenNavigateThenDrop() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        XCTAssertEqual(e.handle(KeyPress(.v)), [.mouseDown(.left), .redraw])
+        XCTAssertTrue(e.dragging)
+        XCTAssertEqual(e.handle(KeyPress(.k)), [.warp(Point(x: 750, y: 450)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.v)), [.mouseUp(.left), .redraw])
+        XCTAssertFalse(e.dragging)
+        XCTAssertTrue(e.isActive)
+    }
+
+    func testEscapeWhileDraggingReleasesButton() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.v))
+        XCTAssertEqual(e.handle(KeyPress(.escape)), [.mouseUp(.left), .hideOverlay])
+        XCTAssertFalse(e.dragging)
+    }
+
+    func testScrollMode() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])
+        XCTAssertEqual(e.mode, .scroll)
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scroll(dx: 0, dy: 60)])
+        XCTAssertEqual(e.handle(KeyPress(.k)), [.scroll(dx: 0, dy: -60)])
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.scroll(dx: 60, dy: 0)])
+        XCTAssertEqual(e.handle(KeyPress(.d)), [.scroll(dx: 0, dy: 300)])
+        XCTAssertEqual(e.handle(KeyPress(.u)), [.scroll(dx: 0, dy: -300)])
+        XCTAssertEqual(e.handle(KeyPress(.i)), []) // quadrant keys inactive in scroll mode
+        XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])
+        XCTAssertEqual(e.mode, .pointer)
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.warp(Point(x: 250, y: 450)), .redraw]) // j is a quadrant again
+    }
+
+    func testHintsReflectState() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        XCTAssertFalse(e.hints.contains { $0.action == "up" })
+        _ = e.handle(KeyPress(.i))
+        XCTAssertTrue(e.hints.contains { $0.action == "up" })
+        _ = e.handle(KeyPress(.s))
+        XCTAssertTrue(e.hints.contains { $0.action == "half page" })
     }
 
     func testEscapeExits() {

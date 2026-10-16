@@ -32,8 +32,10 @@ final class Controller {
             activate()
             return true
         }
-        // Active: swallow everything so the focused app sees nothing, act on key-down only.
-        guard isDown, !isRepeat else { return true }
+        // Active: swallow everything so the focused app sees nothing.
+        guard isDown else { return true }
+        // Key repeat is useful only for scrolling.
+        if isRepeat, engine.mode != .scroll { return true }
         apply(engine.handle(key))
         return true
     }
@@ -56,23 +58,32 @@ final class Controller {
             case .hideOverlay:
                 overlay.hide()
             case .warp(let p):
-                Pointer.warp(to: p)
-            case .click(let button, let count):
-                Pointer.click(button, count: count, at: Pointer.currentLocation)
+                Pointer.warp(to: p, dragging: engine.dragging)
+            case .click(let button, let count, let modifiers):
+                Pointer.click(button, count: count, modifiers: modifiers, at: Pointer.currentLocation)
+            case .mouseDown(let button):
+                Pointer.mouseDown(button, at: Pointer.currentLocation)
+            case .mouseUp(let button):
+                Pointer.mouseUp(button, at: Pointer.currentLocation)
+            case .scroll(let dx, let dy):
+                Pointer.scroll(dx: dx, dy: dy)
             }
         }
     }
 
     private func model() -> OverlayModel? {
-        guard let s = engine.session else { return nil }
+        guard let s = engine.session, let mode = engine.mode else { return nil }
         var labels: [Quadrant: String] = [:]
         for q in Quadrant.allCases { labels[q] = engine.keymap.label(for: q) }
         return OverlayModel(
+            mode: mode,
             current: s.current,
             ancestors: Array(s.ancestors),
             labels: labels,
             screens: engine.screens,
-            activeScreen: engine.screenIndex
+            activeScreen: engine.screenIndex,
+            dragging: engine.dragging,
+            hints: engine.hints
         )
     }
 }

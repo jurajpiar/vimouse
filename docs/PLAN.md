@@ -36,7 +36,7 @@ Bisect navigation. The screen under the pointer is divided into four equal recta
 
 Descent state is drawn: the current rectangle in a strong colour, ancestors as faint outlines, and Backspace (or u) goes up one level. This addresses the warpd complaint directly.
 
-Actions, available at any depth: Enter or m for left click, . for right click (and the context-menu key), , for middle, Enter twice quickly for double click, with Shift/Cmd/Alt held for modifier clicks. v starts a drag (mouse down), navigate, v again releases. Text selection is a drag plus an option to snap the endpoints to AX text positions. s enters Scroll mode (hjkl scroll, d/u half page, gg/G). Shift+Enter clicks and keeps the mode open.
+Actions, available at any depth: Enter or m for left click, . for right click (and the context-menu key), , for middle, x for double click, Space for click-and-stay, with Shift/Cmd/Option held for modifier clicks. v starts a drag (mouse down), navigate, v again releases; Escape releases too. Text selection is a drag plus an option to snap the endpoints to AX text positions. s toggles Scroll mode (jk/hl scroll at the pointer by a configurable step, d/u half a page; key repeat is honoured only here).
 
 Snapping: after a bisect step, optionally jump the pointer to the centre of the nearest AX element inside the rectangle instead of the rectangle centre. This gets most of the benefit of hints without a hint overlay.
 
@@ -100,7 +100,9 @@ Accessibility permission flow and revocation hang (mitigation in section 4). Sec
 
 2026-10-16: Phase 0 verified on Shan's Mac: event tap, overlay over full-screen apps, cursor warp and click all work; display switching added (Tab/Shift+Tab, digits 1-9, bisect resets on switch). Phase 0 closed.
 
-Open: 2x2 vs 3x3 default (decide after spike measurements).
+2026-10-16: 2x2 confirmed as the default after real use (3x3 would make the new navigation habit harder). Scroll mode, drag, modifier clicks, double click, click-and-stay and a first status strip implemented.
+
+Open: none.
 
 ## Sources
 
