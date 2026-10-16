@@ -12,7 +12,7 @@ import VimouseCore
 /// just past the element's frame. A short single-line element (a label, a menu item)
 /// counts as a line too. Everything is bounded by a small time budget.
 final class AXLineProvider: LineProvider {
-    var timeBudget: TimeInterval = 0.12
+    var timeBudget: TimeInterval = 0.25
     /// Vertical probe spacing and reach when looking past an element's edge.
     var probeStep: Double = 6
     var probeReach: Double = 300
@@ -41,13 +41,11 @@ final class AXLineProvider: LineProvider {
         static let forPosition = "AXTextMarkerForPosition"
         static let lineRange = "AXLineTextMarkerRangeForTextMarker"
         static let bounds = "AXBoundsForTextMarkerRange"
-        static let next = "AXNextTextMarkerForTextMarker"
-        static let previous = "AXPreviousTextMarkerForTextMarker"
-        static let rangeStart = "AXStartTextMarkerForTextMarkerRange"
-        static let rangeEnd = "AXEndTextMarkerForTextMarkerRange"
     }
     /// The last line handed out, so a move from it needs no fresh hit test.
     private var last: Found?
+    /// The web area (WebKit, Chromium) that answered last time; reused while the point is inside it.
+    private var webArea: (element: AXUIElement, frame: Rect)?
 
     init() {
         AXUIElementSetMessagingTimeout(systemWide, 0.05)
@@ -81,22 +79,19 @@ final class AXLineProvider: LineProvider {
                     }
                     i += direction
                 }
-            } else if let host = cur.markerHost, let range = cur.markerRange {
-                // Web content: walk the text markers to the neighbouring line.
-                var r: AnyObject = range
-                for _ in 0..<6 {
-                    guard Date() < deadline,
-                          let edgeMarker = markerValue(host, sign > 0 ? Marker.rangeEnd : Marker.rangeStart, r),
-                          let step = markerValue(host, sign > 0 ? Marker.next : Marker.previous, edgeMarker),
-                          let nextRange = markerValue(host, Marker.lineRange, step)
-                    else { break }
-                    r = nextRange
-                    if let b = markerBounds(host, nextRange), b.width > 0, b.height > 0,
-                       sign > 0 ? b.midY > cur.rect.midY : b.midY < cur.rect.midY {
-                        last = Found(element: cur.element, line: nil, rect: b, markerRange: nextRange, markerHost: host)
-                        log("next by marker: \(b)")
-                        return b
+            } else if let host = cur.markerHost {
+                // Web content: the line at a point just past the current one, from the web area.
+                let hostFrame = frame(of: host) ?? screen
+                var py = sign > 0 ? cur.rect.maxY + 2 : cur.rect.y - 2
+                let limit = sign > 0 ? min(hostFrame.maxY, cur.rect.maxY + probeReach) : max(hostFrame.y, cur.rect.y - probeReach)
+                while Date() < deadline, sign > 0 ? py <= limit : py >= limit {
+                    if let f = lineFromMarkers(host, x: x, y: py), !f.rect.intersects(cur.rect),
+                       sign > 0 ? f.rect.midY > cur.rect.midY : f.rect.midY < cur.rect.midY {
+                        last = f
+                        log("next by marker at \(Int(py)): \(f.rect)")
+                        return f.rect
                     }
+                    py += sign * max(4, cur.rect.height / 2)
                 }
             } else if cur.textAPI {
                 // Lines not indexed (Chromium text nodes): ask the same element for the
@@ -163,16 +158,28 @@ final class AXLineProvider: LineProvider {
             guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
             element = parent
         }
-        // Web content (WebKit, Chromium): lines through text markers, answered by the
-        // hit element or one of its ancestors (the web area at the latest).
-        element = hit
-        for _ in 0..<40 {
-            if Date() > deadline { return nil }
-            if let f = lineFromMarkers(element, x: x, y: y) { return f }
-            guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
-            element = parent
+        // Web content (WebKit, Chromium): lines through text markers, answered by the web
+        // area. It is found once by climbing (deep in Electron apps) and reused after.
+        if let wa = webArea, !wa.frame.contains(Point(x: x, y: y)) { webArea = nil }
+        if webArea == nil {
+            element = hit
+            for _ in 0..<40 {
+                if Date() > deadline { log("out of time climbing to the web area"); return nil }
+                if (attribute(element, kAXRoleAttribute) as String?) == "AXWebArea" {
+                    AXUIElementSetMessagingTimeout(element, 0.1)
+                    webArea = (element, frame(of: element) ?? Rect(x: 0, y: 0, width: 0, height: 0))
+                    break
+                }
+                guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
+                element = parent
+            }
         }
-        if debug { dump(hit) }
+        if let wa = webArea {
+            if let f = lineFromMarkers(wa.element, x: x, y: y) { return f }
+            log("web area answered no line at (\(Int(x)),\(Int(y)))")
+        } else if debug {
+            dump(hit)
+        }
         // No text API: a short element of a text-like role is itself one line.
         let role: String = attribute(hit, kAXRoleAttribute) ?? ""
         if ["AXStaticText", "AXMenuItem", "AXLink", "AXCell", "AXRow"].contains(role),
@@ -232,7 +239,7 @@ final class AXLineProvider: LineProvider {
               let range = markerValue(element, Marker.lineRange, marker),
               let b = markerBounds(element, range), b.width > 0
         else { return nil }
-        guard abs(b.midY - y) <= b.height * 1.5 + 4 else { return nil }
+        guard abs(b.midY - y) <= b.height * 1.5 + 4 else { log("marker line \(b) is not under y \(Int(y))"); return nil }
         return Found(element: element, line: nil, rect: b, markerRange: range, markerHost: element)
     }
 
