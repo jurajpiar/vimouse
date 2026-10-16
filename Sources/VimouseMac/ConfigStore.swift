@@ -3,8 +3,10 @@ import AppKit
 import VimouseCore
 
 /// Loads ~/.config/vimouse/config.toml, writes the commented default on first run,
-/// and reloads when the file changes (editors save by replacing the file, so the
-/// directory is watched rather than the file).
+/// and reloads when the file changes. Change detection polls the modification time
+/// once a second: a vnode watch on the file misses atomic saves (the editor replaces
+/// the file) and one on the directory misses in-place writes, so polling is the
+/// simple option that covers both.
 final class ConfigStore {
     static let directory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".config/vimouse", isDirectory: true)
@@ -15,7 +17,7 @@ final class ConfigStore {
     private(set) var lastError: String?
     var onChange: ((Config) -> Void)?
 
-    private var source: DispatchSourceFileSystemObject?
+    private var timer: Timer?
     private var lastModified: Date?
 
     func start() {
@@ -39,6 +41,7 @@ final class ConfigStore {
     }
 
     private func load() {
+        lastModified = modificationDate()
         do {
             let text = try String(contentsOf: ConfigStore.file, encoding: .utf8)
             config = try Config.parse(text)
@@ -52,23 +55,14 @@ final class ConfigStore {
     }
 
     private func watch() {
-        let fd = open(ConfigStore.directory.path, O_EVTONLY)
-        guard fd >= 0 else { return }
-        let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main)
-        src.setEventHandler { [weak self] in self?.directoryChanged() }
-        src.setCancelHandler { close(fd) }
-        src.resume()
-        source = src
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self, self.modificationDate() != self.lastModified else { return }
+            self.load()
+        }
     }
 
-    private func directoryChanged() {
-        // Only reload when the config file itself changed (directory events fire for any entry).
-        let attrs = try? FileManager.default.attributesOfItem(atPath: ConfigStore.file.path)
-        let modified = attrs?[.modificationDate] as? Date
-        guard modified != lastModified else { return }
-        lastModified = modified
-        // Editors write in steps; give them a moment to finish.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.load() }
+    private func modificationDate() -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: ConfigStore.file.path))?[.modificationDate] as? Date
     }
 }
 #endif
