@@ -349,7 +349,8 @@ final class AXLineProvider: LineProvider {
             return nil
         }
         let asCG = normalisedBounds(element, firstRange, flipped: false)
-        let flipped = frame.intersects(asCocoa) || asCG.map { !frame.intersects($0) } ?? true
+        // Prefer the unflipped reading when it fits the element: a tall web area intersects both.
+        let flipped = !(asCG.map { frame.intersects($0) } ?? false) && frame.intersects(asCocoa)
         log("marker route: first line \(asCocoa) (flipped) / \(asCG.map { "\($0)" } ?? "nil") (unflipped), frame \(frame)")
         var range: AnyObject = firstRange
         var lastMid = -Double.infinity
@@ -427,7 +428,10 @@ final class AXLineProvider: LineProvider {
             guard let r = charRect(mid) else { lo = mid + 1; continue }
             if r.maxY > y { hi = mid } else { lo = mid + 1 }
         }
-        guard let under = charRect(lo), y >= under.y - 1, y < under.maxY + 1 else { return nil }
+        guard let under = charRect(lo), y >= under.y - 1, y < under.maxY + 1 else {
+            log("char route: search ended at \(lo) with \(charRect(lo).map { "\($0)" } ?? "no rectangle"), y \(Int(y))")
+            return nil
+        }
         // Row start: the first character at (or above, to a tolerance) this row's top.
         var a = 0, b = lo
         while a < b {
