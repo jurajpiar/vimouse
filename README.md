@@ -149,6 +149,16 @@ If the pointer stops responding after revoking the permission while vimouse is
 running, quit vimouse. That is a known macOS behaviour with active event taps
 and is handled in Phase 2.
 
+## Releasing
+
+`scripts/release.sh <version>` stamps the version, builds and signs with the
+hardened runtime, notarises through `notarytool` (one-time:
+`xcrun notarytool store-credentials vimouse-notary --apple-id <id> --team-id <team>`),
+staples the ticket, zips the app and fills in `Casks/vimouse.rb`. Tag `v<version>`,
+attach the zip to the GitHub release, and the cask installs with
+`brew install --cask jurajpiar/vimouse/vimouse` once the cask lives in a
+`homebrew-vimouse` tap (or `brew install --cask ./Casks/vimouse.rb` from a checkout).
+
 ## Licence
 
 GPL-3.0-or-later. See `LICENSE`.

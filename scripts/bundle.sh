@@ -34,6 +34,12 @@ if [ -z "${SIGN_IDENTITY:-}" ]; then
     echo "warning: no code-signing identity found; signing ad-hoc (Accessibility grant will not survive rebuilds)" >&2
   fi
 fi
-codesign --force --sign "$SIGN_IDENTITY" --options runtime --timestamp=none "$APP" 2>/dev/null \
-  || codesign --force --sign "$SIGN_IDENTITY" "$APP"
+# A release build (NOTARISE=1) needs a secure timestamp for notarisation; a dev build
+# signs without one so it works offline.
+if [ -n "${NOTARISE:-}" ]; then
+  codesign --force --sign "$SIGN_IDENTITY" --options runtime --timestamp "$APP"
+else
+  codesign --force --sign "$SIGN_IDENTITY" --options runtime --timestamp=none "$APP" 2>/dev/null \
+    || codesign --force --sign "$SIGN_IDENTITY" "$APP"
+fi
 echo "$APP (signed as $SIGN_IDENTITY)"
