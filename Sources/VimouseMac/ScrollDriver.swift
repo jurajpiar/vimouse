@@ -13,11 +13,12 @@ final class ScrollDriver {
     var smooth = true
     /// Speed launched by a double tap, px/s; 0 disables.
     var flick: Double = 4000
+    /// Fraction of speed lost per second while coasting, 0 to 1.
+    var friction: Double = 0.85
 
     /// A press shorter than this is a tap (one step); longer is a hold.
     private let tapWindow: TimeInterval = 0.15
     private let frame: TimeInterval = 1.0 / 60
-    private let decayPerFrame = 0.94
     private let stopSpeed = 30.0
 
     private var timer: Timer?
@@ -115,7 +116,7 @@ final class ScrollDriver {
             velocity = speed * multiplier * (0.25 + 0.75 * ramp)
             post(direction.dx * velocity * frame, direction.dy * velocity * frame, phase: .changed)
         } else if coasting {
-            velocity *= decayPerFrame
+            velocity *= pow(1 - min(max(friction, 0.01), 0.999), frame)
             if velocity < stopSpeed {
                 post(0, 0, momentum: .end)
                 finish()

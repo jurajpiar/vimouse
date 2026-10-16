@@ -6,7 +6,7 @@ Settings that were renamed or removed are listed here so a commented-out line in
 ## Unreleased
 
 Initial settings: `[config] update`; `[hotkey] hold`; `[hotkey] activate`; `[keys]` quadrant and action bindings;
-`[scroll]` step, speed, acceleration, flick, momentum, smooth and bindings; `[ruler]` height, move, fine, height_step, dim and
+`[scroll]` step, speed, acceleration, flick, friction, momentum, smooth and bindings; `[ruler]` height, move, fine, height_step, dim and
 bindings; `[nudge]` step and bindings; `[colours.modes]`, `[colours.markers]`; `[keys] top`; `[drag] restart_search`, `[drag] ramp`; `[keys] help`; `[snap] enabled`.
 
 Moved: the former `[keys]` section is split. Quadrant keys, `up`, `top` and

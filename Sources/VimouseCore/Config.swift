@@ -31,6 +31,8 @@ public struct Config: Equatable {
     public var scrollSmooth: Bool = true
     /// Speed launched by a double tap, px/s; 0 disables.
     public var scrollFlick: Double = 4000
+    /// Fraction of speed lost per second while coasting.
+    public var scrollFriction: Double = 0.85
     public var rulerHeight: Double = 32
     /// 0 means move by the band's own height.
     public var rulerMove: Double = 0
@@ -127,6 +129,7 @@ public struct Config: Equatable {
         if let v = try number("scroll", "speed") { c.scrollSpeed = max(50, v) }
         if let v = try number("scroll", "acceleration") { c.scrollAcceleration = max(0.05, v) }
         if let v = try number("scroll", "flick") { c.scrollFlick = max(0, v) }
+        if let v = try number("scroll", "friction") { c.scrollFriction = min(max(v, 0.01), 0.999) }
         for (name, set) in [("momentum", { (c: inout Config, b: Bool) in c.scrollMomentum = b }), ("smooth", { (c: inout Config, b: Bool) in c.scrollSmooth = b })] {
             if let v = t["scroll"]?[name] {
                 guard let b = v.bool else { throw ParseError(description: "[scroll] \(name): expected true or false") }
