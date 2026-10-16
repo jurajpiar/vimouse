@@ -6,9 +6,10 @@ import HintsMode
 import NudgeMode
 import ScrollMode
 import RulerMode
+import ExpandMode
 
 /// The modes the app ships, fresh for each test.
-func standardModes() -> [Mode] { [PointerMode(), HalfMode(), HintsMode(), NudgeMode(), ScrollMode(), RulerMode()] }
+func standardModes() -> [Mode] { [PointerMode(), HalfMode(), HintsMode(), NudgeMode(), ScrollMode(), RulerMode(), ExpandMode()] }
 
 let standardCursors: [CursorStyle] = [RingCursor(), CrosshairCursor(), DotCursor()]
 
@@ -861,6 +862,20 @@ final class PluginTests: XCTestCase {
         _ = e.handle(KeyPress(.c)); XCTAssertEqual(e.handle(KeyPress(.a)), [.warp(Point(x: 320, y: 10)), .redraw, .redraw]) // "ca" = index 6
         XCTAssertEqual(e.mode, "pointer")
         XCTAssertEqual(e.target, Point(x: 320, y: 10))
+    }
+
+    func testExpandMode() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen, pointer: Point(x: 100, y: 100))
+        _ = e.handle(KeyPress(.e))
+        XCTAssertEqual(e.mode, "expand")
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 108, y: 100)), .redraw])   // base 8
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 124, y: 100)), .redraw])   // 16
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 156, y: 100)), .redraw])   // 32
+        XCTAssertEqual(e.handle(KeyPress(.h)), [.warp(Point(x: 140, y: 100)), .redraw])   // back 16
+        XCTAssertEqual(e.handle(KeyPress(.h)), [.warp(Point(x: 132, y: 100)), .redraw])   // back 8
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.warp(Point(x: 132, y: 108)), .redraw])   // perpendicular: base again
+        XCTAssertFalse(Config.defaults.enabledModes!.contains("expand"))
     }
 
     func testEveryModeSchemaStaysInItsSection() {

@@ -7,10 +7,11 @@ import HintsMode
 import NudgeMode
 import ScrollMode
 import RulerMode
+import ExpandMode
 
 // The modes this build ships, in default order (the first is the default mode).
 // Remove a line (and its import) to drop a mode; add one for a new plugin target.
-let modes: [Mode] = [PointerMode(), HalfMode(), HintsMode(), NudgeMode(), ScrollMode(), RulerMode()]
+let modes: [Mode] = [PointerMode(), HalfMode(), HintsMode(), NudgeMode(), ScrollMode(), RulerMode(), ExpandMode()]
 // Cursor markers selectable with [cursor] style; add a CursorStyle here for a new one.
 let cursors: [CursorStyle] = [RingCursor(), CrosshairCursor(), DotCursor()]
 

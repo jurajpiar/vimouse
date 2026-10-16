@@ -48,6 +48,10 @@ Hints: f labels every clickable element the frontmost app exposes through
 accessibility with a letter or two; type the label to click it (or only move there
 with `[hints] click = false`). Backspace deletes a letter, f or Escape leaves.
 
+Expand (work in progress; add `"expand"` to `[modes] enabled`): e enters it;
+h/j/k/l or the arrows move 8 px, each further press the same way doubles the step,
+the opposite direction halves it, so you overshoot and home in.
+
 Nudge: n from Pointer mode, then h/j/k/l or the arrows move the pointer (a tap is
 one step, a hold accelerates, release stops, a horizontal and a vertical key held
 together move diagonally; Shift: one pixel per repeat; counts multiply), n back to
