@@ -74,14 +74,70 @@ public extension KeyCode {
     static let rightBracket = KeyCode(rawValue: 30)
 }
 
+/// Modifier state. The four generic bits say a modifier is down; the side bits say
+/// which key. Events carry both; a binding carries generic bits (either side) or
+/// side bits (that side only).
 public struct Modifiers: OptionSet, Hashable, Sendable {
-    public let rawValue: UInt8
-    public init(rawValue: UInt8) { self.rawValue = rawValue }
+    public let rawValue: UInt16
+    public init(rawValue: UInt16) { self.rawValue = rawValue }
 
     public static let shift = Modifiers(rawValue: 1 << 0)
     public static let control = Modifiers(rawValue: 1 << 1)
     public static let option = Modifiers(rawValue: 1 << 2)
     public static let command = Modifiers(rawValue: 1 << 3)
+    public static let leftShift = Modifiers(rawValue: 1 << 4)
+    public static let rightShift = Modifiers(rawValue: 1 << 5)
+    public static let leftControl = Modifiers(rawValue: 1 << 6)
+    public static let rightControl = Modifiers(rawValue: 1 << 7)
+    public static let leftOption = Modifiers(rawValue: 1 << 8)
+    public static let rightOption = Modifiers(rawValue: 1 << 9)
+    public static let leftCommand = Modifiers(rawValue: 1 << 10)
+    public static let rightCommand = Modifiers(rawValue: 1 << 11)
+
+    public static let generics: [Modifiers] = [.shift, .control, .option, .command]
+
+    static func sides(of generic: Modifiers) -> (left: Modifiers, right: Modifiers) {
+        switch generic {
+        case .shift: return (.leftShift, .rightShift)
+        case .control: return (.leftControl, .rightControl)
+        case .option: return (.leftOption, .rightOption)
+        default: return (.leftCommand, .rightCommand)
+        }
+    }
+
+    /// The generic bits implied by this set (a side bit implies its generic).
+    public var generic: Modifiers {
+        var g = intersection([.shift, .control, .option, .command])
+        for m in Modifiers.generics {
+            let (l, r) = Modifiers.sides(of: m)
+            if contains(l) || contains(r) { g.insert(m) }
+        }
+        return g
+    }
+
+    /// Are all of these modifiers (generic: either side; sided: that side) held in `event`?
+    /// Extra modifiers in the event are allowed.
+    public func matchesHeld(in event: Modifiers) -> Bool {
+        for m in Modifiers.generics {
+            let (l, r) = Modifiers.sides(of: m)
+            if contains(m), !event.contains(m) { return false }
+            if contains(l), !event.contains(l) { return false }
+            if contains(r), !event.contains(r) { return false }
+        }
+        return true
+    }
+
+    /// Does an event's modifier state satisfy this binding's requirement?
+    public func matches(event: Modifiers) -> Bool {
+        for m in Modifiers.generics {
+            let (l, r) = Modifiers.sides(of: m)
+            let required = contains(m) || contains(l) || contains(r)
+            if required != event.contains(m) { return false }
+            if contains(l), !event.contains(l) { return false }
+            if contains(r), !event.contains(r) { return false }
+        }
+        return true
+    }
 }
 
 public struct KeyPress: Hashable, Sendable {
@@ -92,6 +148,16 @@ public struct KeyPress: Hashable, Sendable {
         self.code = code
         self.modifiers = modifiers
     }
+
+    /// This binding matches the event (same key; modifiers as required, sides respected).
+    public func matches(event: KeyPress) -> Bool {
+        code == event.code && modifiers.matches(event: event.modifiers)
+    }
+}
+
+public extension Set where Element == KeyPress {
+    /// Any binding in the set matches the event.
+    func has(_ event: KeyPress) -> Bool { contains { $0.matches(event: event) } }
 }
 
 /// What has to be held for quasi-mode: one specific modifier key, or a chord of
@@ -100,7 +166,7 @@ public enum HoldKey: Equatable, Sendable {
     case key(KeyCode)
     case chord(Modifiers)
 
-    /// The modifier bits to strip from typed keys while held.
+    /// The modifiers the hold key accounts for (stripped from typed keys while held).
     public var bits: Modifiers {
         switch self {
         case .key(let c): return c.modifierBit ?? []
@@ -276,6 +342,14 @@ public struct KeyMap: Sendable, Equatable {
         nudgeDown: [KeyPress(.j), KeyPress(.downArrow)],
         help: [KeyPress(.slash, [.shift])]
     )
+
+    public func quadrant(for event: KeyPress) -> Quadrant? {
+        quadrants.first { $0.key.matches(event: event) }?.value
+    }
+
+    public func digit(for event: KeyPress) -> Int? {
+        digits.first { $0.key.matches(event: event) }?.value
+    }
 
     /// Label shown inside each quadrant.
     public func label(for quadrant: Quadrant) -> String {

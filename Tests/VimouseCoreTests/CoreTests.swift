@@ -234,6 +234,35 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(KeyPress(.space, [.command, .shift]).label, "⇧⌘␣")
     }
 
+    func testSidedModifiers() throws {
+        let rs = KeyPress.parse("right_shift+r")!
+        XCTAssertEqual(rs.modifiers, [.rightShift])
+        XCTAssertTrue(rs.matches(event: KeyPress(.r, [.shift, .rightShift])))
+        XCTAssertFalse(rs.matches(event: KeyPress(.r, [.shift, .leftShift])))
+        XCTAssertFalse(rs.matches(event: KeyPress(.r)))
+        let any = KeyPress.parse("shift+r")!
+        XCTAssertTrue(any.matches(event: KeyPress(.r, [.shift, .leftShift])))
+        XCTAssertTrue(any.matches(event: KeyPress(.r, [.shift, .rightShift])))
+        XCTAssertFalse(any.matches(event: KeyPress(.r, [.shift, .command, .leftCommand, .leftShift])))
+        XCTAssertEqual(rs.label, "R⇧r")
+        // Config: a sided binding and a sided hotkey.
+        let c = try Config.parse("[ruler]\nremove = \"right_shift+r\"\n[hotkey]\nactivate = \"cmd+left_shift+ctrl+space\"")
+        XCTAssertTrue(c.keymap.rulerRemove.has(KeyPress(.r, [.shift, .rightShift])))
+        XCTAssertFalse(c.keymap.rulerRemove.has(KeyPress(.r, [.shift, .leftShift])))
+        XCTAssertTrue(c.keymap.activate.matches(event: KeyPress(.space, [.command, .shift, .control, .leftCommand, .leftShift, .leftControl])))
+        XCTAssertFalse(c.keymap.activate.matches(event: KeyPress(.space, [.command, .shift, .control, .leftCommand, .rightShift, .leftControl])))
+        // Chord held check and generic stripping.
+        let chord = Modifiers.parse("cmd+left_shift")!
+        XCTAssertTrue(chord.matchesHeld(in: [.command, .shift, .rightCommand, .leftShift, .option]))
+        XCTAssertFalse(chord.matchesHeld(in: [.command, .shift, .rightCommand, .rightShift]))
+        XCTAssertEqual(chord.generic, [.command, .shift])
+        // The engine ignores side bits unless a binding names a side.
+        let e = PointerEngine()
+        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
+        XCTAssertEqual(e.handle(KeyPress(.i, [.leftShift])), []) // side bit without generic: not a plain i
+        XCTAssertEqual(e.handle(KeyPress(.i)), [.warp(Point(x: 25, y: 25)), .redraw])
+    }
+
     func testKeySpecs() {
         XCTAssertEqual(KeyPress.parse("cmd+shift+space"), KeyPress(.space, [.command, .shift]))
         XCTAssertEqual(KeyPress.parse("]"), KeyPress(.rightBracket))

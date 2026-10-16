@@ -218,17 +218,31 @@ public struct Config: Equatable {
 // MARK: - Key specs
 
 public extension Modifiers {
-    /// Parses "cmd+shift+ctrl" (modifiers only, at least one).
+    /// One modifier name: generic ("shift") or sided ("left_shift", "rshift").
+    static func named(_ name: String) -> Modifiers? {
+        switch name {
+        case "cmd", "command", "meta": return .command
+        case "shift": return .shift
+        case "ctrl", "control": return .control
+        case "alt", "opt", "option": return .option
+        case "left_shift", "lshift": return .leftShift
+        case "right_shift", "rshift": return .rightShift
+        case "left_ctrl", "lctrl", "left_control": return .leftControl
+        case "right_ctrl", "rctrl", "right_control": return .rightControl
+        case "left_alt", "lalt", "left_option": return .leftOption
+        case "right_alt", "ralt", "right_option": return .rightOption
+        case "left_cmd", "lcmd", "left_command": return .leftCommand
+        case "right_cmd", "rcmd", "right_command": return .rightCommand
+        default: return nil
+        }
+    }
+
+    /// Parses "cmd+shift+ctrl" or "cmd+left_shift" (modifiers only, at least one).
     static func parse(_ spec: String) -> Modifiers? {
         var mods: Modifiers = []
         for m in spec.lowercased().split(separator: "+").map({ $0.trimmingCharacters(in: .whitespaces) }) {
-            switch m {
-            case "cmd", "command", "meta": mods.insert(.command)
-            case "shift": mods.insert(.shift)
-            case "ctrl", "control": mods.insert(.control)
-            case "alt", "opt", "option": mods.insert(.option)
-            default: return nil
-            }
+            guard let bit = Modifiers.named(m) else { return nil }
+            mods.insert(bit)
         }
         return mods.isEmpty ? nil : mods
     }
@@ -238,10 +252,13 @@ public extension KeyPress {
     /// Display form: modifier symbols then the key, e.g. "⇧⇥", "⌘⇧␣", "↓".
     var label: String {
         var s = ""
-        if modifiers.contains(.control) { s += "⌃" }
-        if modifiers.contains(.option) { s += "⌥" }
-        if modifiers.contains(.shift) { s += "⇧" }
-        if modifiers.contains(.command) { s += "⌘" }
+        func sym(_ m: Modifiers, _ symbol: String) {
+            let (l, r) = Modifiers.sides(of: m)
+            if modifiers.contains(l) { s += "L" + symbol }
+            else if modifiers.contains(r) { s += "R" + symbol }
+            else if modifiers.contains(m) { s += symbol }
+        }
+        sym(.control, "⌃"); sym(.option, "⌥"); sym(.shift, "⇧"); sym(.command, "⌘")
         return s + code.label
     }
 
@@ -251,13 +268,8 @@ public extension KeyPress {
         guard let last = parts.last, let code = KeyCode.named(last) else { return nil }
         var mods: Modifiers = []
         for m in parts.dropLast() {
-            switch m {
-            case "cmd", "command", "meta": mods.insert(.command)
-            case "shift": mods.insert(.shift)
-            case "ctrl", "control": mods.insert(.control)
-            case "alt", "opt", "option": mods.insert(.option)
-            default: return nil
-            }
+            guard let bit = Modifiers.named(m) else { return nil }
+            mods.insert(bit)
         }
         return KeyPress(code, mods)
     }

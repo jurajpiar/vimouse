@@ -71,7 +71,7 @@ final class Controller {
             guard key.code == code else { return false }
             satisfied = isDown
         case .chord(let chord):
-            satisfied = key.modifiers.isSuperset(of: chord)
+            satisfied = chord.matchesHeld(in: key.modifiers)
         }
         if satisfied {
             guard !engine.isActive else { return engine.heldActivation }
@@ -89,14 +89,14 @@ final class Controller {
     private func handleKey(_ rawKey: KeyPress, isDown: Bool, isRepeat: Bool, bothSides: Modifiers) -> Bool {
         var key = rawKey
         if !engine.isActive {
-            guard key == engine.keymap.activate, isDown, !isRepeat else { return false }
+            guard engine.keymap.activate.matches(event: key), isDown, !isRepeat else { return false }
             engine.heldActivation = false
             activate()
             return true
         }
         // The hotkey while active: pins a quasi-mode activation (it then survives the
         // release of the hold key), or leaves a pinned or hotkey-started one.
-        if rawKey == engine.keymap.activate, isDown, !isRepeat {
+        if engine.keymap.activate.matches(event: rawKey), isDown, !isRepeat {
             if engine.heldActivation {
                 engine.heldActivation = false
                 overlay.render(model())
@@ -109,12 +109,13 @@ final class Controller {
         // typed, unless the other side of that modifier is down too: a hyper key on the
         // left plus right Shift still means Shift.
         if engine.heldActivation, let bits = engine.keymap.hold?.bits {
-            key = KeyPress(key.code, key.modifiers.subtracting(bits.subtracting(bothSides)))
+            // Strip the chord's modifiers (generic form) except those held on both sides.
+            key = KeyPress(key.code, key.modifiers.subtracting(bits.generic.subtracting(bothSides)))
         }
         // Active: swallow everything so the focused app sees nothing.
         // The help key works on hold: shown on key down, hidden on key up.
         // On key up the modifier may already be released, so match the key code alone.
-        let isHelp = engine.keymap.help.contains(key) || (!isDown && engine.keymap.help.contains { $0.code == key.code })
+        let isHelp = engine.keymap.help.has(key) || (!isDown && engine.keymap.help.contains { $0.code == key.code })
         if isHelp {
             if isRepeat { return true }
             helpShown = isDown

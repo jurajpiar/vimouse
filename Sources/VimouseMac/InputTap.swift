@@ -111,6 +111,16 @@ final class InputTap {
         if flags.contains(.maskControl) { m.insert(.control) }
         if flags.contains(.maskAlternate) { m.insert(.option) }
         if flags.contains(.maskCommand) { m.insert(.command) }
+        // Device-level bits (NX_DEVICE*KEYMASK) say which side is down.
+        let raw = flags.rawValue
+        if raw & 0x02 != 0 { m.insert(.leftShift) }
+        if raw & 0x04 != 0 { m.insert(.rightShift) }
+        if raw & 0x01 != 0 { m.insert(.leftControl) }
+        if raw & 0x2000 != 0 { m.insert(.rightControl) }
+        if raw & 0x20 != 0 { m.insert(.leftOption) }
+        if raw & 0x40 != 0 { m.insert(.rightOption) }
+        if raw & 0x08 != 0 { m.insert(.leftCommand) }
+        if raw & 0x10 != 0 { m.insert(.rightCommand) }
         return m
     }
 }

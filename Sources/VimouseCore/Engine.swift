@@ -190,7 +190,7 @@ public final class PointerEngine {
         guard case .active(let mode, var s) = state else { return [] }
 
         // Count prefix: digits accumulate until a command consumes them.
-        if let d = keymap.digits[key] {
+        if let d = keymap.digit(for: key) {
             pendingCount = min((pendingCount ?? 0) * 10 + d, 9999)
             return [.redraw]
         }
@@ -199,7 +199,7 @@ public final class PointerEngine {
         let n = Double(count ?? 1)
 
         // Shared across modes.
-        if keymap.exit.contains(key) {
+        if keymap.exit.has(key) {
             // As in vi, Escape with a count pending only cancels the count.
             if count != nil { return [.redraw] }
             // During a drag, Escape abandons the drag and stays in the mode.
@@ -211,11 +211,11 @@ public final class PointerEngine {
             }
             return deactivate()
         }
-        if keymap.scrollToggle.contains(key) {
+        if keymap.scrollToggle.has(key) {
             state = .active(mode: mode == .scroll ? .pointer : .scroll, session: s)
             return [.redraw]
         }
-        if keymap.rulerToggle.contains(key) {
+        if keymap.rulerToggle.has(key) {
             if mode == .ruler {
                 state = .active(mode: .pointer, session: s)
             } else {
@@ -226,16 +226,16 @@ public final class PointerEngine {
             }
             return [.redraw]
         }
-        if keymap.rulerRemove.contains(key) {
+        if keymap.rulerRemove.has(key) {
             ruler = nil
             if mode == .ruler { state = .active(mode: .pointer, session: s) }
             return [.redraw]
         }
-        if keymap.nudgeToggle.contains(key), mode == .pointer || mode == .nudge {
+        if keymap.nudgeToggle.has(key), mode == .pointer || mode == .nudge {
             state = .active(mode: mode == .nudge ? .pointer : .nudge, session: s)
             return [.redraw]
         }
-        if keymap.dragToggle.contains(key) {
+        if keymap.dragToggle.has(key) {
             dragging.toggle()
             if dragging {
                 dragOrigin = target
@@ -248,34 +248,34 @@ public final class PointerEngine {
             return [.mouseUp(.left), .redraw]
         }
         if let fx = clickEffects(for: key, count: count) { return fx }
-        if keymap.snapToggle.contains(key), mode == .pointer {
+        if keymap.snapToggle.has(key), mode == .pointer {
             snapping.toggle()
             return [.warp(aim(s.current)), .redraw]
         }
-        if keymap.nextScreen.contains(key) {
+        if keymap.nextScreen.has(key) {
             // With a count, Tab jumps to that screen (1-based); without, to the next one.
             if let c = count { return switchScreen(to: c - 1) }
             return switchScreen(to: (screenIndex + 1) % screens.count)
         }
-        if keymap.previousScreen.contains(key) {
+        if keymap.previousScreen.has(key) {
             if let c = count { return switchScreen(to: c - 1) }
             return switchScreen(to: (screenIndex - 1 + screens.count) % screens.count)
         }
 
         switch mode {
         case .pointer:
-            if let q = keymap.quadrants[key] {
+            if let q = keymap.quadrant(for: key) {
                 for _ in 0..<(count ?? 1) { s.select(q) }
                 state = .active(mode: .pointer, session: s)
                 return [.warp(aim(s.current)), .redraw]
             }
-            if keymap.top.contains(key) {
+            if keymap.top.has(key) {
                 guard s.depth > 0 else { return count == nil ? [] : [.redraw] }
                 s.reset()
                 state = .active(mode: .pointer, session: s)
                 return [.warp(aim(s.current)), .redraw]
             }
-            if keymap.up.contains(key) {
+            if keymap.up.has(key) {
                 guard s.up() else { return count == nil ? [] : [.redraw] }
                 for _ in 1..<(count ?? 1) { s.up() }
                 state = .active(mode: .pointer, session: s)
@@ -284,23 +284,23 @@ public final class PointerEngine {
         case .scroll:
             let half = screens[screenIndex].height / 2
             // A scroll key with the flick modifier held flicks instead of scrolling.
-            if let fm = keymap.flickWith, key.modifiers.isSuperset(of: fm) {
+            if let fm = keymap.flickWith, fm.matchesHeld(in: key.modifiers) {
                 let bare = KeyPress(key.code, key.modifiers.subtracting(fm))
-                if keymap.scrollDown.contains(bare) { return [.scrollFlick(dx: 0, dy: 1, multiplier: n)] }
-                if keymap.scrollUp.contains(bare) { return [.scrollFlick(dx: 0, dy: -1, multiplier: n)] }
-                if keymap.scrollLeft.contains(bare) { return [.scrollFlick(dx: -1, dy: 0, multiplier: n)] }
-                if keymap.scrollRight.contains(bare) { return [.scrollFlick(dx: 1, dy: 0, multiplier: n)] }
+                if keymap.scrollDown.has(bare) { return [.scrollFlick(dx: 0, dy: 1, multiplier: n)] }
+                if keymap.scrollUp.has(bare) { return [.scrollFlick(dx: 0, dy: -1, multiplier: n)] }
+                if keymap.scrollLeft.has(bare) { return [.scrollFlick(dx: -1, dy: 0, multiplier: n)] }
+                if keymap.scrollRight.has(bare) { return [.scrollFlick(dx: 1, dy: 0, multiplier: n)] }
             }
-            if keymap.scrollDown.contains(key) { return [.scrollStart(dx: 0, dy: 1, multiplier: n)] }
-            if keymap.scrollUp.contains(key) { return [.scrollStart(dx: 0, dy: -1, multiplier: n)] }
-            if keymap.scrollLeft.contains(key) { return [.scrollStart(dx: -1, dy: 0, multiplier: n)] }
-            if keymap.scrollRight.contains(key) { return [.scrollStart(dx: 1, dy: 0, multiplier: n)] }
-            if keymap.scrollHalfDown.contains(key) { return [.scroll(dx: 0, dy: half * n)] }
-            if keymap.scrollHalfUp.contains(key) { return [.scroll(dx: 0, dy: -half * n)] }
+            if keymap.scrollDown.has(key) { return [.scrollStart(dx: 0, dy: 1, multiplier: n)] }
+            if keymap.scrollUp.has(key) { return [.scrollStart(dx: 0, dy: -1, multiplier: n)] }
+            if keymap.scrollLeft.has(key) { return [.scrollStart(dx: -1, dy: 0, multiplier: n)] }
+            if keymap.scrollRight.has(key) { return [.scrollStart(dx: 1, dy: 0, multiplier: n)] }
+            if keymap.scrollHalfDown.has(key) { return [.scroll(dx: 0, dy: half * n)] }
+            if keymap.scrollHalfUp.has(key) { return [.scroll(dx: 0, dy: -half * n)] }
         case .nudge:
             let fine = key.modifiers.contains(.shift)
             let base = KeyPress(key.code, key.modifiers.subtracting(.shift))
-            func hit(_ set: Set<KeyPress>) -> Bool { set.contains(key) || (fine && set.contains(base)) }
+            func hit(_ set: Set<KeyPress>) -> Bool { set.has(key) || (fine && set.has(base)) }
             let d = (fine ? 1 : nudgeStep) * n
             var p = target
             if hit(keymap.nudgeLeft) { p.x -= d }
@@ -321,10 +321,10 @@ public final class PointerEngine {
             let base = KeyPress(key.code, key.modifiers.subtracting(.shift))
             let move = fine ? rulerFine : (rulerMove > 0 ? rulerMove : r.height)
             let resize = fine ? rulerFine : rulerHeightStep
-            if keymap.rulerDown.contains(key) || (fine && keymap.rulerDown.contains(base)) { r.y += move * n }
-            else if keymap.rulerUp.contains(key) || (fine && keymap.rulerUp.contains(base)) { r.y -= move * n }
-            else if keymap.rulerGrow.contains(key) || (fine && keymap.rulerGrow.contains(base)) { r.height += resize * n }
-            else if keymap.rulerShrink.contains(key) || (fine && keymap.rulerShrink.contains(base)) { r.height -= resize * n }
+            if keymap.rulerDown.has(key) || (fine && keymap.rulerDown.has(base)) { r.y += move * n }
+            else if keymap.rulerUp.has(key) || (fine && keymap.rulerUp.has(base)) { r.y -= move * n }
+            else if keymap.rulerGrow.has(key) || (fine && keymap.rulerGrow.has(base)) { r.height += resize * n }
+            else if keymap.rulerShrink.has(key) || (fine && keymap.rulerShrink.has(base)) { r.height -= resize * n }
             else { break }
             r.height = max(8, r.height)
             r.y = min(max(r.y, screen.y), screen.maxY)
@@ -339,7 +339,7 @@ public final class PointerEngine {
         guard case .active(.scroll, _) = state else { return [] }
         let bare = KeyPress(key.code)
         let scrollKeys = keymap.scrollDown.union(keymap.scrollUp).union(keymap.scrollLeft).union(keymap.scrollRight)
-        return scrollKeys.contains(bare) || scrollKeys.contains(key) ? [.scrollStop] : []
+        return scrollKeys.has(bare) || scrollKeys.has(key) ? [.scrollStop] : []
     }
 
     /// Click keys match on key code only; held modifiers are passed into the click.
@@ -348,11 +348,11 @@ public final class PointerEngine {
         let bare = KeyPress(key.code)
         let mods = key.modifiers
         let clicks = min(count ?? 1, 3)
-        if keymap.leftClick.contains(bare) { return clickAndExit(.left, count: clicks, mods) }
-        if keymap.doubleClick.contains(bare) { return clickAndExit(.left, count: 2, mods) }
-        if keymap.rightClick.contains(bare) { return clickAndExit(.right, count: 1, mods) }
-        if keymap.middleClick.contains(bare) { return clickAndExit(.middle, count: 1, mods) }
-        if keymap.clickStay.contains(bare) { return [.click(.left, count: clicks, modifiers: mods)] }
+        if keymap.leftClick.has(bare) { return clickAndExit(.left, count: clicks, mods) }
+        if keymap.doubleClick.has(bare) { return clickAndExit(.left, count: 2, mods) }
+        if keymap.rightClick.has(bare) { return clickAndExit(.right, count: 1, mods) }
+        if keymap.middleClick.has(bare) { return clickAndExit(.middle, count: 1, mods) }
+        if keymap.clickStay.has(bare) { return [.click(.left, count: clicks, modifiers: mods)] }
         return nil
     }
 
