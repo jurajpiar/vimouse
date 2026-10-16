@@ -108,6 +108,8 @@ Phase 1 remaining: Nudge sub-mode, hold-? key map, config file. Phase 3 (ruler) 
 
 AX snapping, to verify on real apps: native (Finder, System Settings), Safari/Chrome (large trees; walk capped at 1500 elements / 150 ms so heavy pages may be partly covered), Electron (VS Code, Slack). Watch for activation lag (the walk runs on ⌘⇧Space; fix is a background walk applied when done) and for the pink ring landing on non-targets (a role to drop from AXSnapper.clickableRoles). Known side effect: setting AXEnhancedUserInterface on Chromium apps can disable their window animations while vimouse runs, as with Homerow and Vimac.
 
+2026-10-16: Ruler mode v1 implemented (persistent band, dimming, j/k, [ ], R removes). Shan: it works but needs more work; parked for later. Intent to return to: tune defaults (band height, step, dim level, scroll step near line height), consider dimming only the frontmost window, and the planned AX text-line snapping so the band follows real lines. Next: config file (ruler/scroll parameters are the first entries), then Nudge, hold-? map, then Phase 2 robustness (permission revocation, secure input).
+
 Open: none.
 
 ## Sources
