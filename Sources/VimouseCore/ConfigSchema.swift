@@ -83,6 +83,7 @@ public enum ConfigSchema {
         .init(section: "scroll", key: "step", defaultValue: "60", comment: "Pixels scrolled by a quick tap; a count multiplies (45j). Try 20 for line-by-line reading, 60 to 120 for browsing."),
         .init(section: "scroll", key: "speed", defaultValue: "1500", comment: "Full speed while a scroll key is held, in pixels per second, e.g. 800 (calm), 1500, 3000 (fast)."),
         .init(section: "scroll", key: "acceleration", defaultValue: "0.5", comment: "Seconds from the start of a hold to full speed, e.g. 0.3, 0.5, 1.0."),
+        .init(section: "scroll", key: "flick", defaultValue: "4000", comment: "Double-tap a scroll key to flick: the page launches at this speed in pixels per second and coasts. 0 disables; try 2500 (gentle), 4000, 8000."),
         .init(section: "scroll", key: "momentum", defaultValue: "true", comment: "Coast after releasing a held key, like a trackpad flick: true or false."),
         .init(section: "scroll", key: "smooth", defaultValue: "true", comment: "Send trackpad-style continuous scroll events (smooth, apps animate); false sends mouse-wheel steps."),
         .init(section: "scroll", key: "down", defaultValue: "\"j\"", comment: "Scroll down, e.g. \"j\", \"down\", [\"j\", \"down\"]."),

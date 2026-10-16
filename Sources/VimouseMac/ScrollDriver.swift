@@ -11,6 +11,8 @@ final class ScrollDriver {
     var acceleration: Double = 0.5
     var momentum = true
     var smooth = true
+    /// Speed launched by a double tap, px/s; 0 disables.
+    var flick: Double = 4000
 
     /// A press shorter than this is a tap (one step); longer is a hold.
     private let tapWindow: TimeInterval = 0.15
@@ -28,6 +30,9 @@ final class ScrollDriver {
     private var carry = (x: 0.0, y: 0.0)
     /// The gesture has posted its `began`. False during a brake tap, which scrolls nothing.
     private var begun = false
+    /// Two taps of the same key within this interval are a flick.
+    private let flickWindow: TimeInterval = 0.25
+    private var lastTap: (at: Date, dx: Double, dy: Double)?
 
     var isHeld: Bool { held }
 
@@ -38,6 +43,21 @@ final class ScrollDriver {
         if timer != nil {
             if coasting { post(0, 0, momentum: .end) } else { post(0, 0, phase: .ended) }
             finish()
+        }
+        // A second tap of the same key within the window is a flick: launch and coast.
+        if smooth, momentum, flick > 0, !braking, let last = lastTap,
+           last.dx == dx, last.dy == dy, Date().timeIntervalSince(last.at) < flickWindow {
+            lastTap = nil
+            direction = (dx, dy)
+            carry = (0, 0)
+            post(0, 0, phase: .began)
+            post(0, 0, phase: .ended)
+            velocity = flick * multiplier
+            coasting = true
+            post(0, 0, momentum: .begin)
+            timer = Timer.scheduledTimer(withTimeInterval: frame, repeats: true) { [weak self] _ in self?.tick() }
+            RunLoop.main.add(timer!, forMode: .common)
+            return
         }
         direction = (dx, dy)
         self.multiplier = multiplier
@@ -71,6 +91,8 @@ final class ScrollDriver {
         held = false
         if !smooth { return }
         guard begun else { finish(); return } // a brake tap: nothing to end
+        // Remember a tap (no ramp happened) so a second one can become a flick.
+        lastTap = velocity == 0 ? (Date(), direction.dx, direction.dy) : nil
         post(0, 0, phase: .ended)
         if momentum, velocity > stopSpeed {
             coasting = true

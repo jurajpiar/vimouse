@@ -35,7 +35,8 @@ Nudge: n from Pointer mode, then h/j/k/l or the arrows move the pointer 5 px
 (Shift: 1 px, counts multiply), n back to the quadrants.
 
 Scroll: j/k/h/l scroll at the pointer (a tap is one step, a hold accelerates,
-release coasts like a trackpad flick, a tap on any scroll key stops the coast),
+release coasts, a double tap flicks the page at speed, a tap during a coast
+stops it),
 d/u half a page, s back to Pointer.
 
 Hold ? in any mode for the full key map; release to hide.

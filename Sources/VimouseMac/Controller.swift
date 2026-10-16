@@ -28,6 +28,7 @@ final class Controller {
         scroller.acceleration = config.scrollAcceleration
         scroller.momentum = config.scrollMomentum
         scroller.smooth = config.scrollSmooth
+        scroller.flick = config.scrollFlick
         colours = config.colours
         dragRamp = config.dragRamp
         overlay.render(model())
