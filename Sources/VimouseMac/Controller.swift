@@ -47,14 +47,24 @@ final class Controller {
         overlay.render(model())
     }
 
-    func start() throws {
+    /// Starts the event tap if allowed; either way the health monitor runs and will
+    /// start (or restart) the tap once Accessibility access is there.
+    func start() {
         tap.handler = { [weak self] key, isDown, isRepeat, isModifier, bothSides in
             guard let self else { return false }
             if isModifier { return self.handleModifier(key, isDown: isDown) }
             return self.handleKey(key, isDown: isDown, isRepeat: isRepeat, bothSides: bothSides)
         }
-        try tap.start()
-        tapRunning = true
+        do {
+            try tap.start()
+            tapRunning = true
+            NSLog("vimouse: ready")
+        } catch {
+            tapRunning = false
+            health = .noPermission
+            onHealthChange?(health)
+            NSLog("vimouse: waiting for Accessibility access (System Settings > Privacy & Security > Accessibility)")
+        }
         startHealthMonitor()
     }
 

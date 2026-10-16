@@ -18,21 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.onHealthChange = { [weak self] _ in self?.refreshStatus() }
         configStore.start()
 
-        guard Permissions.ensureAccessibility() else {
-            NSLog("vimouse: waiting for Accessibility permission (System Settings > Privacy & Security > Accessibility)")
-            Permissions.pollUntilTrusted { [weak self] in self?.startTap() }
-            return
-        }
-        startTap()
-    }
-
-    private func startTap() {
-        do {
-            try controller.start()
-            NSLog("vimouse: ready. Press ⌘⇧Space.")
-        } catch {
-            NSLog("vimouse: could not start event tap: \(error)")
-        }
+        _ = Permissions.ensureAccessibility() // shows the system prompt when not yet granted
+        controller.start()
     }
 
     private func setUpStatusItem() {
