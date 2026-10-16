@@ -12,6 +12,16 @@ final class GeometryTests: XCTestCase {
         // Quadrant centres lie inside the parent.
         for sub in q.values { XCTAssertTrue(r.contains(sub.center)) }
     }
+
+    func testIntersection() {
+        let a = Rect(x: 0, y: 0, width: 100, height: 100)
+        let b = Rect(x: 50, y: 60, width: 100, height: 100)
+        XCTAssertTrue(a.intersects(b))
+        XCTAssertEqual(a.intersection(b), Rect(x: 50, y: 60, width: 50, height: 40))
+        let c = Rect(x: 200, y: 0, width: 10, height: 10)
+        XCTAssertFalse(a.intersects(c))
+        XCTAssertEqual(a.intersection(c).width, 0)
+    }
 }
 
 final class BisectTests: XCTestCase {
@@ -31,6 +41,46 @@ final class BisectTests: XCTestCase {
         s.select(.topLeft)
         XCTAssertTrue(s.up())
         XCTAssertEqual(s.current, s.root)
+    }
+}
+
+final class FakeSnap: SnapProvider {
+    var points: [Point] = []
+    var prepared = 0
+    func prepare(screen: Rect) { prepared += 1 }
+    func snapPoint(in rect: Rect) -> Point? {
+        points.filter { rect.contains($0) }.min { a, b in
+            let c = rect.center
+            return (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y) < (b.x - c.x) * (b.x - c.x) + (b.y - c.y) * (b.y - c.y)
+        }
+    }
+}
+
+final class SnapTests: XCTestCase {
+    let screen = Rect(x: 0, y: 0, width: 1000, height: 600)
+
+    func testSnapsToNearestElementInsideRectAndToggles() {
+        let snap = FakeSnap()
+        snap.points = [Point(x: 100, y: 100), Point(x: 240, y: 140), Point(x: 900, y: 500)]
+        let e = PointerEngine(snapping: true, snapProvider: snap)
+        _ = e.activate(screen: screen)
+        XCTAssertEqual(snap.prepared, 1)
+        // Top-left quadrant (0,0,500,300), centre (250,150): nearest element inside is (240,140).
+        XCTAssertEqual(e.handle(KeyPress(.i)), [.warp(Point(x: 240, y: 140)), .redraw])
+        XCTAssertEqual(e.target, Point(x: 240, y: 140))
+        // Toggle off: back to the geometric centre.
+        XCTAssertEqual(e.handle(KeyPress(.a)), [.warp(Point(x: 250, y: 150)), .redraw])
+        XCTAssertFalse(e.snapping)
+        // Toggle on, then a quadrant with no elements inside falls back to its centre.
+        _ = e.handle(KeyPress(.a))
+        XCTAssertEqual(e.handle(KeyPress(.o)), [.warp(Point(x: 375, y: 75)), .redraw])
+    }
+
+    func testNoProviderMeansCentre() {
+        let e = PointerEngine(snapping: true)
+        _ = e.activate(screen: screen)
+        XCTAssertEqual(e.handle(KeyPress(.i)), [.warp(Point(x: 250, y: 150)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.a)), [.warp(Point(x: 250, y: 150)), .redraw]) // toggles, no visible effect
     }
 }
 

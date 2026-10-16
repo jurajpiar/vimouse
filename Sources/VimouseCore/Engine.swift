@@ -20,6 +20,14 @@ public enum Mode: Equatable, Sendable {
     case pointer, scroll
 }
 
+/// Supplies a better pointer target inside a rectangle (for example the centre of
+/// the nearest clickable UI element). Return nil to use the rectangle's centre.
+public protocol SnapProvider: AnyObject {
+    /// Called once when Pointer mode starts on a screen; a chance to cache.
+    func prepare(screen: Rect)
+    func snapPoint(in rect: Rect) -> Point?
+}
+
 /// Modal state machine for Pointer mode. Pure: no platform calls, fully testable.
 public final class PointerEngine {
     public enum State: Equatable {
@@ -41,8 +49,16 @@ public final class PointerEngine {
     /// Vertical/horizontal scroll per j/k/h/l press, in pixels.
     public var scrollStep: Double = 60
 
-    public init(keymap: KeyMap = .default) {
+    /// Snap the pointer to UI elements (needs a `snapProvider`). Toggled in Pointer mode.
+    public var snapping: Bool
+    public weak var snapProvider: SnapProvider?
+    /// Where the pointer was last sent (the snap target or the rectangle centre).
+    public private(set) var target: Point = Point(x: 0, y: 0)
+
+    public init(keymap: KeyMap = .default, snapping: Bool = true, snapProvider: SnapProvider? = nil) {
         self.keymap = keymap
+        self.snapping = snapping
+        self.snapProvider = snapProvider
     }
 
     public var isActive: Bool {
@@ -70,7 +86,19 @@ public final class PointerEngine {
         let s = BisectSession(root: screens[index])
         state = .active(mode: .pointer, session: s)
         pendingCount = nil
-        return [.showOverlay, .warp(s.current.center)]
+        snapProvider?.prepare(screen: screens[index])
+        return [.showOverlay, .warp(aim(s.current))]
+    }
+
+    /// The point to send the pointer to for a rectangle: a snapped element if enabled and
+    /// available, otherwise the centre.
+    private func aim(_ r: Rect) -> Point {
+        if snapping, let p = snapProvider?.snapPoint(in: r), r.contains(p) {
+            target = p
+        } else {
+            target = r.center
+        }
+        return target
     }
 
     /// Convenience for a single screen.
@@ -121,6 +149,10 @@ public final class PointerEngine {
             return [dragging ? .mouseDown(.left) : .mouseUp(.left), .redraw]
         }
         if let fx = clickEffects(for: key, count: count) { return fx }
+        if keymap.snapToggle.contains(key), mode == .pointer {
+            snapping.toggle()
+            return [.warp(aim(s.current)), .redraw]
+        }
         if keymap.nextScreen.contains(key) {
             // With a count, Tab jumps to that screen (1-based); without, to the next one.
             if let c = count { return switchScreen(to: c - 1) }
@@ -136,13 +168,13 @@ public final class PointerEngine {
             if let q = keymap.quadrants[key] {
                 for _ in 0..<(count ?? 1) { s.select(q) }
                 state = .active(mode: .pointer, session: s)
-                return [.warp(s.current.center), .redraw]
+                return [.warp(aim(s.current)), .redraw]
             }
             if keymap.up.contains(key) {
                 guard s.up() else { return count == nil ? [] : [.redraw] }
                 for _ in 1..<(count ?? 1) { s.up() }
                 state = .active(mode: .pointer, session: s)
-                return [.warp(s.current.center), .redraw]
+                return [.warp(aim(s.current)), .redraw]
             }
         case .scroll:
             let half = screens[screenIndex].height / 2
@@ -190,7 +222,8 @@ public final class PointerEngine {
         screenIndex = index
         let s = BisectSession(root: screens[index])
         state = .active(mode: mode, session: s)
-        return [.warp(s.current.center), .redraw]
+        snapProvider?.prepare(screen: screens[index])
+        return [.warp(aim(s.current)), .redraw]
     }
 
     // MARK: Discoverability
@@ -209,6 +242,7 @@ public final class PointerEngine {
             h.append(("x", "double"))
             h.append(("v", dragging ? "drop" : "drag"))
             h.append(("s", "scroll"))
+            if snapProvider != nil { h.append(("a", snapping ? "snap on" : "snap off")) }
         case .scroll:
             h.append(("jk hl", "scroll"))
             h.append(("d u", "half page"))

@@ -4,9 +4,14 @@ import VimouseCore
 
 /// Wires the pure engine to the platform: event tap in, effects out.
 final class Controller {
-    private let engine = PointerEngine(keymap: .default)
+    private let snapper = AXSnapper()
+    private let engine: PointerEngine
     private let tap = InputTap()
     private let overlay = Overlay()
+
+    init(snapByDefault: Bool = true) {
+        engine = PointerEngine(keymap: .default, snapping: snapByDefault, snapProvider: snapper)
+    }
 
     func start() throws {
         tap.handler = { [weak self] key, isDown, isRepeat in
@@ -84,6 +89,8 @@ final class Controller {
             activeScreen: engine.screenIndex,
             dragging: engine.dragging,
             pendingCount: engine.pendingCount,
+            target: engine.target,
+            snapping: engine.snapping,
             hints: engine.hints
         )
     }

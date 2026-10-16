@@ -39,6 +39,17 @@ public struct Rect: Equatable, Sendable {
         p.x >= x && p.x < maxX && p.y >= y && p.y < maxY
     }
 
+    public func intersects(_ o: Rect) -> Bool {
+        x < o.maxX && o.x < maxX && y < o.maxY && o.y < maxY
+    }
+
+    /// Overlap of the two rectangles; zero-sized when they do not overlap.
+    public func intersection(_ o: Rect) -> Rect {
+        let nx = max(x, o.x), ny = max(y, o.y)
+        let nw = max(0, min(maxX, o.maxX) - nx), nh = max(0, min(maxY, o.maxY) - ny)
+        return Rect(x: nx, y: ny, width: nw, height: nh)
+    }
+
     /// Splits the rectangle into four equal quadrants.
     public func subdivided() -> [Quadrant: Rect] {
         let w = width / 2

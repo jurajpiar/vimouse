@@ -96,6 +96,7 @@ public struct KeyMap: Sendable {
     public var scrollRight: Set<KeyPress>
     public var scrollHalfDown: Set<KeyPress>
     public var scrollHalfUp: Set<KeyPress>
+    public var snapToggle: Set<KeyPress>
 
     public init(
         activate: KeyPress,
@@ -117,7 +118,8 @@ public struct KeyMap: Sendable {
         scrollLeft: Set<KeyPress> = [],
         scrollRight: Set<KeyPress> = [],
         scrollHalfDown: Set<KeyPress> = [],
-        scrollHalfUp: Set<KeyPress> = []
+        scrollHalfUp: Set<KeyPress> = [],
+        snapToggle: Set<KeyPress> = []
     ) {
         self.activate = activate
         self.quadrants = quadrants
@@ -139,6 +141,7 @@ public struct KeyMap: Sendable {
         self.scrollRight = scrollRight
         self.scrollHalfDown = scrollHalfDown
         self.scrollHalfUp = scrollHalfUp
+        self.snapToggle = snapToggle
     }
 
     public static let `default` = KeyMap(
@@ -169,7 +172,8 @@ public struct KeyMap: Sendable {
         scrollLeft: [KeyPress(.h)],
         scrollRight: [KeyPress(.l)],
         scrollHalfDown: [KeyPress(.d)],
-        scrollHalfUp: [KeyPress(.u)]
+        scrollHalfUp: [KeyPress(.u)],
+        snapToggle: [KeyPress(.a)]
     )
 
     /// Label shown inside each quadrant. Derived from the ANSI key name for now;

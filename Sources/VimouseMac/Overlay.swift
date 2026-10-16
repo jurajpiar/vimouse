@@ -13,6 +13,9 @@ struct OverlayModel {
     var activeScreen: Int
     var dragging: Bool
     var pendingCount: Int?
+    /// Where the pointer was sent; drawn when it differs from the rectangle centre (a snap).
+    var target: Point
+    var snapping: Bool
     var hints: [(key: String, action: String)]
 }
 
@@ -116,6 +119,14 @@ final class OverlayView: NSView {
                 if let label = model.labels[q] {
                     drawLabel(label, centredIn: local)
                 }
+            }
+            // Snap target, when it is not simply the centre.
+            if model.snapping, model.target != model.current.center {
+                let t = Coordinates.localRect(Rect(x: model.target.x - 7, y: model.target.y - 7, width: 14, height: 14), inWindow: windowFrame)
+                let ring = NSBezierPath(ovalIn: t)
+                ring.lineWidth = 2
+                NSColor.systemPink.setStroke()
+                ring.stroke()
             }
         } else {
             // Scroll mode: a ring around the pointer, which is where scrolling happens.
