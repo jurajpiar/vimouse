@@ -27,6 +27,15 @@ public enum ConfigSchema {
     # unknown or superseded settings are commented out (see \(changelog)).
     """
 
+    /// One line above each section header.
+    public static let sectionComments: [String: String] = [
+        "hotkey": "How Pointer mode is entered.",
+        "keys": "Bindings inside Pointer mode: picking quadrants, clicking, dragging, switching modes and displays.",
+        "scroll": "Scroll mode: scrolling the content under the pointer with the keyboard.",
+        "ruler": "Ruler mode: the reading band that dims everything except the line being read.",
+        "snap": "Snapping the pointer to clickable UI elements read from the accessibility tree.",
+    ]
+
     public static let entries: [ConfigEntry] = [
         .init(section: "hotkey", key: "activate", defaultValue: "\"cmd+shift+space\"", comment: "Global hotkey that enters Pointer mode, e.g. \"cmd+shift+space\", \"ctrl+alt+m\"."),
 
@@ -82,7 +91,7 @@ public enum ConfigSchema {
     public static func template() -> String {
         var out = header + "\n"
         for section in sections {
-            out += "\n[\(section)]\n"
+            out += "\n# \(sectionComments[section] ?? section)\n[\(section)]\n"
             for e in entries where e.section == section {
                 out += "# \(e.comment)\n\(e.key) = \(e.defaultValue)\n"
             }
@@ -99,16 +108,24 @@ public enum ConfigSchema {
         if lines.last == "" { lines.removeLast() }
         var changed = false
 
-        // Pass 1: find sections, their line ranges, and the keys they contain.
+        // Pass 1: find sections, their line ranges, and the keys they contain. Known
+        // sections and keys without a comment on the line above get theirs.
         struct SectionInfo { var start: Int; var end: Int; var keys: Set<String> }
         var sections: [String: SectionInfo] = [:]
         var current: String? = nil
+        var commentsToInsert: [(before: Int, text: String)] = []
+        func hasCommentAbove(_ i: Int) -> Bool {
+            i > 0 && lines[i - 1].trimmingCharacters(in: .whitespaces).hasPrefix("#")
+        }
         for (i, raw) in lines.enumerated() {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("[") && line.hasSuffix("]") {
                 let name = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
                 current = name
                 sections[name] = SectionInfo(start: i, end: i, keys: [])
+                if let c = sectionComments[name], !hasCommentAbove(i) {
+                    commentsToInsert.append((before: i, text: "# \(c)"))
+                }
                 continue
             }
             guard let sec = current, sections[sec] != nil else { continue }
@@ -116,8 +133,9 @@ public enum ConfigSchema {
             guard !line.isEmpty, !line.hasPrefix("#"), let eq = line.firstIndex(of: "=") else { continue }
             let key = line[..<eq].trimmingCharacters(in: .whitespaces)
             sections[sec]!.keys.insert(key)
-            let known = entries.contains { $0.section == sec && $0.key == key }
-            if !known {
+            if let entry = entries.first(where: { $0.section == sec && $0.key == key }) {
+                if !hasCommentAbove(i) { commentsToInsert.append((before: i, text: "# \(entry.comment)")) }
+            } else {
                 let note = superseded["\(sec).\(key)"] ?? "unknown setting"
                 lines[i] = "# \(note), ignored (see \(changelog)): \(raw)"
                 changed = true
@@ -139,8 +157,17 @@ public enum ConfigSchema {
             }
             changed = true
         }
-        for ins in insertions.sorted(by: { $0.after > $1.after }) {
-            lines.insert(contentsOf: ins.text, at: ins.after + 1)
+        // Apply every insert bottom up so earlier indices stay valid. A comment goes at
+        // `before`; a block of new keys goes at `after + 1`. At the same position the
+        // comment (which belongs to the line after it) is inserted first, so the block,
+        // which belongs to the section before, ends up above it.
+        var inserts: [(at: Int, isComment: Bool, text: [String])] =
+            commentsToInsert.map { (at: $0.before, isComment: true, text: [$0.text]) }
+            + insertions.map { (at: $0.after + 1, isComment: false, text: $0.text) }
+        inserts.sort { a, b in a.at != b.at ? a.at > b.at : (a.isComment && !b.isComment) }
+        for ins in inserts {
+            lines.insert(contentsOf: ins.text, at: ins.at)
+            changed = true
         }
         lines += appendix
         return (lines.joined(separator: "\n") + "\n", changed)

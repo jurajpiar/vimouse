@@ -102,6 +102,8 @@ final class ConfigTests: XCTestCase {
         let (text, changed) = ConfigSchema.migrate(old)
         XCTAssertTrue(changed)
         XCTAssertTrue(text.contains("# my notes"))
+        XCTAssertTrue(text.contains("# Bindings inside Pointer mode"))      // section description added
+        XCTAssertTrue(text.contains("# Pick the top-left quadrant, e.g. \"i\", \"up\".\ntop_left = \"q\"")) // comment for an existing key
         XCTAssertTrue(text.contains("top_left = \"q\""))                 // user value kept
         XCTAssertTrue(text.contains("ignored (see CHANGELOG.md in the vimouse repository): mystery = 1"))
         XCTAssertTrue(text.contains("left_click = [\"return\", \"m\"]"))   // missing key appended with default
@@ -117,8 +119,9 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(ConfigSchema.migrate("").changed)
     }
 
-    func testEverySettingHasAComment() {
+    func testEverySettingAndSectionHasAComment() {
         for e in ConfigSchema.entries { XCTAssertFalse(e.comment.isEmpty, "\(e.section).\(e.key)") }
+        for s in ConfigSchema.sections { XCTAssertNotNil(ConfigSchema.sectionComments[s], s) }
     }
 
     func testArrowKeysAndLabels() throws {
