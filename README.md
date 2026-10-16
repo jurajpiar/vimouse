@@ -16,6 +16,7 @@ swift run vimouse     # menu bar item "vm" appears
 
 Press ⌘⇧Space to enter Pointer mode. i/o/j/k pick a quadrant, Backspace or u goes
 up a level, Return or m left-clicks, . right-clicks, , middle-clicks, Escape exits.
+With several displays, Tab / Shift+Tab cycle screens and 1–9 jump to one directly.
 
 ## Accessibility permission
 

@@ -65,6 +65,21 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.delete)), [])
     }
 
+    func testScreenSwitching() {
+        let e = PointerEngine()
+        let second = Rect(x: 1000, y: -200, width: 800, height: 800)
+        _ = e.activate(screens: [screen, second], index: 0)
+        _ = e.handle(KeyPress(.i))
+        XCTAssertEqual(e.handle(KeyPress(.tab)), [.warp(Point(x: 1400, y: 200)), .redraw])
+        XCTAssertEqual(e.screenIndex, 1)
+        XCTAssertEqual(e.session?.depth, 0)
+        XCTAssertEqual(e.handle(KeyPress(.tab)), [.warp(Point(x: 500, y: 300)), .redraw]) // wraps
+        XCTAssertEqual(e.handle(KeyPress(.tab, [.shift])), [.warp(Point(x: 1400, y: 200)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.two)), []) // already there
+        XCTAssertEqual(e.handle(KeyPress(.nine)), []) // no such screen
+        XCTAssertEqual(e.handle(KeyPress(.one)), [.warp(Point(x: 500, y: 300)), .redraw])
+    }
+
     func testEscapeExits() {
         let e = PointerEngine()
         _ = e.activate(screen: screen)

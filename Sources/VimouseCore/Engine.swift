@@ -19,6 +19,10 @@ public final class PointerEngine {
         case bisect(BisectSession)
     }
 
+    /// All displays (CG coordinates) and which one the session is on.
+    public private(set) var screens: [Rect] = []
+    public private(set) var screenIndex: Int = 0
+
     public private(set) var state: State = .idle
     public let keymap: KeyMap
 
@@ -36,11 +40,28 @@ public final class PointerEngine {
         return nil
     }
 
-    /// Enter Pointer mode over the given screen rectangle (CG coordinates).
-    public func activate(screen: Rect) -> [Effect] {
-        let s = BisectSession(root: screen)
+    /// Enter Pointer mode over `screens[index]` (CG coordinates).
+    public func activate(screens: [Rect], index: Int) -> [Effect] {
+        precondition(!screens.isEmpty && screens.indices.contains(index))
+        self.screens = screens
+        screenIndex = index
+        let s = BisectSession(root: screens[index])
         state = .bisect(s)
         return [.showOverlay, .warp(s.current.center)]
+    }
+
+    /// Convenience for a single screen.
+    public func activate(screen: Rect) -> [Effect] {
+        activate(screens: [screen], index: 0)
+    }
+
+    /// Restart the bisect at another screen's root. No-op for an invalid index.
+    private func switchScreen(to index: Int) -> [Effect] {
+        guard screens.indices.contains(index), index != screenIndex else { return [] }
+        screenIndex = index
+        let s = BisectSession(root: screens[index])
+        state = .bisect(s)
+        return [.warp(s.current.center), .redraw]
     }
 
     public func deactivate() -> [Effect] {
@@ -74,6 +95,15 @@ public final class PointerEngine {
         }
         if keymap.exit.contains(key) {
             return deactivate()
+        }
+        if keymap.nextScreen.contains(key) {
+            return switchScreen(to: (screenIndex + 1) % screens.count)
+        }
+        if keymap.previousScreen.contains(key) {
+            return switchScreen(to: (screenIndex - 1 + screens.count) % screens.count)
+        }
+        if let i = keymap.screens[key] {
+            return switchScreen(to: i)
         }
         return []
     }

@@ -39,6 +39,16 @@ public extension KeyCode {
     static let space = KeyCode(rawValue: 49)
     static let delete = KeyCode(rawValue: 51)
     static let escape = KeyCode(rawValue: 53)
+    static let tab = KeyCode(rawValue: 48)
+    static let one = KeyCode(rawValue: 18)
+    static let two = KeyCode(rawValue: 19)
+    static let three = KeyCode(rawValue: 20)
+    static let four = KeyCode(rawValue: 21)
+    static let five = KeyCode(rawValue: 23)
+    static let six = KeyCode(rawValue: 22)
+    static let seven = KeyCode(rawValue: 26)
+    static let eight = KeyCode(rawValue: 28)
+    static let nine = KeyCode(rawValue: 25)
 }
 
 public struct Modifiers: OptionSet, Hashable, Sendable {
@@ -71,6 +81,10 @@ public struct KeyMap: Sendable {
     public var rightClick: Set<KeyPress>
     public var middleClick: Set<KeyPress>
     public var exit: Set<KeyPress>
+    public var nextScreen: Set<KeyPress>
+    public var previousScreen: Set<KeyPress>
+    /// Direct jump: key -> 0-based screen index.
+    public var screens: [KeyPress: Int]
 
     public init(
         activate: KeyPress,
@@ -79,7 +93,10 @@ public struct KeyMap: Sendable {
         leftClick: Set<KeyPress>,
         rightClick: Set<KeyPress>,
         middleClick: Set<KeyPress>,
-        exit: Set<KeyPress>
+        exit: Set<KeyPress>,
+        nextScreen: Set<KeyPress> = [],
+        previousScreen: Set<KeyPress> = [],
+        screens: [KeyPress: Int] = [:]
     ) {
         self.activate = activate
         self.quadrants = quadrants
@@ -88,6 +105,9 @@ public struct KeyMap: Sendable {
         self.rightClick = rightClick
         self.middleClick = middleClick
         self.exit = exit
+        self.nextScreen = nextScreen
+        self.previousScreen = previousScreen
+        self.screens = screens
     }
 
     public static let `default` = KeyMap(
@@ -102,7 +122,13 @@ public struct KeyMap: Sendable {
         leftClick: [KeyPress(.return), KeyPress(.m)],
         rightClick: [KeyPress(.period)],
         middleClick: [KeyPress(.comma)],
-        exit: [KeyPress(.escape)]
+        exit: [KeyPress(.escape)],
+        nextScreen: [KeyPress(.tab)],
+        previousScreen: [KeyPress(.tab, [.shift])],
+        screens: [
+            KeyPress(.one): 0, KeyPress(.two): 1, KeyPress(.three): 2, KeyPress(.four): 3, KeyPress(.five): 4,
+            KeyPress(.six): 5, KeyPress(.seven): 6, KeyPress(.eight): 7, KeyPress(.nine): 8,
+        ]
     )
 
     /// Label shown inside each quadrant. Derived from the ANSI key name for now;

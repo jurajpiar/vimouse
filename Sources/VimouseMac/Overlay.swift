@@ -7,6 +7,9 @@ struct OverlayModel {
     var current: Rect
     var ancestors: [Rect]
     var labels: [Quadrant: String]
+    /// All displays (CG coordinates) and the active one, for the screen-number badges.
+    var screens: [Rect]
+    var activeScreen: Int
 }
 
 /// One transparent, click-through panel per display, above everything including
@@ -30,14 +33,15 @@ final class Overlay {
 
     private func rebuild() {
         panels.forEach { $0.close() }
-        panels = NSScreen.screens.map { OverlayPanel(screen: $0) }
+        panels = NSScreen.screens.enumerated().map { OverlayPanel(screen: $1, index: $0) }
     }
 }
 
 final class OverlayPanel: NSPanel {
-    let view = OverlayView()
+    let view: OverlayView
 
-    init(screen: NSScreen) {
+    init(screen: NSScreen, index: Int) {
+        view = OverlayView(screenIndex: index)
         super.init(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         level = .screenSaver
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
@@ -54,10 +58,24 @@ final class OverlayPanel: NSPanel {
 
 final class OverlayView: NSView {
     var model: OverlayModel?
+    let screenIndex: Int
+
+    init(screenIndex: Int) {
+        self.screenIndex = screenIndex
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let model, let windowFrame = window?.frame else { return }
         let toLocal = { (r: Rect) in Coordinates.localRect(r, inWindow: windowFrame) }
+
+        // Inactive displays: only a faint screen number (1-based, Tab or digit switches).
+        if screenIndex != model.activeScreen {
+            drawScreenBadge(screenIndex + 1, in: bounds)
+            return
+        }
 
         // Ancestors: faint outlines so the descent stays visible.
         NSColor.systemBlue.withAlphaComponent(0.25).setStroke()
@@ -88,6 +106,16 @@ final class OverlayView: NSView {
                 drawLabel(label, centredIn: local)
             }
         }
+    }
+
+    private func drawScreenBadge(_ number: Int, in rect: NSRect) {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: min(rect.height * 0.3, 200), weight: .bold),
+            .foregroundColor: NSColor.systemBlue.withAlphaComponent(0.25),
+        ]
+        let s = NSAttributedString(string: "\(number)", attributes: attrs)
+        let sz = s.size()
+        s.draw(at: NSPoint(x: rect.midX - sz.width / 2, y: rect.midY - sz.height / 2))
     }
 
     private func drawLabel(_ text: String, centredIn rect: NSRect) {

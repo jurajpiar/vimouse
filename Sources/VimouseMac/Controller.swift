@@ -40,8 +40,10 @@ final class Controller {
 
     private func activate() {
         let mouse = NSEvent.mouseLocation
-        guard let screen = Coordinates.screen(containing: mouse) else { return }
-        apply(engine.activate(screen: Coordinates.cgRect(fromAppKit: screen.frame)))
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return }
+        let index = screens.firstIndex { NSMouseInRect(mouse, $0.frame, false) } ?? 0
+        apply(engine.activate(screens: screens.map { Coordinates.cgRect(fromAppKit: $0.frame) }, index: index))
     }
 
     private func apply(_ effects: [Effect]) {
@@ -65,7 +67,13 @@ final class Controller {
         guard let s = engine.session else { return nil }
         var labels: [Quadrant: String] = [:]
         for q in Quadrant.allCases { labels[q] = engine.keymap.label(for: q) }
-        return OverlayModel(current: s.current, ancestors: Array(s.ancestors), labels: labels)
+        return OverlayModel(
+            current: s.current,
+            ancestors: Array(s.ancestors),
+            labels: labels,
+            screens: engine.screens,
+            activeScreen: engine.screenIndex
+        )
     }
 }
 #endif
