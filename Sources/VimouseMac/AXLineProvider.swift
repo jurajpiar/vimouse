@@ -331,7 +331,10 @@ final class AXLineProvider: LineProvider {
         guard AXUIElementCopyAttributeValue(element, Marker.startOfElement as CFString, &value) == .success, var m = value else { return nil }
         guard let firstRange = markerValue(element, Marker.lineRange, m) else { log("start marker but no line range"); return nil }
         // Which way the bounds come: the reading that lands inside the element's frame.
-        guard let asCocoa = normalisedBounds(element, firstRange, flipped: true) else { log("start marker but no bounds"); return nil }
+        guard let asCocoa = normalisedBounds(element, firstRange, flipped: true) else {
+            if debug { diagnoseBounds(element, firstRange) }
+            return nil
+        }
         let asCG = normalisedBounds(element, firstRange, flipped: false)
         let flipped = frame.intersects(asCocoa) || asCG.map { !frame.intersects($0) } ?? true
         var range: AnyObject = firstRange
@@ -352,6 +355,40 @@ final class AXLineProvider: LineProvider {
         }
         log("no line under y \(Int(y)) by start marker")
         return nil
+    }
+
+    /// Debug: what the bounds calls return for a line range and for an index range.
+    private func diagnoseBounds(_ element: AXUIElement, _ range: AnyObject) {
+        var out: CFTypeRef?
+        let err = AXUIElementCopyParameterizedAttributeValue(element, Marker.bounds as CFString, range, &out)
+        var desc = "err \(err.rawValue)"
+        if let v = out {
+            desc += " type \(CFGetTypeID(v)) (AXValue is \(AXValueGetTypeID()))"
+            if CFGetTypeID(v) == AXValueGetTypeID() {
+                var r = CGRect.zero
+                // swiftlint:disable:next force_cast
+                if AXValueGetValue(v as! AXValue, .cgRect, &r) { desc += " rect \(r)" } else { desc += " AXValue kind \(AXValueGetType(v as! AXValue).rawValue)" }
+            } else {
+                desc += " \(v)"
+            }
+        }
+        log("marker-range bounds: \(desc)")
+        let n: Int = attribute(element, kAXNumberOfCharactersAttribute) ?? -1
+        var cf = CFRange(location: 0, length: min(5, max(n, 1)))
+        if let rv = AXValueCreate(.cfRange, &cf) {
+            var out2: CFTypeRef?
+            let err2 = AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString, rv, &out2)
+            var d2 = "err \(err2.rawValue)"
+            if let v = out2, CFGetTypeID(v) == AXValueGetTypeID() {
+                var r = CGRect.zero
+                // swiftlint:disable:next force_cast
+                if AXValueGetValue(v as! AXValue, .cgRect, &r) { d2 += " rect \(r)" }
+            }
+            log("index-range bounds (0..<\(cf.length) of \(n)): \(d2)")
+            var out3: CFTypeRef?
+            let err3 = AXUIElementCopyParameterizedAttributeValue(element, kAXLineForIndexParameterizedAttribute as CFString, 3 as CFNumber, &out3)
+            log("line for index 3: err \(err3.rawValue) \(out3.map { "\($0)" } ?? "nil")")
+        }
     }
 
     /// Chromium: the hit element's start as a text index, its line number, then the
