@@ -103,8 +103,10 @@ public final class PointerEngine {
         let id = mode.flatMap { enabled.contains($0) ? $0 : nil } ?? defaultMode
         previousMode = nil
         context.activeMode = id
+        let before = context.target
         self.mode(id)?.activate(context)
-        return [.showOverlay]
+        // A mode may place the pointer on activation (a band seating on a text line).
+        return context.target == before ? [.showOverlay] : [.showOverlay, .warp(context.target)]
     }
 
     /// Convenience for a single screen.
@@ -120,8 +122,9 @@ public final class PointerEngine {
         // Going back to where we came from clears the trail; anything else records it.
         previousMode = id == previousMode ? nil : current
         context.activeMode = id
+        let before = context.target
         next.activate(context)
-        return [.redraw]
+        return context.target == before ? [.redraw] : [.warp(context.target), .redraw]
     }
 
     /// The mode to fall back to: the previous one if still enabled, else the default.

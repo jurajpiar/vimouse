@@ -614,7 +614,7 @@ final class EngineTests: XCTestCase {
         e.context.services.lines = fake
         _ = e.activate(screen: screen)
         _ = e.handle(KeyPress(.i)) // (250,150): on the line at y 148..168
-        _ = e.handle(KeyPress(.r))
+        XCTAssertEqual(e.handle(KeyPress(.r)), [.warp(Point(x: 250, y: 158)), .redraw]) // seated on the line, pointer with it
         XCTAssertEqual(e.ruler?.y, 158)
         XCTAssertEqual(e.ruler?.height, 24) // 20 + 2 px padding each side
         _ = e.handle(KeyPress(.j))
@@ -650,8 +650,9 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.ruler, Ruler(screenIndex: 0, x: 250, y: 150, height: 32))
         XCTAssertEqual(e.ruler?.band(on: screen), Rect(x: 0, y: 134, width: 1000, height: 32))
         _ = e.handle(KeyPress(.five))
-        XCTAssertEqual(e.handle(KeyPress(.j)), [.redraw])
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.warp(Point(x: 250, y: 310)), .redraw]) // the pointer rides along
         XCTAssertEqual(e.ruler?.y, 150 + 5 * 32) // moves by its own height
+        XCTAssertEqual(e.target, Point(x: 250, y: 310))
         _ = e.handle(KeyPress(.rightBracket))
         XCTAssertEqual(e.ruler?.height, 36)
         _ = e.handle(KeyPress(.k))

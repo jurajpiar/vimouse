@@ -110,6 +110,14 @@ public final class RulerMode: Mode {
             if let line = snappedLine(for: r, direction: 0, ctx) { r.y = line.y; r.height = line.height }
             ruler = r
         }
+        follow(ctx)
+    }
+
+    /// The pointer rides on the band's centre line so the marker, clicks and a switch to
+    /// Scroll mode all act where the band is.
+    private func follow(_ ctx: ModeContext) {
+        guard let r = ruler, r.screenIndex == ctx.screenIndex else { return }
+        ctx.target = ctx.clamped(Point(x: ctx.target.x, y: r.y))
     }
 
     public func handleAnywhere(_ key: KeyPress, count: Int?, _ ctx: ModeContext) -> [Effect]? {
@@ -130,7 +138,8 @@ public final class RulerMode: Mode {
                 r.y = line.y; r.height = line.height
                 ruler = r
             }
-            return [.redraw]
+            follow(ctx)
+            return [.warp(ctx.target), .redraw]
         }
         guard var r = ruler else { return nil }
         let screen = ctx.screens[r.screenIndex]
@@ -157,7 +166,8 @@ public final class RulerMode: Mode {
         r.height = max(8, r.height)
         r.y = min(max(r.y, screen.y), screen.maxY)
         ruler = r
-        return [.redraw]
+        follow(ctx)
+        return [.warp(ctx.target), .redraw]
     }
 
     /// Centre and height for the band on the text line `count` lines from the current one
