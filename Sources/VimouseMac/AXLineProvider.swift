@@ -418,8 +418,13 @@ final class AXLineProvider: LineProvider {
             return nil
         }
         guard let first = charRect(0) else { log("char route: no rectangle for character 0 of \(n)"); return nil }
-        log("char route: character 0 at \(first), element frame \(frame)")
         guard y >= first.y - 1 else { return nil }
+        // WebKit answers index ranges with the first row's geometry whatever the index:
+        // an element several rows tall whose last character sits on the first row is lying.
+        if frame.height > first.height * 1.8, let lastChar = charRect(n - 1), lastChar.y < first.y + first.height / 2 {
+            log("char route: not trustworthy here (last character on the first row)")
+            return nil
+        }
         // The first character whose row ends below y.
         var lo = 0, hi = n - 1
         while lo < hi {
