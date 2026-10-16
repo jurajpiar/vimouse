@@ -11,11 +11,11 @@ final class Controller {
     private let overlay = Overlay()
     private let scroller = ScrollDriver()
     private let nudger = NudgeDriver()
-    private var rulerDim: Double = Config().rulerDim
-    private var colours = Colours()
     private var dragRamp = false
-    private var activateMode: Mode = .pointer
-    private var holdMode: Mode = .pointer
+    private var activateMode: String
+    private var holdMode: String
+    /// Modifiers that flick in Scroll mode; releasing them brakes a coast.
+    private var flickWith: Modifiers?
     /// True while the help key is held.
     private var helpShown = false
 
@@ -26,27 +26,34 @@ final class Controller {
     private var healthTimer: Timer?
     private var tapRunning = false
 
-    init() {
-        engine = PointerEngine(keymap: .default, snapping: true, snapProvider: snapper)
-        engine.lineProvider = lines
+    init(modes: [Mode]) {
+        engine = PointerEngine(modes: modes)
+        engine.context.services.snap = snapper
+        engine.context.services.lines = lines
+        activateMode = engine.defaultMode
+        holdMode = engine.defaultMode
     }
 
     /// Called on load and on every reload of config.toml.
     func apply(_ config: Config) {
         engine.apply(config)
-        rulerDim = config.rulerDim
-        scroller.step = config.scrollStep
-        scroller.speed = config.scrollSpeed
-        scroller.acceleration = config.scrollAcceleration
-        scroller.momentum = config.scrollMomentum
-        scroller.smooth = config.scrollSmooth
-        scroller.flick = config.scrollFlick
-        scroller.friction = config.scrollFriction
-        scroller.doubleTapFlicks = config.flickDoubleTapEnabled
-        nudger.step = config.nudgeStep
-        nudger.speed = config.nudgeSpeed
-        nudger.acceleration = config.nudgeAcceleration
-        colours = config.colours
+        // The drivers take their tunables from whichever mode provides them.
+        if let s = config.modeSettings.values.first(where: { $0 is ScrollTunables }) as? ScrollTunables {
+            scroller.step = s.step
+            scroller.speed = s.speed
+            scroller.acceleration = s.acceleration
+            scroller.momentum = s.momentum
+            scroller.smooth = s.smooth
+            scroller.flick = s.flick
+            scroller.friction = s.friction
+            scroller.doubleTapFlicks = s.flickDoubleTapEnabled
+            flickWith = s.flickWith
+        }
+        if let n = config.modeSettings.values.first(where: { $0 is NudgeTunables }) as? NudgeTunables {
+            nudger.step = n.step
+            nudger.speed = n.speed
+            nudger.acceleration = n.acceleration
+        }
         dragRamp = config.dragRamp
         activateMode = config.activateMode
         holdMode = config.holdMode
@@ -130,7 +137,7 @@ final class Controller {
     /// Other modifier changes pass through.
     private func handleModifier(_ key: KeyPress, isDown: Bool) -> Bool {
         // Releasing the flick modifier while the page coasts brakes it.
-        if !isDown, scroller.isCoasting, let fm = engine.keymap.flickWith,
+        if !isDown, scroller.isCoasting, let fm = flickWith,
            let generic = key.code.modifierBit, let side = key.code.sideBit,
            !fm.intersection([generic, side]).isEmpty {
             scroller.brake()
@@ -204,9 +211,9 @@ final class Controller {
             apply(engine.handleRelease(key))
             return true
         }
-        // Key repeat is useful for nudging and moving the ruler, not for picking quadrants;
-        // a held scroll key is driven by the scroller, not by repeats.
-        if isRepeat, engine.mode == .pointer || (engine.mode == .scroll && scroller.smooth) || nudger.isHeld { return true }
+        // Key repeat is useful for some modes (moving the ruler), not for others (picking
+        // quadrants); a key the drivers hold is theirs, not the repeat's.
+        if isRepeat, !(engine.activeMode?.acceptsKeyRepeat ?? true) || nudger.isHeld || scroller.isHeld { return true }
         apply(engine.handle(key))
         return true
     }
@@ -264,28 +271,8 @@ final class Controller {
     }
 
     /// nil when there is nothing to draw.
-    private func model() -> OverlayModel? {
-        guard engine.needsOverlay else { return nil }
-        var pointer: PointerModel?
-        if let s = engine.session, let mode = engine.mode {
-            var labels: [Quadrant: String] = [:]
-            for q in Quadrant.allCases { labels[q] = engine.keymap.label(for: q) }
-            pointer = PointerModel(
-                mode: mode,
-                current: s.current,
-                ancestors: Array(s.ancestors),
-                labels: labels,
-                dragging: engine.dragging,
-                dragOrigin: engine.dragOrigin,
-                pendingCount: engine.pendingCount,
-                target: engine.target,
-                snapping: engine.snapping,
-                hints: engine.hints,
-                help: helpShown ? engine.help : nil
-            )
-        }
-        let ruler = engine.ruler.map { RulerModel(screenIndex: $0.screenIndex, band: $0.band(on: engine.screens[$0.screenIndex]), dim: rulerDim) }
-        return OverlayModel(pointer: pointer, ruler: ruler, colours: colours, screens: engine.screens, activeScreen: engine.screenIndex)
+    private func model() -> Scene? {
+        engine.scene(showHelp: helpShown)
     }
 }
 #endif

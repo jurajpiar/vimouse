@@ -5,7 +5,8 @@ import Foundation
 public enum Manual {
     public static let version = "0.1-dev"
 
-    public static func roff(date: String = "2026-10") -> String {
+    public static func roff(modes: [Mode], date: String = "2026-10") -> String {
+        let schema = ConfigSchema(modes: modes)
         var o = ""
         func line(_ s: String) { o += s + "\n" }
         func esc(_ s: String) -> String {
@@ -20,23 +21,18 @@ public enum Manual {
         line(".SH SYNOPSIS")
         line(".B vimouse")
         line(".PP")
-        line("A menu bar app. Press the activation hotkey (default \(esc(k.activate.label))) to enter Pointer mode.")
+        line("A menu bar app. Press the activation hotkey (default \(esc(k.activate.label))) to enter the default mode.")
         line(".SH DESCRIPTION")
-        line("vimouse divides the screen into four quadrants; one key picks a quadrant, which is divided again, until the pointer is on the target. Clicks, drags, scrolling, a reading ruler and pixel nudging are available at any depth. A status strip at the screen edge lists the keys valid at any moment; hold the help key for the full map.")
+        line("vimouse drives the pointer from the keyboard through modes: by default, quadrant navigation (the screen is divided into four, one key picks a quadrant, which is divided again, until the pointer is on the target), pixel nudging, scrolling and a reading ruler. Modes are plugins; [modes] enabled in the configuration chooses which are available. Clicks and drags work in every mode. A status strip at the screen edge lists the keys valid at any moment; hold the help key for the full map.")
         line(".PP")
         line("Counts work as in vi: digits typed before a command repeat or scale it (45j scrolls 45 steps, 3\\(:backspace: goes up three levels, 3\\(:return: triple-clicks, 2\\(:tab: switches to display 2).")
 
         line(".SH MODES")
-        let modes: [(String, String)] = [
-            ("Pointer", "Quadrant navigation. Keys: \(esc([Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { k.label(for: $0) }.joined(separator: " "))) pick a quadrant; \(esc(keys(k.up))) up one level; \(esc(keys(k.top))) back to the whole screen; \(esc(keys(k.snapToggle))) toggles snapping to UI elements."),
-            ("Nudge", "Pixel movement for the final adjustment. \(esc(keys(k.nudgeToggle))) enters and leaves; \(esc(keys(k.nudgeLeft))) / \(esc(keys(k.nudgeDown))) / \(esc(keys(k.nudgeUp))) / \(esc(keys(k.nudgeRight))) move; Shift held moves one pixel."),
-            ("Scroll", "Scrolls the content under the pointer. \(esc(keys(k.scrollToggle))) enters and leaves; \(esc(keys(k.scrollDown))) / \(esc(keys(k.scrollUp))) / \(esc(keys(k.scrollLeft))) / \(esc(keys(k.scrollRight))) scroll; \(esc(keys(k.scrollHalfDown))) / \(esc(keys(k.scrollHalfUp))) half a screen. Key repeat works here."),
-            ("Ruler", "A reading band that dims everything except the line being read. \(esc(keys(k.rulerToggle))) creates it at the pointer and enters the mode (again: back to Pointer, band stays); \(esc(keys(k.rulerDown))) / \(esc(keys(k.rulerUp))) move it by its own height; \(esc(keys(k.rulerShrink))) / \(esc(keys(k.rulerGrow))) resize; Shift held makes one-pixel changes; \(esc(keys(k.rulerRemove))) removes the band. The band survives leaving Pointer mode."),
-        ]
-        for (name, text) in modes {
+        for m in modes {
             line(".TP")
-            line(".B \(name)")
-            line(text)
+            line(".B \(m.name.capitalized)")
+            let toggle = m.toggle.isEmpty ? "" : " Enter it with \(esc(keys(m.toggle))) (again: back to the default mode)."
+            line(esc(m.manual) + toggle)
         }
 
         line(".SH ACTIONS")
@@ -67,10 +63,10 @@ public enum Manual {
         line("On start, unless [config] update = false, settings missing from the file are appended with their defaults and unknown or superseded ones are moved to a \"Retired settings\" block at the end. The file")
         line(".I ~/.config/vimouse/config.example.toml")
         line("is always rewritten with the current defaults.")
-        for section in ConfigSchema.sections {
+        for section in schema.sections {
             line(".SS [\(section)]")
-            line(esc(ConfigSchema.sectionComments[section] ?? ""))
-            for e in ConfigSchema.entries where e.section == section {
+            line(esc(schema.sectionComments[section] ?? ""))
+            for e in schema.entries where e.section == section {
                 line(".TP")
                 line(".B \(esc(e.key))")
                 line("\(esc(e.comment)) Default: \(esc(e.defaultValue))")

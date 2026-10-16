@@ -2,9 +2,10 @@
 
 Keyboard-driven mouse for macOS. Divide the screen into quadrants, pick one with
 i/o/j/k, repeat until the pointer is where you want it, then click. See
-`docs/PLAN.md` for the design and roadmap.
+`docs/PLAN.md` for the design and roadmap and `docs/PLUGINS.md` for how modes are
+built as plugins.
 
-Status: Phase 0 spike. Expect rough edges.
+Status: pre-release. Expect rough edges.
 
 ## Build and run (macOS 14+, Xcode 15+ command line tools)
 
@@ -22,14 +23,17 @@ right Shift gives ⇧r). The hotkey pressed meanwhile pins the mode so it surviv
 the release. The status strip at the screen edge lists the
 keys valid at any moment. Defaults:
 
+Modes are plugins (`docs/PLUGINS.md`); `[modes] enabled` in the config picks which
+are available and which is the default. The standard four:
+
 Pointer: i/o/j/k pick a quadrant, Backspace or u goes up a level, Shift+u or
 Shift+Backspace back to the whole screen. Return or m
 left-clicks and exits, Space clicks and stays, x double-clicks, . right-clicks,
 , middle-clicks. Hold Shift, Cmd or Option with any click key to pass the modifier
 into the click. v presses the left button (drag or select) and, unless
-`[drag] restart_search = false`, restarts the quadrant search from the whole
+`[pointer] drag_restart = false`, restarts the quadrant search from the whole
 screen; navigate (any mode, any display), then v or Return releases. Escape during a drag cancels it and returns the pointer to
-where the button went down. s enters Scroll mode. a toggles snapping: when on (the default), each
+where the button went down. s enters Scroll mode. a toggles snapping: when on (`[pointer] snap`, the default), each
 step sends the pointer to the nearest clickable element inside the chosen rectangle
 (read from the frontmost app's accessibility tree) instead of its centre; a pink
 ring marks the snap target. Escape exits (releasing any drag).
@@ -51,7 +55,7 @@ of the screen, and enters Ruler mode: j/k move it by its own height (or a fixed 
 via `[ruler] move`), [ ] change its height, Shift with any of those moves or
 resizes by one pixel, s goes to
 Scroll mode (scroll the text under a fixed band), r back to Pointer. The band stays
-after Escape; Shift+r removes it. With `[ruler] snap = true` (the default) the band
+after Escape; Shift+r removes it from any mode. With `[ruler] snap = true` (the default) the band
 reads the lines of text under the pointer's column through the accessibility API: it
 is created on the line under the pointer, sized to it (plus `[ruler] pad`), and j/k
 move it a line at a time, falling back to height steps where no text is found; a

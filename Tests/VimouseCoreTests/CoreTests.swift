@@ -1,5 +1,36 @@
 import XCTest
 @testable import VimouseCore
+import PointerMode
+import NudgeMode
+import ScrollMode
+import RulerMode
+
+/// The modes the app ships, fresh for each test.
+func standardModes() -> [Mode] { [PointerMode(), NudgeMode(), ScrollMode(), RulerMode()] }
+
+extension PointerEngine {
+    convenience init(keymap: KeyMap = .default) { self.init(modes: standardModes(), keymap: keymap) }
+    var pointer: PointerMode { mode("pointer") as! PointerMode }
+    var rulerMode: RulerMode { mode("ruler") as! RulerMode }
+    var ruler: Ruler? { rulerMode.ruler }
+    var session: BisectSession? { pointer.session }
+    var snapping: Bool { pointer.snapping }
+}
+
+extension Config {
+    static func parse(_ text: String) throws -> Config { try parse(text, modes: standardModes()) }
+    static var defaults: Config { Config(modes: standardModes()) }
+    static var defaultTOML: String { ConfigSchema(modes: standardModes()).template() }
+    var scrollStep: Double { settings(ScrollMode.Settings.self, for: "scroll")!.step }
+    var rulerDim: Double { settings(RulerMode.Settings.self, for: "ruler")!.dim }
+    var snapEnabled: Bool { settings(PointerMode.Settings.self, for: "pointer")!.snap }
+    var quadrants: [KeyPress: Quadrant] { settings(PointerMode.Settings.self, for: "pointer")!.quadrants }
+    var flickWith: Modifiers? { settings(ScrollMode.Settings.self, for: "scroll")!.flickWith }
+    var flickDoubleTapEnabled: Bool { settings(ScrollMode.Settings.self, for: "scroll")!.flickDoubleTapEnabled }
+    var rulerRemove: Set<KeyPress> { settings(RulerMode.Settings.self, for: "ruler")!.remove }
+}
+
+let schema = ConfigSchema(modes: standardModes())
 
 final class GeometryTests: XCTestCase {
     func testSubdivisionCoversRect() {
@@ -46,11 +77,11 @@ final class BisectTests: XCTestCase {
 
 final class ConfigTests: XCTestCase {
     func testDefaultTemplateReproducesDefaults() throws {
-        XCTAssertEqual(try Config.parse(Config.defaultTOML), Config())
+        XCTAssertEqual(try Config.parse(Config.defaultTOML), Config.defaults)
     }
 
     func testEmptyFileIsDefaults() throws {
-        XCTAssertEqual(try Config.parse(""), Config())
+        XCTAssertEqual(try Config.parse(""), Config.defaults)
     }
 
     func testOverridesAndKeySpecs() throws {
@@ -62,18 +93,17 @@ final class ConfigTests: XCTestCase {
         top_right = "w"
         bottom_left = "a"
         bottom_right = "s"
+        snap = false
         [actions]
         left_click = "space"
         [scroll]
         step = 24
         [ruler]
         dim = 2   # clamped
-        [snap]
-        enabled = false
         """)
         XCTAssertEqual(c.keymap.activate, KeyPress(.m, [.control, .option]))
-        XCTAssertEqual(c.keymap.quadrants[KeyPress(.q)], .topLeft)
-        XCTAssertEqual(c.keymap.quadrants[KeyPress(.s)], .bottomRight)
+        XCTAssertEqual(c.quadrants[KeyPress(.q)], .topLeft)
+        XCTAssertEqual(c.quadrants[KeyPress(.s)], .bottomRight)
         XCTAssertEqual(c.keymap.leftClick, [KeyPress(.space)])
         XCTAssertEqual(c.scrollStep, 24)
         XCTAssertEqual(c.rulerDim, 1)
@@ -100,7 +130,7 @@ final class ConfigTests: XCTestCase {
         [scroll]
         step = 24
         """
-        let (text, changed) = ConfigSchema.migrate(old)
+        let (text, changed) = schema.migrate(old)
         XCTAssertTrue(changed)
         XCTAssertTrue(text.contains("# my notes"))
         XCTAssertTrue(text.contains("# Pointer mode: narrowing down"))      // section description added
@@ -110,12 +140,12 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(text.hasSuffix("# Retired settings (see CHANGELOG.md in the vimouse repository):\n# [pointer] mystery = 1\n"))
         XCTAssertTrue(text.contains("left_click = [\"return\", \"m\"]"))   // missing key appended with default
         XCTAssertTrue(text.contains("[ruler]"))                            // missing section appended
-        let (t2, _) = ConfigSchema.migrate("[ruler]\nstep = 20\n")
+        let (t2, _) = schema.migrate("[ruler]\nstep = 20\n")
         XCTAssertTrue(t2.hasSuffix("# Retired settings (see CHANGELOG.md in the vimouse repository):\n# [ruler] step = 20\n"))
         XCTAssertFalse(t2.contains("\nstep = 20"))
         XCTAssertTrue(t2.contains("\nmove = 0"))
         // A renamed setting carries its value to the new place.
-        let (t3, _) = ConfigSchema.migrate("[keys]\nleft_click = \"space\"\nexit = \"q\"\n")
+        let (t3, _) = schema.migrate("[keys]\nleft_click = \"space\"\nexit = \"q\"\n")
         XCTAssertFalse(t3.contains("[keys]"))                              // empty old section dropped
         XCTAssertFalse(t3.contains("moved to"))                            // renames are silent
         XCTAssertTrue(t3.contains("\nleft_click = \"space\"\n"))
@@ -123,50 +153,55 @@ final class ConfigTests: XCTestCase {
         let c3 = try Config.parse(t3)
         XCTAssertEqual(c3.keymap.leftClick, [KeyPress(.space)])
         XCTAssertEqual(c3.keymap.exit, [KeyPress(.q)])
-        XCTAssertFalse(ConfigSchema.migrate(t3).changed)
+        XCTAssertFalse(schema.migrate(t3).changed)
         // Notes left inline by earlier versions are gathered into the retired block.
         let legacy = "[scroll]\nstep = 24\n# moved to [actions] drag (see x): drag = \"v\"\n# unknown setting, ignored (see x): foo = 1\n"
-        let (t4, c4) = ConfigSchema.migrate(legacy)
+        let (t4, c4) = schema.migrate(legacy)
         XCTAssertTrue(c4)
         XCTAssertFalse(t4.contains("moved to"))
         XCTAssertTrue(t4.hasSuffix("# Retired settings (see CHANGELOG.md in the vimouse repository):\n# foo = 1\n"))
-        XCTAssertFalse(ConfigSchema.migrate(t4).changed)
+        XCTAssertFalse(schema.migrate(t4).changed)
         XCTAssertTrue(text.contains("# Darkening outside the band"))      // with its comment
         let c = try Config.parse(text)
         XCTAssertEqual(c.scrollStep, 24)
-        XCTAssertEqual(c.keymap.quadrants[KeyPress(.q)], .topLeft)
+        XCTAssertEqual(c.quadrants[KeyPress(.q)], .topLeft)
         XCTAssertEqual(c.keymap.leftClick, KeyMap.default.leftClick)
         // A second migration is a no-op.
-        XCTAssertFalse(ConfigSchema.migrate(text).changed)
-        XCTAssertFalse(ConfigSchema.migrate(Config.defaultTOML).changed)
-        XCTAssertTrue(ConfigSchema.migrate("").changed)
+        XCTAssertFalse(schema.migrate(text).changed)
+        XCTAssertFalse(schema.migrate(Config.defaultTOML).changed)
+        XCTAssertTrue(schema.migrate("").changed)
+        // The old [snap] section and [drag] restart_search move into [pointer].
+        let (t5, _) = schema.migrate("[snap]\nenabled = false\n[drag]\nrestart_search = false\n")
+        XCTAssertFalse(t5.contains("[snap]"))
+        XCTAssertFalse(try Config.parse(t5).snapEnabled)
+        XCTAssertFalse(try Config.parse(t5).settings(PointerMode.Settings.self, for: "pointer")!.dragRestart)
     }
 
     func testManualMentionsEverySetting() {
-        let m = Manual.roff()
+        let m = Manual.roff(modes: standardModes())
         XCTAssertTrue(m.hasPrefix(".TH VIMOUSE 1"))
-        for e in ConfigSchema.entries { XCTAssertTrue(m.contains(".B \(e.key)"), e.key) }
+        for e in schema.entries { XCTAssertTrue(m.contains(".B \(e.key)"), e.key) }
         XCTAssertTrue(m.contains(".SH DEPRECATIONS"))
         XCTAssertTrue(m.contains("now [actions] left_click"))
     }
 
     func testColours() throws {
         let c = try Config.parse("[colours.modes]\nscroll = \"#ff0000\"\n[colours.markers]\nsnap = \"#000000\"")
-        XCTAssertEqual(c.colours.scroll, "#FF0000")
+        XCTAssertEqual(c.colours.mode("scroll"), "#FF0000")
         XCTAssertEqual(c.colours.snap, "#000000")
-        XCTAssertEqual(c.colours.pointer, Colours().pointer)
+        XCTAssertEqual(c.colours.mode("pointer"), PointerMode().defaultColour)
         XCTAssertThrowsError(try Config.parse("[colours.modes]\nruler = \"red\""))
         // The flat [colours] of the first draft migrates into the sub-sections.
-        let (t, _) = ConfigSchema.migrate("[colours]\npointer = \"#123456\"\ndrag = \"#654321\"\n")
+        let (t, _) = schema.migrate("[colours]\npointer = \"#123456\"\ndrag = \"#654321\"\n")
         XCTAssertFalse(t.contains("[colours]\n"))
         let m = try Config.parse(t)
-        XCTAssertEqual(m.colours.pointer, "#123456")
+        XCTAssertEqual(m.colours.mode("pointer"), "#123456")
         XCTAssertEqual(m.colours.drag, "#654321")
-        XCTAssertFalse(ConfigSchema.migrate(t).changed)
+        XCTAssertFalse(schema.migrate(t).changed)
     }
 
     func testHoldKey() throws {
-        XCTAssertNil(Config().keymap.hold)
+        XCTAssertNil(Config.defaults.keymap.hold)
         XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"right_cmd\"").keymap.hold, .key(.rightCommand))
         XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"fn\"").keymap.hold, .key(.function))
         XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"cmd+shift+ctrl\"").keymap.hold, .chord([.command, .shift, .control]))
@@ -186,20 +221,20 @@ final class ConfigTests: XCTestCase {
 
     func testFlickModifier() throws {
         let c = try Config.parse("[scroll]\nflick_with = \"alt\"\nflick_double_tap = false")
-        XCTAssertEqual(c.keymap.flickWith, [.option])
+        XCTAssertEqual(c.flickWith, [.option])
         XCTAssertFalse(c.flickDoubleTapEnabled)
-        XCTAssertTrue(Config().flickDoubleTapEnabled)                                                        // auto, no modifier
+        XCTAssertTrue(Config.defaults.flickDoubleTapEnabled)                                                        // auto, no modifier
         XCTAssertFalse(try Config.parse("[scroll]\nflick_with = \"alt\"").flickDoubleTapEnabled)          // auto, modifier set
         XCTAssertTrue(try Config.parse("[scroll]\nflick_with = \"alt\"\nflick_double_tap = true").flickDoubleTapEnabled)
         XCTAssertThrowsError(try Config.parse("[scroll]\nflick_double_tap = \"maybe\""))
         XCTAssertThrowsError(try Config.parse("[scroll]\nflick_with = \"j\""))
-        let e = PointerEngine(keymap: c.keymap)
+        let e = PointerEngine(); e.apply(c)
         _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
         _ = e.handle(KeyPress(.s))
         XCTAssertEqual(e.handle(KeyPress(.j, [.option])), [.scrollFlick(dx: 0, dy: 1, multiplier: 1)])
         // A sided flick modifier: the event carries the generic bit too.
         let c2 = try Config.parse("[scroll]\nflick_with = \"right_alt\"")
-        let e2 = PointerEngine(keymap: c2.keymap)
+        let e2 = PointerEngine(); e2.apply(c2)
         _ = e2.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
         _ = e2.handle(KeyPress(.s))
         XCTAssertEqual(e2.handle(KeyPress(.j, [.option, .rightOption])), [.scrollFlick(dx: 0, dy: 1, multiplier: 1)])
@@ -209,34 +244,35 @@ final class ConfigTests: XCTestCase {
 
     func testStartModes() throws {
         let c = try Config.parse("[hotkey]\nactivate_mode = \"scroll\"\nhold_mode = \"Ruler\"")
-        XCTAssertEqual(c.activateMode, .scroll)
-        XCTAssertEqual(c.holdMode, .ruler)
+        XCTAssertEqual(c.activateMode, "scroll")
+        XCTAssertEqual(c.holdMode, "ruler")
         XCTAssertThrowsError(try Config.parse("[hotkey]\nactivate_mode = \"flying\""))
         let e = PointerEngine()
-        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100), pointer: Point(x: 10, y: 20), mode: .ruler)
-        XCTAssertEqual(e.mode, .ruler)
+        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100), pointer: Point(x: 10, y: 20), mode: "ruler")
+        XCTAssertEqual(e.mode, "ruler")
         XCTAssertEqual(e.ruler?.y, 20)
     }
 
     func testEnterMode() {
         let e = PointerEngine()
-        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100), pointer: Point(x: 10, y: 30), mode: .nudge)
-        XCTAssertEqual(e.enter(mode: .nudge), [])
-        XCTAssertEqual(e.enter(mode: .pointer), [.redraw])
-        XCTAssertEqual(e.mode, .pointer)
-        XCTAssertEqual(e.enter(mode: .ruler), [.redraw])
+        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100), pointer: Point(x: 10, y: 30), mode: "nudge")
+        XCTAssertEqual(e.enter(mode: "nudge"), [])
+        XCTAssertEqual(e.enter(mode: "pointer"), [.redraw])
+        XCTAssertEqual(e.mode, "pointer")
+        XCTAssertEqual(e.enter(mode: "flying"), [])
+        XCTAssertEqual(e.enter(mode: "ruler"), [.redraw])
         XCTAssertEqual(e.ruler?.y, 30)
     }
 
     func testConfigUpdateSwitch() throws {
-        XCTAssertTrue(Config().autoUpdate)
+        XCTAssertTrue(Config.defaults.autoUpdate)
         XCTAssertFalse(try Config.parse("[config]\nupdate = false").autoUpdate)
         XCTAssertThrowsError(try Config.parse("[config]\nupdate = 1"))
     }
 
     func testEverySettingAndSectionHasAComment() {
-        for e in ConfigSchema.entries { XCTAssertFalse(e.comment.isEmpty, "\(e.section).\(e.key)") }
-        for s in ConfigSchema.sections { XCTAssertNotNil(ConfigSchema.sectionComments[s], s) }
+        for e in schema.entries { XCTAssertFalse(e.comment.isEmpty, "\(e.section).\(e.key)") }
+        for s in schema.sections { XCTAssertNotNil(schema.sectionComments[s], s) }
     }
 
     func testArrowKeysAndLabels() throws {
@@ -245,7 +281,7 @@ final class ConfigTests: XCTestCase {
         down = "down"
         up = ["k", "up"]
         """)
-        let e = PointerEngine(keymap: c.keymap)
+        let e = PointerEngine(); e.apply(c)
         _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
         _ = e.handle(KeyPress(.s))
         XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.scrollStart(dx: 0, dy: 1, multiplier: 1)])
@@ -268,8 +304,8 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(rs.label, "R⇧r")
         // Config: a sided binding and a sided hotkey.
         let c = try Config.parse("[ruler]\nremove = \"right_shift+r\"\n[hotkey]\nactivate = \"cmd+left_shift+ctrl+space\"")
-        XCTAssertTrue(c.keymap.rulerRemove.has(KeyPress(.r, [.shift, .rightShift])))
-        XCTAssertFalse(c.keymap.rulerRemove.has(KeyPress(.r, [.shift, .leftShift])))
+        XCTAssertTrue(c.rulerRemove.has(KeyPress(.r, [.shift, .rightShift])))
+        XCTAssertFalse(c.rulerRemove.has(KeyPress(.r, [.shift, .leftShift])))
         XCTAssertTrue(c.keymap.activate.matches(event: KeyPress(.space, [.command, .shift, .control, .leftCommand, .leftShift, .leftControl])))
         XCTAssertFalse(c.keymap.activate.matches(event: KeyPress(.space, [.command, .shift, .control, .leftCommand, .rightShift, .leftControl])))
         // Chord held check and generic stripping.
@@ -330,7 +366,8 @@ final class SnapTests: XCTestCase {
     func testSnapsToNearestElementInsideRectAndToggles() {
         let snap = FakeSnap()
         snap.points = [Point(x: 100, y: 100), Point(x: 240, y: 140), Point(x: 900, y: 500)]
-        let e = PointerEngine(snapping: true, snapProvider: snap)
+        let e = PointerEngine()
+        e.context.services.snap = snap
         _ = e.activate(screen: screen)
         XCTAssertEqual(snap.prepared, 1)
         // Top-left quadrant (0,0,500,300), centre (250,150): nearest element inside is (240,140).
@@ -345,7 +382,7 @@ final class SnapTests: XCTestCase {
     }
 
     func testNoProviderMeansCentre() {
-        let e = PointerEngine(snapping: true)
+        let e = PointerEngine()
         _ = e.activate(screen: screen)
         XCTAssertEqual(e.handle(KeyPress(.i)), [.warp(Point(x: 250, y: 150)), .redraw])
         XCTAssertEqual(e.handle(KeyPress(.a)), [.warp(Point(x: 250, y: 150)), .redraw]) // toggles, no visible effect
@@ -478,7 +515,7 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.u, [.shift])), [.warp(Point(x: 500, y: 300)), .redraw])
         XCTAssertEqual(e.session?.depth, 0)
         XCTAssertEqual(e.handle(KeyPress(.delete, [.shift])), []) // already at the top
-        e.dragRestartsSearch = false
+        e.pointer.settings.dragRestart = false
         _ = e.handle(KeyPress(.i)); _ = e.handle(KeyPress(.i))
         _ = e.handle(KeyPress(.v))
         XCTAssertEqual(e.session?.depth, 2) // descent kept for extending a selection
@@ -496,7 +533,7 @@ final class EngineTests: XCTestCase {
         let e = PointerEngine()
         _ = e.activate(screen: screen)
         XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])
-        XCTAssertEqual(e.mode, .scroll)
+        XCTAssertEqual(e.mode, "scroll")
         XCTAssertEqual(e.handle(KeyPress(.j)), [.scrollStart(dx: 0, dy: 1, multiplier: 1)])
         XCTAssertEqual(e.handleRelease(KeyPress(.j)), [.scrollStop])
         XCTAssertEqual(e.handleRelease(KeyPress(.i)), [])
@@ -506,7 +543,7 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.u)), [.scroll(dx: 0, dy: -300)])
         XCTAssertEqual(e.handle(KeyPress(.i)), []) // quadrant keys inactive in scroll mode
         XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])
-        XCTAssertEqual(e.mode, .pointer)
+        XCTAssertEqual(e.mode, "pointer")
         XCTAssertEqual(e.handle(KeyPress(.j)), [.warp(Point(x: 250, y: 450)), .redraw]) // j is a quadrant again
     }
 
@@ -525,7 +562,7 @@ final class EngineTests: XCTestCase {
         _ = e.activate(screen: screen)
         _ = e.handle(KeyPress(.i)) // target (250,150)
         XCTAssertEqual(e.handle(KeyPress(.n)), [.redraw])
-        XCTAssertEqual(e.mode, .nudge)
+        XCTAssertEqual(e.mode, "nudge")
         XCTAssertEqual(e.handle(KeyPress(.l)), [.nudgeStart(dx: 1, dy: 0, multiplier: 1)])
         XCTAssertEqual(e.handleRelease(KeyPress(.l)), [.nudgeStop])
         XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.nudgeStart(dx: 0, dy: 1, multiplier: 1)])
@@ -543,7 +580,7 @@ final class EngineTests: XCTestCase {
         _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine))
         XCTAssertEqual(e.handle(KeyPress(.l, [.shift])), [.warp(Point(x: 999, y: 155)), .redraw]) // fine, clamped to the screen
         XCTAssertEqual(e.handle(KeyPress(.n)), [.redraw])
-        XCTAssertEqual(e.mode, .pointer)
+        XCTAssertEqual(e.mode, "pointer")
         XCTAssertEqual(e.session?.depth, 1) // the descent is untouched
         XCTAssertTrue(e.help.first?.title == "POINTER")
         XCTAssertTrue(e.help.flatMap(\.rows).contains { $0.keys.contains("←") })
@@ -565,7 +602,7 @@ final class EngineTests: XCTestCase {
     func testRulerFollowsTextLines() {
         let e = PointerEngine()
         let fake = FakeLines()
-        e.lineProvider = fake
+        e.context.services.lines = fake
         _ = e.activate(screen: screen)
         _ = e.handle(KeyPress(.i)) // (250,150): on the line at y 148..168
         _ = e.handle(KeyPress(.r))
@@ -578,7 +615,7 @@ final class EngineTests: XCTestCase {
         _ = e.handle(KeyPress(.j, [.shift])) // fine moves ignore lines
         XCTAssertEqual(e.ruler?.y, 135)
         _ = e.handle(KeyPress(.a)) // lines off: back to stepping by height
-        XCTAssertFalse(e.rulerSnap)
+        XCTAssertFalse(e.rulerMode.snapping)
         _ = e.handle(KeyPress(.j))
         XCTAssertEqual(e.ruler?.y, 135 + 24)
         _ = e.handle(KeyPress(.a)) // on again: re-seat on the line under the band
@@ -588,7 +625,7 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.ruler?.y, 302 + 4 * 24) // six line steps, then four height steps
         // No text under the column: plain steps from the start.
         let e2 = PointerEngine()
-        e2.lineProvider = fake
+        e2.context.services.lines = fake
         _ = e2.activate(screen: screen)
         _ = e2.handle(KeyPress(.o)) // (750,150)
         _ = e2.handle(KeyPress(.r))
@@ -600,7 +637,7 @@ final class EngineTests: XCTestCase {
         _ = e.activate(screen: screen)
         _ = e.handle(KeyPress(.i)) // target (250,150)
         XCTAssertEqual(e.handle(KeyPress(.r)), [.redraw])
-        XCTAssertEqual(e.mode, .ruler)
+        XCTAssertEqual(e.mode, "ruler")
         XCTAssertEqual(e.ruler, Ruler(screenIndex: 0, x: 250, y: 150, height: 32))
         XCTAssertEqual(e.ruler?.band(on: screen), Rect(x: 0, y: 134, width: 1000, height: 32))
         _ = e.handle(KeyPress(.five))
@@ -610,7 +647,7 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.ruler?.height, 36)
         _ = e.handle(KeyPress(.k))
         XCTAssertEqual(e.ruler?.y, 310 - 36)     // and the new height after resizing
-        e.rulerMove = 10
+        e.rulerMode.settings.move = 10
         _ = e.handle(KeyPress(.k))
         XCTAssertEqual(e.ruler?.y, 274 - 10)     // explicit pixel step
         _ = e.handle(KeyPress(.j, [.shift]))
@@ -632,7 +669,7 @@ final class EngineTests: XCTestCase {
         _ = e.handle(KeyPress(.r))
         XCTAssertEqual(e.ruler?.y, 600)
         _ = e.handle(KeyPress(.r))
-        XCTAssertEqual(e.mode, .pointer)
+        XCTAssertEqual(e.mode, "pointer")
         _ = e.handle(KeyPress(.r, [.shift]))
         XCTAssertNil(e.ruler)
         XCTAssertEqual(e.handle(KeyPress(.escape)), [.hideOverlay])
@@ -645,5 +682,76 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.escape)), [.hideOverlay])
         XCTAssertFalse(e.isActive)
         XCTAssertEqual(e.handle(KeyPress(.i)), [])
+    }
+}
+
+final class PluginTests: XCTestCase {
+    let screen = Rect(x: 0, y: 0, width: 1000, height: 600)
+
+    func testEnabledModesAndDefault() throws {
+        let c = try Config.parse("[modes]\nenabled = [\"nudge\", \"scroll\"]")
+        XCTAssertEqual(c.enabledModes, ["nudge", "scroll"])
+        XCTAssertThrowsError(try Config.parse("[modes]\nenabled = [\"flying\"]"))
+        XCTAssertThrowsError(try Config.parse("[modes]\nenabled = []"))
+        let e = PointerEngine()
+        e.apply(c)
+        XCTAssertEqual(e.defaultMode, "nudge")
+        _ = e.activate(screen: screen, pointer: Point(x: 10, y: 10))
+        XCTAssertEqual(e.mode, "nudge")
+        XCTAssertEqual(e.handle(KeyPress(.r)), [])            // ruler is disabled: its toggle does nothing
+        XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])
+        XCTAssertEqual(e.mode, "scroll")
+        XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])     // own toggle: back to the default
+        XCTAssertEqual(e.mode, "nudge")
+        XCTAssertEqual(e.handle(KeyPress(.n)), [])            // the default's own toggle: nothing
+        XCTAssertEqual(e.activate(screen: screen, mode: "ruler"), [.showOverlay]) // disabled start mode: default
+        XCTAssertEqual(e.mode, "nudge")
+    }
+
+    func testSceneDescribesWhatToDraw() {
+        let e = PointerEngine()
+        XCTAssertNil(e.scene())
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.i))
+        let s = e.scene()!
+        XCTAssertEqual(s.modeName, "POINTER")
+        XCTAssertEqual(s.modeColour, PointerMode().defaultColour)
+        XCTAssertEqual(s.focus, Point(x: 250, y: 150))
+        XCTAssertTrue(s.drawables.contains(.outline(Rect(x: 0, y: 0, width: 500, height: 300), colour: s.modeColour, alpha: 1, width: 2)))
+        XCTAssertTrue(s.drawables.contains { if case .label("i", _, _, _) = $0 { return true } else { return false } })
+        XCTAssertTrue(s.hints.contains { $0.action == "nudge" })
+        XCTAssertNil(s.help)
+        XCTAssertEqual(e.scene(showHelp: true)?.help?.first?.title, "POINTER")
+        // A ruler stays in the scene after the engine goes idle, dimming its screen.
+        _ = e.handle(KeyPress(.r))
+        _ = e.handle(KeyPress(.escape))
+        let idle = e.scene()!
+        XCTAssertNil(idle.modeName)
+        XCTAssertTrue(idle.drawables.contains { if case .dim(0, _, 0.35) = $0 { return true } else { return false } })
+        XCTAssertTrue(idle.hints.isEmpty)
+    }
+
+    func testRemovingTheBandInRulerModeReturnsToDefault() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.r))
+        XCTAssertEqual(e.mode, "ruler")
+        XCTAssertEqual(e.handle(KeyPress(.r, [.shift])), [.redraw, .redraw])
+        XCTAssertEqual(e.mode, "pointer")
+        XCTAssertNil(e.ruler)
+        // From another mode the band goes but the mode stays.
+        _ = e.handle(KeyPress(.r)); _ = e.handle(KeyPress(.s))
+        XCTAssertEqual(e.handle(KeyPress(.r, [.shift])), [.redraw])
+        XCTAssertEqual(e.mode, "scroll")
+        XCTAssertNil(e.ruler)
+    }
+
+    func testEveryModeSchemaStaysInItsSection() {
+        for m in standardModes() {
+            for entry in m.schema { XCTAssertEqual(entry.section, m.id) }
+            XCTAssertFalse(m.summary.isEmpty)
+            XCTAssertTrue(Colours.isValid(m.defaultColour), m.id)
+            XCTAssertNoThrow(try m.parseSettings([:]))
+        }
     }
 }

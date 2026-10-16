@@ -14,13 +14,21 @@ final class ConfigStore {
     static let exampleFile = directory.appendingPathComponent("config.example.toml")
     static let manualFile = directory.appendingPathComponent("vimouse.1")
 
-    private(set) var config = Config()
+    let modes: [Mode]
+    private let schema: ConfigSchema
+    private(set) var config: Config
     /// Last load error, shown in the menu bar; nil when the file parsed.
     private(set) var lastError: String?
     var onChange: ((Config) -> Void)?
 
     private var timer: Timer?
     private var lastModified: Date?
+
+    init(modes: [Mode]) {
+        self.modes = modes
+        schema = ConfigSchema(modes: modes)
+        config = Config(modes: modes)
+    }
 
     func start() {
         ensureFile()
@@ -33,8 +41,8 @@ final class ConfigStore {
     /// The example config and the manual, always current. Overwritten on every start.
     private func writeReference() {
         do {
-            try Config.defaultTOML.write(to: ConfigStore.exampleFile, atomically: true, encoding: .utf8)
-            try Manual.roff().write(to: ConfigStore.manualFile, atomically: true, encoding: .utf8)
+            try schema.template().write(to: ConfigStore.exampleFile, atomically: true, encoding: .utf8)
+            try Manual.roff(modes: modes).write(to: ConfigStore.manualFile, atomically: true, encoding: .utf8)
         } catch {
             NSLog("vimouse: could not write reference files: \(error)")
         }
@@ -50,7 +58,7 @@ final class ConfigStore {
     /// Append settings added since the file was written; retire ones that went away.
     private func migrate() {
         guard let text = try? String(contentsOf: ConfigStore.file, encoding: .utf8) else { return }
-        let (updated, changed) = ConfigSchema.migrate(text)
+        let (updated, changed) = schema.migrate(text)
         guard changed else { return }
         do {
             try updated.write(to: ConfigStore.file, atomically: true, encoding: .utf8)
@@ -67,7 +75,7 @@ final class ConfigStore {
         guard !fm.fileExists(atPath: ConfigStore.file.path) else { return }
         do {
             try fm.createDirectory(at: ConfigStore.directory, withIntermediateDirectories: true)
-            try Config.defaultTOML.write(to: ConfigStore.file, atomically: true, encoding: .utf8)
+            try schema.template().write(to: ConfigStore.file, atomically: true, encoding: .utf8)
             NSLog("vimouse: wrote default config to \(ConfigStore.file.path)")
         } catch {
             NSLog("vimouse: could not write default config: \(error)")
@@ -78,7 +86,7 @@ final class ConfigStore {
         lastModified = modificationDate()
         do {
             let text = try String(contentsOf: ConfigStore.file, encoding: .utf8)
-            config = try Config.parse(text)
+            config = try Config.parse(text, modes: modes)
             lastError = nil
             if case .chord(let m)? = config.keymap.hold, m.contains(.shift) {
                 NSLog("vimouse: [hotkey] hold includes shift; use the shift key on the other side for shifted bindings while it is held")

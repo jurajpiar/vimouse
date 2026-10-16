@@ -1,117 +1,82 @@
 import Foundation
 
-/// User configuration: key bindings and tunables. Parsed from config.toml; every
-/// missing key keeps its default, so an empty file is a valid config.
-/// Overlay colours as "#RRGGBB".
+/// Overlay colours as "#RRGGBB": one per mode (keyed by mode id) and the markers.
 public struct Colours: Equatable {
-    public var pointer = "#0A84FF"
+    public var modes: [String: String] = [:]
     public var drag = "#30D158"
-    public var nudge = "#40C8E0"
-    public var scroll = "#FF9F0A"
-    public var ruler = "#BF5AF2"
     public var snap = "#FF375F"
+    /// Used for a mode without a configured colour.
+    public static let fallback = "#0A84FF"
 
     public init() {}
+
+    public func mode(_ id: String) -> String { modes[id] ?? Colours.fallback }
 
     public static func isValid(_ hex: String) -> Bool {
         hex.count == 7 && hex.hasPrefix("#") && hex.dropFirst().allSatisfy(\.isHexDigit)
     }
 }
 
+/// User configuration: the shared bindings and tunables, plus each mode's parsed
+/// settings. Parsed from config.toml; every missing key keeps its default, so an empty
+/// file is a valid config.
 public struct Config: Equatable {
+    public static func == (a: Config, b: Config) -> Bool {
+        a.keymap == b.keymap && a.activateMode == b.activateMode && a.holdMode == b.holdMode
+            && a.colours == b.colours && a.enabledModes == b.enabledModes && a.autoUpdate == b.autoUpdate
+            && a.dragRamp == b.dragRamp && Set(a.modeSettings.keys) == Set(b.modeSettings.keys)
+            && a.modeSettings.allSatisfy { id, s in b.modeSettings[id].map(s.isEqual(to:)) ?? false }
+    }
+
     public var keymap: KeyMap = .default
-    /// Mode entered by the hotkey and by the hold key.
-    public var activateMode: Mode = .pointer
-    public var holdMode: Mode = .pointer
+    /// Mode entered by the hotkey and by the hold key (mode ids).
+    public var activateMode: String
+    public var holdMode: String
     public var colours = Colours()
+    /// `[modes] enabled`; nil when not set (all registered modes, in registration order).
+    public var enabledModes: [String]?
     /// Whether the app may rewrite config.toml on start (migration).
     public var autoUpdate: Bool = true
-    public var scrollStep: Double = 60
-    /// Full speed while a scroll key is held, px/s; seconds to reach it; coast after release; trackpad-style events.
-    public var scrollSpeed: Double = 1500
-    public var scrollAcceleration: Double = 0.5
-    public var scrollMomentum: Bool = true
-    public var scrollSmooth: Bool = true
-    /// Speed launched by a double tap, px/s; 0 disables.
-    public var scrollFlick: Double = 4000
-    /// Double tap of a scroll key flicks: nil = auto (only when no flick modifier is set).
-    public var scrollFlickDoubleTap: Bool? = nil
-
-    /// The effective double-tap setting.
-    public var flickDoubleTapEnabled: Bool { scrollFlickDoubleTap ?? (keymap.flickWith == nil) }
-    /// Fraction of speed lost per second while coasting.
-    public var scrollFriction: Double = 0.85
-    public var rulerHeight: Double = 32
-    /// 0 means move by the band's own height.
-    public var rulerMove: Double = 0
-    public var rulerHeightStep: Double = 4
-    /// Pixels per press with Shift held, for move and resize.
-    public var rulerFine: Double = 1
-    public var rulerDim: Double = 0.35
-    /// The band follows lines of text found via accessibility; pixels added above and below.
-    public var rulerSnap = true
-    public var rulerPad: Double = 2
-    public var snapEnabled: Bool = true
-    public var nudgeStep: Double = 5
-    /// Full speed while a nudge key is held, px/s; seconds to reach it.
-    public var nudgeSpeed: Double = 600
-    public var nudgeAcceleration: Double = 0.6
-    public var dragRestartsSearch: Bool = true
     public var dragRamp: Bool = false
+    /// Each mode's settings, keyed by mode id, as parsed by the mode.
+    public var modeSettings: [String: ModeSettings] = [:]
 
-    public init() {}
+    public init(modes: [Mode] = []) {
+        activateMode = modes.first?.id ?? "pointer"
+        holdMode = activateMode
+        for m in modes {
+            colours.modes[m.id] = m.defaultColour
+            modeSettings[m.id] = try? m.parseSettings([:])
+        }
+    }
 
     public struct ParseError: Error, CustomStringConvertible {
         public let description: String
     }
 
-    /// The file written on first run. Generated from `ConfigSchema`; parsing it must
-    /// reproduce `Config()` (there is a test).
-    public static var defaultTOML: String { ConfigSchema.template() }
-
-    public static func parse(_ text: String) throws -> Config {
+    /// The whole file, with the modes' sections. Parsing it must reproduce the defaults
+    /// (there is a test).
+    public static func parse(_ text: String, modes: [Mode]) throws -> Config {
         let t: TOMLTable
         do { t = try TOML.parse(text) } catch let e as TOMLError { throw ParseError(description: e.description) }
-        var c = Config()
+        var c = Config(modes: modes)
         var k = KeyMap.default
+        let ids = modes.map(\.id)
 
-        func keys(_ section: String, _ name: String) throws -> Set<KeyPress>? {
-            guard let v = t[section]?[name] else { return nil }
-            guard let specs = v.strings else { throw ParseError(description: "[\(section)] \(name): expected a key name or list of key names") }
-            var out = Set<KeyPress>()
-            for spec in specs {
-                guard let p = KeyPress.parse(spec) else { throw ParseError(description: "[\(section)] \(name): unknown key \"\(spec)\"") }
-                out.insert(p)
-            }
-            return out
-        }
-        func one(_ section: String, _ name: String) throws -> KeyPress? {
-            guard let set = try keys(section, name) else { return nil }
-            guard set.count == 1, let p = set.first else { throw ParseError(description: "[\(section)] \(name): exactly one key expected") }
-            return p
-        }
-        func number(_ section: String, _ name: String) throws -> Double? {
-            guard let v = t[section]?[name] else { return nil }
-            guard let d = v.double else { throw ParseError(description: "[\(section)] \(name): expected a number") }
-            return d
-        }
+        // Unknown sections and keys are tolerated (migration retires them); known ones must parse.
+        if let v = try ConfigReader(t, section: "config").bool("update") { c.autoUpdate = v }
 
-        if let v = t["config"]?["update"] {
-            guard let b = v.bool else { throw ParseError(description: "[config] update: expected true or false") }
-            c.autoUpdate = b
-        }
-        if let p = try one("hotkey", "activate") { k.activate = p }
-        func mode(_ name: String) throws -> Mode? {
-            guard let v = t["hotkey"]?[name] else { return nil }
-            guard let s = v.string, let m = Mode(rawValue: s.lowercased()) else {
-                throw ParseError(description: "[hotkey] \(name): expected one of \(Mode.allCases.map(\.rawValue).joined(separator: ", "))")
-            }
-            return m
+        let hotkey = ConfigReader(t, section: "hotkey")
+        if let p = try hotkey.one("activate") { k.activate = p }
+        func mode(_ name: String) throws -> String? {
+            guard let s = try hotkey.string(name) else { return nil }
+            let id = s.lowercased()
+            guard ids.contains(id) else { throw hotkey.fail(name, "expected one of \(ids.joined(separator: ", "))") }
+            return id
         }
         if let m = try mode("activate_mode") { c.activateMode = m }
         if let m = try mode("hold_mode") { c.holdMode = m }
-        if let v = t["hotkey"]?["hold"] {
-            guard let name = v.string else { throw ParseError(description: "[hotkey] hold: expected a modifier key name or \"\"") }
+        if let name = try hotkey.string("hold") {
             if name.isEmpty {
                 k.hold = nil
             } else if let code = KeyCode.named(name.lowercased()), code.modifierBit != nil || code == .function {
@@ -119,117 +84,57 @@ public struct Config: Equatable {
             } else if let chord = Modifiers.parse(name) {
                 k.hold = .chord(chord)
             } else {
-                throw ParseError(description: "[hotkey] hold: expected a modifier chord like \"cmd+shift\" or one of left_cmd, right_cmd, left_alt, right_alt, left_ctrl, right_ctrl, left_shift, right_shift, fn")
+                throw hotkey.fail("hold", "expected a modifier chord like \"cmd+shift\" or one of left_cmd, right_cmd, left_alt, right_alt, left_ctrl, right_ctrl, left_shift, right_shift, fn")
             }
         }
 
-        var quadrants: [KeyPress: Quadrant] = [:]
-        let qNames: [(String, Quadrant)] = [("top_left", .topLeft), ("top_right", .topRight), ("bottom_left", .bottomLeft), ("bottom_right", .bottomRight)]
-        for (name, q) in qNames {
-            if let p = try one("pointer", name) { quadrants[p] = q }
-        }
-        if !quadrants.isEmpty {
-            guard quadrants.count == 4 else { throw ParseError(description: "[pointer]: all four quadrant keys must be set and distinct") }
-            k.quadrants = quadrants
-        }
-        if let v = try keys("pointer", "up") { k.up = v }
-        if let v = try keys("pointer", "top") { k.top = v }
-        if let v = try keys("actions", "left_click") { k.leftClick = v }
-        if let v = try keys("actions", "click_stay") { k.clickStay = v }
-        if let v = try keys("actions", "double_click") { k.doubleClick = v }
-        if let v = try keys("actions", "right_click") { k.rightClick = v }
-        if let v = try keys("actions", "middle_click") { k.middleClick = v }
-        if let v = try keys("actions", "drag") { k.dragToggle = v }
-        if let v = try keys("global", "exit") { k.exit = v }
-        if let v = try keys("global", "next_screen") { k.nextScreen = v }
-        if let v = try keys("global", "previous_screen") { k.previousScreen = v }
-        if let v = try keys("pointer", "snap_toggle") { k.snapToggle = v }
-        if let v = try keys("scroll", "toggle") { k.scrollToggle = v }
-        if let v = try keys("ruler", "toggle") { k.rulerToggle = v }
-        if let v = try keys("ruler", "remove") { k.rulerRemove = v }
-
-        if let v = try number("scroll", "step") { c.scrollStep = v }
-        if let v = try number("scroll", "speed") { c.scrollSpeed = max(50, v) }
-        if let v = try number("scroll", "acceleration") { c.scrollAcceleration = max(0.05, v) }
-        if let v = try number("scroll", "flick") { c.scrollFlick = max(0, v) }
-        if let v = t["scroll"]?["flick_double_tap"] {
-            if let b = v.bool { c.scrollFlickDoubleTap = b }
-            else if v.string?.lowercased() == "auto" { c.scrollFlickDoubleTap = nil }
-            else { throw ParseError(description: "[scroll] flick_double_tap: expected true, false or \"auto\"") }
-        }
-        if let v = t["scroll"]?["flick_with"] {
-            guard let s = v.string else { throw ParseError(description: "[scroll] flick_with: expected modifiers like \"alt\" or \"\"") }
-            if s.isEmpty { k.flickWith = nil }
-            else if let m = Modifiers.parse(s) { k.flickWith = m }
-            else { throw ParseError(description: "[scroll] flick_with: expected modifiers like \"alt\", \"cmd+shift\" or \"\"") }
-        }
-        if let v = try number("scroll", "friction") { c.scrollFriction = min(max(v, 0.01), 0.999) }
-        for (name, set) in [("momentum", { (c: inout Config, b: Bool) in c.scrollMomentum = b }), ("smooth", { (c: inout Config, b: Bool) in c.scrollSmooth = b })] {
-            if let v = t["scroll"]?[name] {
-                guard let b = v.bool else { throw ParseError(description: "[scroll] \(name): expected true or false") }
-                set(&c, b)
+        let modesSection = ConfigReader(t, section: "modes")
+        if let v = modesSection.value("enabled") {
+            guard let list = v.strings else { throw modesSection.fail("enabled", "expected a list of mode names") }
+            var out: [String] = []
+            for name in list {
+                let id = name.lowercased()
+                guard ids.contains(id) else { throw modesSection.fail("enabled", "unknown mode \"\(name)\"; available: \(ids.joined(separator: ", "))") }
+                if !out.contains(id) { out.append(id) }
             }
+            guard !out.isEmpty else { throw modesSection.fail("enabled", "at least one mode") }
+            c.enabledModes = out
         }
-        if let v = try keys("scroll", "down") { k.scrollDown = v }
-        if let v = try keys("scroll", "up") { k.scrollUp = v }
-        if let v = try keys("scroll", "left") { k.scrollLeft = v }
-        if let v = try keys("scroll", "right") { k.scrollRight = v }
-        if let v = try keys("scroll", "half_page_down") { k.scrollHalfDown = v }
-        if let v = try keys("scroll", "half_page_up") { k.scrollHalfUp = v }
 
-        if let v = try number("ruler", "height") { c.rulerHeight = v }
-        if let v = try number("ruler", "move") { c.rulerMove = max(0, v) }
-        if let v = try number("ruler", "height_step") { c.rulerHeightStep = v }
-        if let v = try number("ruler", "fine") { c.rulerFine = max(0.5, v) }
-        if let v = try number("ruler", "dim") { c.rulerDim = min(max(v, 0), 1) }
-        if let v = try keys("ruler", "down") { k.rulerDown = v }
-        if let v = try keys("ruler", "up") { k.rulerUp = v }
-        if let v = try keys("ruler", "grow") { k.rulerGrow = v }
-        if let v = try keys("ruler", "shrink") { k.rulerShrink = v }
-        if let v = t["ruler"]?["snap"] {
-            guard let b = v.bool else { throw ParseError(description: "[ruler] snap: expected true or false") }
-            c.rulerSnap = b
-        }
-        if let v = try number("ruler", "pad") { c.rulerPad = max(0, v) }
-        if let v = try keys("ruler", "snap_toggle") { k.rulerSnapToggle = v }
+        let global = ConfigReader(t, section: "global")
+        if let v = try global.keys("exit") { k.exit = v }
+        if let v = try global.keys("next_screen") { k.nextScreen = v }
+        if let v = try global.keys("previous_screen") { k.previousScreen = v }
+        if let v = try global.keys("help") { k.help = v }
 
-        if let v = try keys("global", "help") { k.help = v }
-        if let v = try number("nudge", "step") { c.nudgeStep = max(1, v) }
-        if let v = try number("nudge", "speed") { c.nudgeSpeed = max(20, v) }
-        if let v = try number("nudge", "acceleration") { c.nudgeAcceleration = max(0.05, v) }
-        if let v = try keys("nudge", "toggle") { k.nudgeToggle = v }
-        if let v = try keys("nudge", "left") { k.nudgeLeft = v }
-        if let v = try keys("nudge", "right") { k.nudgeRight = v }
-        if let v = try keys("nudge", "up") { k.nudgeUp = v }
-        if let v = try keys("nudge", "down") { k.nudgeDown = v }
+        let actions = ConfigReader(t, section: "actions")
+        if let v = try actions.keys("left_click") { k.leftClick = v }
+        if let v = try actions.keys("click_stay") { k.clickStay = v }
+        if let v = try actions.keys("double_click") { k.doubleClick = v }
+        if let v = try actions.keys("right_click") { k.rightClick = v }
+        if let v = try actions.keys("middle_click") { k.middleClick = v }
+        if let v = try actions.keys("drag") { k.dragToggle = v }
 
-        if let v = t["drag"]?["restart_search"] {
-            guard let b = v.bool else { throw ParseError(description: "[drag] restart_search: expected true or false") }
-            c.dragRestartsSearch = b
-        }
-        if let v = t["drag"]?["ramp"] {
-            guard let b = v.bool else { throw ParseError(description: "[drag] ramp: expected true or false") }
-            c.dragRamp = b
-        }
+        if let v = try ConfigReader(t, section: "drag").bool("ramp") { c.dragRamp = v }
+
         func colour(_ section: String, _ name: String, _ set: (inout Colours, String) -> Void) throws {
             guard let v = t[section]?[name] else { return }
             guard let hex = v.string, Colours.isValid(hex) else { throw ParseError(description: "[\(section)] \(name): expected \"#RRGGBB\"") }
             set(&c.colours, hex.uppercased())
         }
-        try colour("colours.modes", "pointer") { $0.pointer = $1 }
-        try colour("colours.modes", "nudge") { $0.nudge = $1 }
-        try colour("colours.modes", "scroll") { $0.scroll = $1 }
-        try colour("colours.modes", "ruler") { $0.ruler = $1 }
+        for id in ids { try colour("colours.modes", id) { $0.modes[id] = $1 } }
         try colour("colours.markers", "drag") { $0.drag = $1 }
         try colour("colours.markers", "snap") { $0.snap = $1 }
 
-        if let v = t["snap"]?["enabled"] {
-            guard let b = v.bool else { throw ParseError(description: "[snap] enabled: expected true or false") }
-            c.snapEnabled = b
-        }
+        for m in modes { c.modeSettings[m.id] = try m.parseSettings(t) }
 
         c.keymap = k
         return c
+    }
+
+    /// A mode's settings, typed.
+    public func settings<S: ModeSettings>(_ type: S.Type, for id: String) -> S? {
+        modeSettings[id] as? S
     }
 }
 

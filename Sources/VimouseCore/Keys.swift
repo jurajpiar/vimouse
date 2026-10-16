@@ -197,138 +197,62 @@ public enum HoldKey: Equatable, Sendable {
     }
 }
 
-/// Bindings for Pointer mode. Will be loaded from config.toml later; the
-/// defaults match docs/PLAN.md.
+/// Bindings shared by every mode. Mode-specific bindings live in each mode's settings.
 public struct KeyMap: Sendable, Equatable {
     public var activate: KeyPress
-    /// Quasi-mode trigger: Pointer mode while this is held; nil when unused.
+    /// Quasi-mode trigger: active while this is held; nil when unused.
     public var hold: HoldKey?
-    public var quadrants: [KeyPress: Quadrant]
-    public var up: Set<KeyPress>
-    /// Back to the whole screen (root of the descent).
-    public var top: Set<KeyPress>
     public var leftClick: Set<KeyPress>
     public var rightClick: Set<KeyPress>
     public var middleClick: Set<KeyPress>
+    public var clickStay: Set<KeyPress>
+    public var doubleClick: Set<KeyPress>
+    public var dragToggle: Set<KeyPress>
     public var exit: Set<KeyPress>
     public var nextScreen: Set<KeyPress>
     public var previousScreen: Set<KeyPress>
     /// Count prefix digits (vi style): key -> digit value.
     public var digits: [KeyPress: Int]
-    public var clickStay: Set<KeyPress>
-    public var doubleClick: Set<KeyPress>
-    public var dragToggle: Set<KeyPress>
-    public var scrollToggle: Set<KeyPress>
-    public var scrollDown: Set<KeyPress>
-    public var scrollUp: Set<KeyPress>
-    public var scrollLeft: Set<KeyPress>
-    public var scrollRight: Set<KeyPress>
-    public var scrollHalfDown: Set<KeyPress>
-    public var scrollHalfUp: Set<KeyPress>
-    /// Modifiers that turn a scroll key into a flick; nil for none.
-    public var flickWith: Modifiers?
-    public var snapToggle: Set<KeyPress>
-    public var rulerSnapToggle: Set<KeyPress>
-    public var rulerToggle: Set<KeyPress>
-    public var rulerRemove: Set<KeyPress>
-    public var rulerDown: Set<KeyPress>
-    public var rulerUp: Set<KeyPress>
-    public var rulerGrow: Set<KeyPress>
-    public var rulerShrink: Set<KeyPress>
-    public var nudgeToggle: Set<KeyPress>
-    public var nudgeLeft: Set<KeyPress>
-    public var nudgeRight: Set<KeyPress>
-    public var nudgeUp: Set<KeyPress>
-    public var nudgeDown: Set<KeyPress>
     public var help: Set<KeyPress>
 
     public init(
         activate: KeyPress,
-        quadrants: [KeyPress: Quadrant],
-        up: Set<KeyPress>,
-        top: Set<KeyPress> = [],
+        hold: HoldKey? = nil,
         leftClick: Set<KeyPress>,
         rightClick: Set<KeyPress>,
         middleClick: Set<KeyPress>,
+        clickStay: Set<KeyPress> = [],
+        doubleClick: Set<KeyPress> = [],
+        dragToggle: Set<KeyPress> = [],
         exit: Set<KeyPress>,
         nextScreen: Set<KeyPress> = [],
         previousScreen: Set<KeyPress> = [],
         digits: [KeyPress: Int] = [:],
-        clickStay: Set<KeyPress> = [],
-        doubleClick: Set<KeyPress> = [],
-        dragToggle: Set<KeyPress> = [],
-        scrollToggle: Set<KeyPress> = [],
-        scrollDown: Set<KeyPress> = [],
-        scrollUp: Set<KeyPress> = [],
-        scrollLeft: Set<KeyPress> = [],
-        scrollRight: Set<KeyPress> = [],
-        scrollHalfDown: Set<KeyPress> = [],
-        scrollHalfUp: Set<KeyPress> = [],
-        snapToggle: Set<KeyPress> = [],
-        rulerSnapToggle: Set<KeyPress> = [],
-        rulerToggle: Set<KeyPress> = [],
-        rulerRemove: Set<KeyPress> = [],
-        rulerDown: Set<KeyPress> = [],
-        rulerUp: Set<KeyPress> = [],
-        rulerGrow: Set<KeyPress> = [],
-        rulerShrink: Set<KeyPress> = [],
-        nudgeToggle: Set<KeyPress> = [],
-        nudgeLeft: Set<KeyPress> = [],
-        nudgeRight: Set<KeyPress> = [],
-        nudgeUp: Set<KeyPress> = [],
-        nudgeDown: Set<KeyPress> = [],
         help: Set<KeyPress> = []
     ) {
         self.activate = activate
-        self.quadrants = quadrants
-        self.up = up
-        self.top = top
+        self.hold = hold
         self.leftClick = leftClick
         self.rightClick = rightClick
         self.middleClick = middleClick
+        self.clickStay = clickStay
+        self.doubleClick = doubleClick
+        self.dragToggle = dragToggle
         self.exit = exit
         self.nextScreen = nextScreen
         self.previousScreen = previousScreen
         self.digits = digits
-        self.clickStay = clickStay
-        self.doubleClick = doubleClick
-        self.dragToggle = dragToggle
-        self.scrollToggle = scrollToggle
-        self.scrollDown = scrollDown
-        self.scrollUp = scrollUp
-        self.scrollLeft = scrollLeft
-        self.scrollRight = scrollRight
-        self.scrollHalfDown = scrollHalfDown
-        self.scrollHalfUp = scrollHalfUp
-        self.snapToggle = snapToggle
-        self.rulerSnapToggle = rulerSnapToggle
-        self.rulerToggle = rulerToggle
-        self.rulerRemove = rulerRemove
-        self.rulerDown = rulerDown
-        self.rulerUp = rulerUp
-        self.rulerGrow = rulerGrow
-        self.rulerShrink = rulerShrink
-        self.nudgeToggle = nudgeToggle
-        self.nudgeLeft = nudgeLeft
-        self.nudgeRight = nudgeRight
-        self.nudgeUp = nudgeUp
-        self.nudgeDown = nudgeDown
         self.help = help
     }
 
     public static let `default` = KeyMap(
         activate: KeyPress(.space, [.command, .shift]),
-        quadrants: [
-            KeyPress(.i): .topLeft,
-            KeyPress(.o): .topRight,
-            KeyPress(.j): .bottomLeft,
-            KeyPress(.k): .bottomRight,
-        ],
-        up: [KeyPress(.delete), KeyPress(.u)],
-        top: [KeyPress(.u, [.shift]), KeyPress(.delete, [.shift])],
         leftClick: [KeyPress(.return), KeyPress(.m)],
         rightClick: [KeyPress(.period)],
         middleClick: [KeyPress(.comma)],
+        clickStay: [KeyPress(.space)],
+        doubleClick: [KeyPress(.x)],
+        dragToggle: [KeyPress(.v)],
         exit: [KeyPress(.escape)],
         nextScreen: [KeyPress(.tab)],
         previousScreen: [KeyPress(.tab, [.shift])],
@@ -336,43 +260,11 @@ public struct KeyMap: Sendable, Equatable {
             KeyPress(.zero): 0, KeyPress(.one): 1, KeyPress(.two): 2, KeyPress(.three): 3, KeyPress(.four): 4,
             KeyPress(.five): 5, KeyPress(.six): 6, KeyPress(.seven): 7, KeyPress(.eight): 8, KeyPress(.nine): 9,
         ],
-        clickStay: [KeyPress(.space)],
-        doubleClick: [KeyPress(.x)],
-        dragToggle: [KeyPress(.v)],
-        scrollToggle: [KeyPress(.s)],
-        scrollDown: [KeyPress(.j)],
-        scrollUp: [KeyPress(.k)],
-        scrollLeft: [KeyPress(.h)],
-        scrollRight: [KeyPress(.l)],
-        scrollHalfDown: [KeyPress(.d)],
-        scrollHalfUp: [KeyPress(.u)],
-        snapToggle: [KeyPress(.a)],
-        rulerSnapToggle: [KeyPress(.a)],
-        rulerToggle: [KeyPress(.r)],
-        rulerRemove: [KeyPress(.r, [.shift])],
-        rulerDown: [KeyPress(.j)],
-        rulerUp: [KeyPress(.k)],
-        rulerGrow: [KeyPress(.rightBracket)],
-        rulerShrink: [KeyPress(.leftBracket)],
-        nudgeToggle: [KeyPress(.n)],
-        nudgeLeft: [KeyPress(.h), KeyPress(.leftArrow)],
-        nudgeRight: [KeyPress(.l), KeyPress(.rightArrow)],
-        nudgeUp: [KeyPress(.k), KeyPress(.upArrow)],
-        nudgeDown: [KeyPress(.j), KeyPress(.downArrow)],
         help: [KeyPress(.slash, [.shift])]
     )
 
-    public func quadrant(for event: KeyPress) -> Quadrant? {
-        quadrants.first { $0.key.matches(event: event) }?.value
-    }
-
     public func digit(for event: KeyPress) -> Int? {
         digits.first { $0.key.matches(event: event) }?.value
-    }
-
-    /// Label shown inside each quadrant.
-    public func label(for quadrant: Quadrant) -> String {
-        KeyMap.label(of: quadrants.filter { $0.value == quadrant }.map(\.key))
     }
 
     /// One representative key for a binding, for legends: fewest modifiers, then shortest label.

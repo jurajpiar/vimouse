@@ -2,47 +2,13 @@
 import AppKit
 import VimouseCore
 
-/// What the overlay draws, in Core (CG) coordinates.
-struct PointerModel {
-    var mode: Mode
-    var current: Rect
-    var ancestors: [Rect]
-    var labels: [Quadrant: String]
-    var dragging: Bool
-    var dragOrigin: Point?
-    var pendingCount: Int?
-    /// Where the pointer was sent; drawn when it differs from the rectangle centre (a snap).
-    var target: Point
-    var snapping: Bool
-    var hints: [(key: String, action: String)]
-    /// Non-nil while the help key is held.
-    var help: [(title: String, rows: [(keys: String, action: String)])]?
-}
-
-struct RulerModel {
-    var screenIndex: Int
-    var band: Rect
-    /// Darkening outside the band, 0 to 1.
-    var dim: Double
-}
-
-struct OverlayModel {
-    /// nil when no mode is active (only a ruler is shown).
-    var pointer: PointerModel?
-    var ruler: RulerModel?
-    var colours: Colours
-    /// All displays (CG coordinates) and the active one, for the screen-number badges.
-    var screens: [Rect]
-    var activeScreen: Int
-}
-
 /// One transparent, click-through panel per display, above everything including
 /// full-screen apps. Each panel draws only the part of the model on its display.
 final class Overlay {
     private var panels: [OverlayPanel] = []
 
     /// Show the model, or hide everything when it is nil.
-    func render(_ model: OverlayModel?) {
+    func render(_ model: Scene?) {
         guard let model else {
             panels.forEach { $0.orderOut(nil) }
             return
@@ -81,7 +47,7 @@ final class OverlayPanel: NSPanel {
 }
 
 final class OverlayView: NSView {
-    var model: OverlayModel?
+    var model: Scene?
     let screenIndex: Int
 
     init(screenIndex: Int) {
@@ -91,136 +57,82 @@ final class OverlayView: NSView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    private func tint(_ p: PointerModel) -> NSColor {
-        let c = model?.colours ?? Colours()
-        switch p.mode {
-        case .scroll: return NSColor(hex: c.scroll)
-        case .ruler: return NSColor(hex: c.ruler)
-        case .nudge: return NSColor(hex: c.nudge)
-        case .pointer: return NSColor(hex: p.dragging ? c.drag : c.pointer)
-        }
-    }
-
-    private var dragColour: NSColor { NSColor(hex: model?.colours.drag ?? Colours().drag) }
-    private var snapColour: NSColor { NSColor(hex: model?.colours.snap ?? Colours().snap) }
-    private var rulerColour: NSColor { NSColor(hex: model?.colours.ruler ?? Colours().ruler) }
-    private var pointerColour: NSColor { NSColor(hex: model?.colours.pointer ?? Colours().pointer) }
-
     override func draw(_ dirtyRect: NSRect) {
-        guard let model, let windowFrame = window?.frame else { return }
+        guard let model, let windowFrame = window?.frame, model.screens.indices.contains(screenIndex) else { return }
         let toLocal = { (r: Rect) in Coordinates.localRect(r, inWindow: windowFrame) }
+        let point = { (p: Point) in Coordinates.localRect(Rect(x: p.x, y: p.y, width: 0, height: 0), inWindow: windowFrame).origin }
+        let screen = model.screens[screenIndex]
+        let colour = NSColor(hex: model.modeColour)
 
-        if let ruler = model.ruler, ruler.screenIndex == screenIndex {
-            drawRuler(ruler, screen: model.screens[screenIndex], toLocal: toLocal, adjusting: model.pointer?.mode == .ruler)
+        for d in model.drawables {
+            switch d {
+            case .fill(let r, let c, let a):
+                guard r.intersects(screen) else { continue }
+                NSColor(hex: c).withAlphaComponent(a).setFill()
+                toLocal(r).fill()
+            case .outline(let r, let c, let a, let w):
+                guard r.intersects(screen) else { continue }
+                let path = NSBezierPath(rect: toLocal(r))
+                path.lineWidth = w
+                NSColor(hex: c).withAlphaComponent(a).setStroke()
+                path.stroke()
+            case .ring(let p, let radius, let c, let a, let w):
+                guard screen.contains(p) else { continue }
+                let o = point(p)
+                let ring = NSBezierPath(ovalIn: NSRect(x: o.x - radius, y: o.y - radius, width: radius * 2, height: radius * 2))
+                ring.lineWidth = w
+                NSColor(hex: c).withAlphaComponent(a).setStroke()
+                ring.stroke()
+            case .dot(let p, let radius, let c, let a):
+                guard screen.contains(p) else { continue }
+                let o = point(p)
+                NSColor(hex: c).withAlphaComponent(a).setFill()
+                NSBezierPath(ovalIn: NSRect(x: o.x - radius, y: o.y - radius, width: radius * 2, height: radius * 2)).fill()
+            case .line(let p1, let p2, let c, let a, let w, let dashed):
+                guard screen.contains(p1) || screen.contains(p2) else { continue }
+                let line = NSBezierPath()
+                line.move(to: point(p1)); line.line(to: point(p2))
+                line.lineWidth = w
+                if dashed { line.setLineDash([4, 4], count: 2, phase: 0) }
+                NSColor(hex: c).withAlphaComponent(a).setStroke()
+                line.stroke()
+            case .crosshair(let p, let size, let c, let a, let w):
+                guard screen.contains(p) else { continue }
+                let t = toLocal(Rect(x: p.x - size / 2, y: p.y - size / 2, width: size, height: size))
+                let path = NSBezierPath()
+                path.move(to: NSPoint(x: t.minX, y: t.midY)); path.line(to: NSPoint(x: t.maxX, y: t.midY))
+                path.move(to: NSPoint(x: t.midX, y: t.minY)); path.line(to: NSPoint(x: t.midX, y: t.maxY))
+                path.lineWidth = w
+                NSColor(hex: c).withAlphaComponent(a).setStroke()
+                path.stroke()
+            case .label(let text, let r, let c, let a):
+                guard r.intersects(screen) else { continue }
+                drawLabel(text, centredIn: toLocal(r), colour: NSColor(hex: c).withAlphaComponent(a))
+            case .dim(let index, let except, let a):
+                guard index == screenIndex else { continue }
+                let above = Rect(x: screen.x, y: screen.y, width: screen.width, height: max(0, except.y - screen.y))
+                let below = Rect(x: screen.x, y: except.maxY, width: screen.width, height: max(0, screen.maxY - except.maxY))
+                let left = Rect(x: screen.x, y: except.y, width: max(0, except.x - screen.x), height: except.height)
+                let right = Rect(x: except.maxX, y: except.y, width: max(0, screen.maxX - except.maxX), height: except.height)
+                NSColor.black.withAlphaComponent(CGFloat(a)).setFill()
+                for r in [above, below, left, right] where r.width > 0 && r.height > 0 { toLocal(r).fill() }
+            }
         }
 
-        guard let p = model.pointer else { return }
-        let colour = tint(p)
-
+        guard let name = model.modeName else { return }
         // Inactive displays: only a faint screen number (Tab or n⇥ switches).
         if screenIndex != model.activeScreen {
-            drawScreenBadge(screenIndex + 1, in: bounds)
+            drawScreenBadge(screenIndex + 1, in: bounds, colour: colour)
             return
         }
-
-        let cur = toLocal(p.current)
-
-        switch p.mode {
-        case .pointer:
-            // Ancestors: faint outlines so the descent stays visible.
-            colour.withAlphaComponent(0.25).setStroke()
-            for (i, a) in p.ancestors.enumerated() where i > 0 {
-                let path = NSBezierPath(rect: toLocal(a))
-                path.lineWidth = 1
-                path.stroke()
-            }
-
-            // Current rectangle: strong outline, light fill.
-            colour.withAlphaComponent(0.08).setFill()
-            cur.fill()
-            colour.setStroke()
-            let curPath = NSBezierPath(rect: cur)
-            curPath.lineWidth = 2
-            curPath.stroke()
-
-            // Next choices: the four quadrants, each with its key drawn in the middle.
-            colour.withAlphaComponent(0.6).setStroke()
-            for (q, r) in p.current.subdivided() {
-                let local = toLocal(r)
-                let path = NSBezierPath(rect: local)
-                path.lineWidth = 1
-                path.stroke()
-                if let label = p.labels[q] {
-                    drawLabel(label, centredIn: local, colour: colour)
-                }
-            }
-
-            // Snap target, when it is not simply the centre.
-            if p.snapping, p.target != p.current.center {
-                let t = toLocal(Rect(x: p.target.x - 7, y: p.target.y - 7, width: 14, height: 14))
-                let ring = NSBezierPath(ovalIn: t)
-                ring.lineWidth = 2
-                snapColour.setStroke()
-                ring.stroke()
-            }
-        case .scroll:
-            // A ring around the pointer, which is where scrolling happens.
-            let c = NSPoint(x: cur.midX, y: cur.midY)
-            let ring = NSBezierPath(ovalIn: NSRect(x: c.x - 18, y: c.y - 18, width: 36, height: 36))
-            ring.lineWidth = 3
-            colour.setStroke()
-            ring.stroke()
-        case .nudge:
-            // Crosshair at the pointer.
-            let t = toLocal(Rect(x: p.target.x - 12, y: p.target.y - 12, width: 24, height: 24))
-            let path = NSBezierPath()
-            path.move(to: NSPoint(x: t.minX, y: t.midY)); path.line(to: NSPoint(x: t.maxX, y: t.midY))
-            path.move(to: NSPoint(x: t.midX, y: t.minY)); path.line(to: NSPoint(x: t.midX, y: t.maxY))
-            path.lineWidth = 2
-            colour.setStroke()
-            path.stroke()
-        case .ruler:
-            break // the band itself is the feedback
-        }
-
-        // A drag in progress: line from where the button went down to the pointer.
-        if p.dragging, let o = p.dragOrigin {
-            let a = Coordinates.localRect(Rect(x: o.x, y: o.y, width: 0, height: 0), inWindow: windowFrame).origin
-            let b = Coordinates.localRect(Rect(x: p.target.x, y: p.target.y, width: 0, height: 0), inWindow: windowFrame).origin
-            // The line only while bisecting; in Nudge or Scroll it would sit on the text being selected.
-            if p.mode == .pointer {
-                let line = NSBezierPath()
-                line.move(to: a); line.line(to: b)
-                line.lineWidth = 1
-                line.setLineDash([4, 4], count: 2, phase: 0)
-                dragColour.withAlphaComponent(0.4).setStroke()
-                line.stroke()
-            }
-            dragColour.withAlphaComponent(0.8).setFill()
-            NSBezierPath(ovalIn: NSRect(x: a.x - 4, y: a.y - 4, width: 8, height: 8)).fill()
-        }
-
-        drawStatusStrip(p, colour: colour, awayFrom: cur)
-        if let help = p.help { drawHelp(help, colour: colour) }
+        drawStatusStrip(model, name: name, colour: colour, awayFrom: point(model.focus))
+        if let help = model.help { drawHelp(help, colour: colour) }
     }
 
-    private func drawRuler(_ ruler: RulerModel, screen: Rect, toLocal: (Rect) -> NSRect, adjusting: Bool) {
-        let band = ruler.band
-        let above = Rect(x: screen.x, y: screen.y, width: screen.width, height: max(0, band.y - screen.y))
-        let below = Rect(x: screen.x, y: band.maxY, width: screen.width, height: max(0, screen.maxY - band.maxY))
-        NSColor.black.withAlphaComponent(CGFloat(ruler.dim)).setFill()
-        toLocal(above).fill()
-        toLocal(below).fill()
-        let edge = NSBezierPath(rect: toLocal(band))
-        edge.lineWidth = adjusting ? 2 : 1
-        rulerColour.withAlphaComponent(adjusting ? 0.9 : 0.5).setStroke()
-        edge.stroke()
-    }
-
-    private func drawScreenBadge(_ number: Int, in rect: NSRect) {
+    private func drawScreenBadge(_ number: Int, in rect: NSRect, colour: NSColor) {
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: min(rect.height * 0.3, 200), weight: .bold),
-            .foregroundColor: pointerColour.withAlphaComponent(0.25),
+            .foregroundColor: colour.withAlphaComponent(0.25),
         ]
         let s = NSAttributedString(string: "\(number)", attributes: attrs)
         let sz = s.size()
@@ -231,7 +143,7 @@ final class OverlayView: NSView {
         let size = min(max(rect.height * 0.35, 10), 72)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: size, weight: .semibold),
-            .foregroundColor: colour.withAlphaComponent(0.85),
+            .foregroundColor: colour,
         ]
         let s = NSAttributedString(string: text, attributes: attrs)
         let sz = s.size()
@@ -239,7 +151,7 @@ final class OverlayView: NSView {
     }
 
     /// Full key map in the middle of the screen while the help key is held.
-    private func drawHelp(_ help: [(title: String, rows: [(keys: String, action: String)])], colour: NSColor) {
+    private func drawHelp(_ help: [Scene.HelpGroup], colour: NSColor) {
         let title: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .bold), .foregroundColor: NSColor.white]
         let keys: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.white]
         let action: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.white.withAlphaComponent(0.8)]
@@ -253,7 +165,7 @@ final class OverlayView: NSView {
                 lines.append((NSAttributedString(string: r.keys, attributes: keys), NSAttributedString(string: r.action, attributes: action)))
             }
         }
-        let width: CGFloat = 640
+        let width: CGFloat = 720
         let height = CGFloat(lines.count) * lineH + 24
         let box = NSRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2, width: width, height: height)
         NSColor.black.withAlphaComponent(0.85).setFill()
@@ -271,16 +183,9 @@ final class OverlayView: NSView {
     }
 
     /// One line: mode name, then "key action" pairs. Placed at the bottom edge unless
-    /// the current rectangle is in the lower half, then at the top, so it never covers the target.
-    private func drawStatusStrip(_ p: PointerModel, colour: NSColor, awayFrom target: NSRect) {
-        let modeName: String
-        switch p.mode {
-        case .scroll: modeName = "SCROLL"
-        case .ruler: modeName = "RULER"
-        case .nudge: modeName = "NUDGE"
-        case .pointer: modeName = "POINTER"
-        }
-        let dragBadge = p.dragging ? "DRAG · " : ""
+    /// the pointer is in the lower half, then at the top, so it never covers the target.
+    private func drawStatusStrip(_ m: Scene, name: String, colour: NSColor, awayFrom focus: NSPoint) {
+        let dragColour = NSColor(hex: m.colours.drag)
         let text = NSMutableAttributedString()
         let keyAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.white,
@@ -288,29 +193,29 @@ final class OverlayView: NSView {
         let actionAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.white.withAlphaComponent(0.75),
         ]
-        if p.dragging {
-            text.append(NSAttributedString(string: dragBadge, attributes: [
+        if m.dragging {
+            text.append(NSAttributedString(string: "DRAG · ", attributes: [
                 .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: dragColour,
             ]))
         }
-        text.append(NSAttributedString(string: modeName, attributes: keyAttrs))
-        if let c = p.pendingCount {
+        text.append(NSAttributedString(string: name, attributes: keyAttrs))
+        if let c = m.pendingCount {
             text.append(NSAttributedString(string: " \(c)", attributes: [
                 .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.yellow,
             ]))
         }
         text.append(NSAttributedString(string: "   ", attributes: keyAttrs))
-        for (i, h) in p.hints.enumerated() {
+        for (i, h) in m.hints.enumerated() {
             text.append(NSAttributedString(string: h.key + " ", attributes: keyAttrs))
-            text.append(NSAttributedString(string: h.action + (i == p.hints.count - 1 ? "" : "   "), attributes: actionAttrs))
+            text.append(NSAttributedString(string: h.action + (i == m.hints.count - 1 ? "" : "   "), attributes: actionAttrs))
         }
 
         let sz = text.size()
         let pad: CGFloat = 10
         let w = sz.width + pad * 2
         let h = sz.height + pad
-        // View coordinates: y up. Target in lower half -> strip at top.
-        let atTop = target.midY < bounds.midY
+        // View coordinates: y up. Pointer in lower half -> strip at top.
+        let atTop = focus.y < bounds.midY
         let y = atTop ? bounds.maxY - h - 40 : bounds.minY + 40
         let box = NSRect(x: bounds.midX - w / 2, y: y, width: w, height: h)
         let bg = NSBezierPath(roundedRect: box, xRadius: 8, yRadius: 8)

@@ -6,10 +6,17 @@ import VimouseCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var controller: Controller!
-    private let configStore = ConfigStore()
+    private let configStore: ConfigStore
+    private let modes: [Mode]
+
+    init(modes: [Mode]) {
+        self.modes = modes
+        configStore = ConfigStore(modes: modes)
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        controller = Controller()
+        controller = Controller(modes: modes)
         setUpStatusItem()
         configStore.onChange = { [weak self] config in
             self?.controller.apply(config)
