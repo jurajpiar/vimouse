@@ -167,13 +167,17 @@ final class ConfigTests: XCTestCase {
 
     func testHoldKey() throws {
         XCTAssertNil(Config().keymap.hold)
-        XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"right_cmd\"").keymap.hold, .rightCommand)
-        XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"fn\"").keymap.hold, .function)
+        XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"right_cmd\"").keymap.hold, .key(.rightCommand))
+        XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"fn\"").keymap.hold, .key(.function))
+        XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"cmd+shift+ctrl\"").keymap.hold, .chord([.command, .shift, .control]))
+        XCTAssertEqual(HoldKey.chord([.command, .shift, .control]).label, "⌃⇧⌘")
+        XCTAssertEqual(HoldKey.chord([.command, .shift]).bits, [.command, .shift])
         XCTAssertNil(try Config.parse("[hotkey]\nhold = \"\"").keymap.hold)
         XCTAssertThrowsError(try Config.parse("[hotkey]\nhold = \"space\""))
+        XCTAssertThrowsError(try Config.parse("[hotkey]\nhold = \"cmd+q\""))
         XCTAssertEqual(KeyCode.rightCommand.modifierBit, .command)
         var k = KeyMap.default
-        k.hold = .rightCommand
+        k.hold = .key(.rightCommand)
         let e = PointerEngine(keymap: k)
         e.heldActivation = true
         _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))

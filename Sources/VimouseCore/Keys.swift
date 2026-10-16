@@ -94,12 +94,34 @@ public struct KeyPress: Hashable, Sendable {
     }
 }
 
+/// What has to be held for quasi-mode: one specific modifier key, or a chord of
+/// modifiers regardless of side.
+public enum HoldKey: Equatable, Sendable {
+    case key(KeyCode)
+    case chord(Modifiers)
+
+    /// The modifier bits to strip from typed keys while held.
+    public var bits: Modifiers {
+        switch self {
+        case .key(let c): return c.modifierBit ?? []
+        case .chord(let m): return m
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .key(let c): return c.label
+        case .chord(let m): return KeyPress(.space, m).label.replacingOccurrences(of: "␣", with: "")
+        }
+    }
+}
+
 /// Bindings for Pointer mode. Will be loaded from config.toml later; the
 /// defaults match docs/PLAN.md.
 public struct KeyMap: Sendable, Equatable {
     public var activate: KeyPress
-    /// A modifier key that enters Pointer mode while held (quasi-mode); nil when unused.
-    public var hold: KeyCode?
+    /// Quasi-mode trigger: Pointer mode while this is held; nil when unused.
+    public var hold: HoldKey?
     public var quadrants: [KeyPress: Quadrant]
     public var up: Set<KeyPress>
     /// Back to the whole screen (root of the descent).

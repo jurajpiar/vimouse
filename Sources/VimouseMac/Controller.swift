@@ -48,9 +48,19 @@ final class Controller {
     /// Quasi-mode: the hold key enters Pointer mode on press and leaves on release.
     /// Other modifier changes pass through.
     private func handleModifier(_ key: KeyPress, isDown: Bool) -> Bool {
-        guard let hold = engine.keymap.hold, key.code == hold else { return false }
-        if isDown {
-            guard !engine.isActive else { return true }
+        guard let hold = engine.keymap.hold else { return false }
+        // Is the trigger satisfied after this change? A specific key: that key's state.
+        // A chord: every modifier of the chord present in the flags.
+        let satisfied: Bool
+        switch hold {
+        case .key(let code):
+            guard key.code == code else { return false }
+            satisfied = isDown
+        case .chord(let chord):
+            satisfied = key.modifiers.isSuperset(of: chord)
+        }
+        if satisfied {
+            guard !engine.isActive else { return engine.heldActivation }
             engine.heldActivation = true
             activate()
             return true
@@ -71,8 +81,8 @@ final class Controller {
             return true
         }
         // While the hold key is down, its own modifier is not part of what the user typed.
-        if engine.heldActivation, let bit = engine.keymap.hold?.modifierBit {
-            key = KeyPress(key.code, key.modifiers.subtracting(bit))
+        if engine.heldActivation, let bits = engine.keymap.hold?.bits {
+            key = KeyPress(key.code, key.modifiers.subtracting(bits))
         }
         // Active: swallow everything so the focused app sees nothing.
         // The help key works on hold: shown on key down, hidden on key up.

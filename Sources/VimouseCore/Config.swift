@@ -82,11 +82,12 @@ public struct Config: Equatable {
             guard let name = v.string else { throw ParseError(description: "[hotkey] hold: expected a modifier key name or \"\"") }
             if name.isEmpty {
                 k.hold = nil
+            } else if let code = KeyCode.named(name.lowercased()), code.modifierBit != nil || code == .function {
+                k.hold = .key(code)
+            } else if let chord = Modifiers.parse(name) {
+                k.hold = .chord(chord)
             } else {
-                guard let code = KeyCode.named(name.lowercased()), code.modifierBit != nil || code == .function else {
-                    throw ParseError(description: "[hotkey] hold: expected one of left_cmd, right_cmd, left_alt, right_alt, left_ctrl, right_ctrl, left_shift, right_shift, fn")
-                }
-                k.hold = code
+                throw ParseError(description: "[hotkey] hold: expected a modifier chord like \"cmd+shift\" or one of left_cmd, right_cmd, left_alt, right_alt, left_ctrl, right_ctrl, left_shift, right_shift, fn")
             }
         }
 
@@ -172,6 +173,23 @@ public struct Config: Equatable {
 }
 
 // MARK: - Key specs
+
+public extension Modifiers {
+    /// Parses "cmd+shift+ctrl" (modifiers only, at least one).
+    static func parse(_ spec: String) -> Modifiers? {
+        var mods: Modifiers = []
+        for m in spec.lowercased().split(separator: "+").map({ $0.trimmingCharacters(in: .whitespaces) }) {
+            switch m {
+            case "cmd", "command", "meta": mods.insert(.command)
+            case "shift": mods.insert(.shift)
+            case "ctrl", "control": mods.insert(.control)
+            case "alt", "opt", "option": mods.insert(.option)
+            default: return nil
+            }
+        }
+        return mods.isEmpty ? nil : mods
+    }
+}
 
 public extension KeyPress {
     /// Display form: modifier symbols then the key, e.g. "⇧⇥", "⌘⇧␣", "↓".
