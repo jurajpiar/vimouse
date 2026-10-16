@@ -49,6 +49,7 @@ public extension KeyCode {
     static let seven = KeyCode(rawValue: 26)
     static let eight = KeyCode(rawValue: 28)
     static let nine = KeyCode(rawValue: 25)
+    static let zero = KeyCode(rawValue: 29)
 }
 
 public struct Modifiers: OptionSet, Hashable, Sendable {
@@ -83,8 +84,8 @@ public struct KeyMap: Sendable {
     public var exit: Set<KeyPress>
     public var nextScreen: Set<KeyPress>
     public var previousScreen: Set<KeyPress>
-    /// Direct jump: key -> 0-based screen index.
-    public var screens: [KeyPress: Int]
+    /// Count prefix digits (vi style): key -> digit value.
+    public var digits: [KeyPress: Int]
     public var clickStay: Set<KeyPress>
     public var doubleClick: Set<KeyPress>
     public var dragToggle: Set<KeyPress>
@@ -106,7 +107,7 @@ public struct KeyMap: Sendable {
         exit: Set<KeyPress>,
         nextScreen: Set<KeyPress> = [],
         previousScreen: Set<KeyPress> = [],
-        screens: [KeyPress: Int] = [:],
+        digits: [KeyPress: Int] = [:],
         clickStay: Set<KeyPress> = [],
         doubleClick: Set<KeyPress> = [],
         dragToggle: Set<KeyPress> = [],
@@ -127,7 +128,7 @@ public struct KeyMap: Sendable {
         self.exit = exit
         self.nextScreen = nextScreen
         self.previousScreen = previousScreen
-        self.screens = screens
+        self.digits = digits
         self.clickStay = clickStay
         self.doubleClick = doubleClick
         self.dragToggle = dragToggle
@@ -155,9 +156,9 @@ public struct KeyMap: Sendable {
         exit: [KeyPress(.escape)],
         nextScreen: [KeyPress(.tab)],
         previousScreen: [KeyPress(.tab, [.shift])],
-        screens: [
-            KeyPress(.one): 0, KeyPress(.two): 1, KeyPress(.three): 2, KeyPress(.four): 3, KeyPress(.five): 4,
-            KeyPress(.six): 5, KeyPress(.seven): 6, KeyPress(.eight): 7, KeyPress(.nine): 8,
+        digits: [
+            KeyPress(.zero): 0, KeyPress(.one): 1, KeyPress(.two): 2, KeyPress(.three): 3, KeyPress(.four): 4,
+            KeyPress(.five): 5, KeyPress(.six): 6, KeyPress(.seven): 7, KeyPress(.eight): 8, KeyPress(.nine): 9,
         ],
         clickStay: [KeyPress(.space)],
         doubleClick: [KeyPress(.x)],

@@ -25,7 +25,10 @@ releases. s enters Scroll mode. Escape exits (releasing any drag).
 
 Scroll: j/k/h/l scroll at the pointer, d/u half a page, s back to Pointer.
 
-With several displays, Tab / Shift+Tab cycle screens and 1–9 jump to one directly.
+Counts work as in vi: digits before a command repeat or scale it. 45j scrolls 45
+steps, 3⌫ goes up three levels, 3⏎ triple-clicks, and with several displays 2⇥
+jumps to screen 2 (bare Tab / Shift+Tab cycle). Escape with a count pending cancels
+the count.
 
 ## Accessibility permission
 

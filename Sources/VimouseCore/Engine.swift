@@ -35,6 +35,8 @@ public final class PointerEngine {
     public private(set) var screenIndex: Int = 0
     /// Left button currently held by a `v` drag.
     public private(set) var dragging = false
+    /// vi-style count prefix typed so far; nil when none. Consumed by the next command.
+    public private(set) var pendingCount: Int?
 
     /// Vertical/horizontal scroll per j/k/h/l press, in pixels.
     public var scrollStep: Double = 60
@@ -67,6 +69,7 @@ public final class PointerEngine {
         screenIndex = index
         let s = BisectSession(root: screens[index])
         state = .active(mode: .pointer, session: s)
+        pendingCount = nil
         return [.showOverlay, .warp(s.current.center)]
     }
 
@@ -78,6 +81,7 @@ public final class PointerEngine {
     /// Leave Pointer mode, releasing a held drag first.
     public func deactivate() -> [Effect] {
         state = .idle
+        pendingCount = nil
         var fx: [Effect] = []
         if dragging {
             dragging = false
@@ -94,8 +98,20 @@ public final class PointerEngine {
     public func handle(_ key: KeyPress) -> [Effect] {
         guard case .active(let mode, var s) = state else { return [] }
 
+        // Count prefix: digits accumulate until a command consumes them.
+        if let d = keymap.digits[key] {
+            pendingCount = min((pendingCount ?? 0) * 10 + d, 9999)
+            return [.redraw]
+        }
+        let count = pendingCount
+        pendingCount = nil
+        let n = Double(count ?? 1)
+
         // Shared across modes.
-        if keymap.exit.contains(key) { return deactivate() }
+        if keymap.exit.contains(key) {
+            // As in vi, Escape with a count pending only cancels the count.
+            return count == nil ? deactivate() : [.redraw]
+        }
         if keymap.scrollToggle.contains(key) {
             state = .active(mode: mode == .scroll ? .pointer : .scroll, session: s)
             return [.redraw]
@@ -104,50 +120,53 @@ public final class PointerEngine {
             dragging.toggle()
             return [dragging ? .mouseDown(.left) : .mouseUp(.left), .redraw]
         }
-        if let fx = clickEffects(for: key) { return fx }
+        if let fx = clickEffects(for: key, count: count) { return fx }
         if keymap.nextScreen.contains(key) {
+            // With a count, Tab jumps to that screen (1-based); without, to the next one.
+            if let c = count { return switchScreen(to: c - 1) }
             return switchScreen(to: (screenIndex + 1) % screens.count)
         }
         if keymap.previousScreen.contains(key) {
+            if let c = count { return switchScreen(to: c - 1) }
             return switchScreen(to: (screenIndex - 1 + screens.count) % screens.count)
-        }
-        if let i = keymap.screens[key] {
-            return switchScreen(to: i)
         }
 
         switch mode {
         case .pointer:
             if let q = keymap.quadrants[key] {
-                s.select(q)
+                for _ in 0..<(count ?? 1) { s.select(q) }
                 state = .active(mode: .pointer, session: s)
                 return [.warp(s.current.center), .redraw]
             }
             if keymap.up.contains(key) {
-                guard s.up() else { return [] }
+                guard s.up() else { return count == nil ? [] : [.redraw] }
+                for _ in 1..<(count ?? 1) { s.up() }
                 state = .active(mode: .pointer, session: s)
                 return [.warp(s.current.center), .redraw]
             }
         case .scroll:
             let half = screens[screenIndex].height / 2
-            if keymap.scrollDown.contains(key) { return [.scroll(dx: 0, dy: scrollStep)] }
-            if keymap.scrollUp.contains(key) { return [.scroll(dx: 0, dy: -scrollStep)] }
-            if keymap.scrollLeft.contains(key) { return [.scroll(dx: -scrollStep, dy: 0)] }
-            if keymap.scrollRight.contains(key) { return [.scroll(dx: scrollStep, dy: 0)] }
-            if keymap.scrollHalfDown.contains(key) { return [.scroll(dx: 0, dy: half)] }
-            if keymap.scrollHalfUp.contains(key) { return [.scroll(dx: 0, dy: -half)] }
+            if keymap.scrollDown.contains(key) { return [.scroll(dx: 0, dy: scrollStep * n)] }
+            if keymap.scrollUp.contains(key) { return [.scroll(dx: 0, dy: -scrollStep * n)] }
+            if keymap.scrollLeft.contains(key) { return [.scroll(dx: -scrollStep * n, dy: 0)] }
+            if keymap.scrollRight.contains(key) { return [.scroll(dx: scrollStep * n, dy: 0)] }
+            if keymap.scrollHalfDown.contains(key) { return [.scroll(dx: 0, dy: half * n)] }
+            if keymap.scrollHalfUp.contains(key) { return [.scroll(dx: 0, dy: -half * n)] }
         }
-        return []
+        return count == nil ? [] : [.redraw]
     }
 
     /// Click keys match on key code only; held modifiers are passed into the click.
-    private func clickEffects(for key: KeyPress) -> [Effect]? {
+    /// A count prefix sets the click count (3⏎ triple-clicks); it is capped at 3.
+    private func clickEffects(for key: KeyPress, count: Int?) -> [Effect]? {
         let bare = KeyPress(key.code)
         let mods = key.modifiers
-        if keymap.leftClick.contains(bare) { return clickAndExit(.left, count: 1, mods) }
+        let clicks = min(count ?? 1, 3)
+        if keymap.leftClick.contains(bare) { return clickAndExit(.left, count: clicks, mods) }
         if keymap.doubleClick.contains(bare) { return clickAndExit(.left, count: 2, mods) }
         if keymap.rightClick.contains(bare) { return clickAndExit(.right, count: 1, mods) }
         if keymap.middleClick.contains(bare) { return clickAndExit(.middle, count: 1, mods) }
-        if keymap.clickStay.contains(bare) { return [.click(.left, count: 1, modifiers: mods)] }
+        if keymap.clickStay.contains(bare) { return [.click(.left, count: clicks, modifiers: mods)] }
         return nil
     }
 
@@ -196,8 +215,8 @@ public final class PointerEngine {
             h.append(("⏎", "click"))
             h.append(("s", "pointer"))
         }
-        if screens.count > 1 { h.append(("⇥ 1-\(screens.count)", "screen")) }
-        h.append(("esc", "exit"))
+        if screens.count > 1 { h.append(("⇥ / n⇥", "screen")) }
+        h.append(("esc", pendingCount == nil ? "exit" : "cancel count"))
         return h
     }
 }

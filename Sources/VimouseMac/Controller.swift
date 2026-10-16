@@ -83,6 +83,7 @@ final class Controller {
             screens: engine.screens,
             activeScreen: engine.screenIndex,
             dragging: engine.dragging,
+            pendingCount: engine.pendingCount,
             hints: engine.hints
         )
     }

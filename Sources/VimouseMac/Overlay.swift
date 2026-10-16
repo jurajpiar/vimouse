@@ -12,6 +12,7 @@ struct OverlayModel {
     var screens: [Rect]
     var activeScreen: Int
     var dragging: Bool
+    var pendingCount: Int?
     var hints: [(key: String, action: String)]
 }
 
@@ -161,7 +162,13 @@ final class OverlayView: NSView {
         let actionAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.white.withAlphaComponent(0.75),
         ]
-        text.append(NSAttributedString(string: modeName + "   ", attributes: keyAttrs))
+        text.append(NSAttributedString(string: modeName, attributes: keyAttrs))
+        if let c = model.pendingCount {
+            text.append(NSAttributedString(string: " \(c)", attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.yellow,
+            ]))
+        }
+        text.append(NSAttributedString(string: "   ", attributes: keyAttrs))
         for (i, h) in hints.enumerated() {
             text.append(NSAttributedString(string: h.key + " ", attributes: keyAttrs))
             text.append(NSAttributedString(string: h.action + (i == hints.count - 1 ? "" : "   "), attributes: actionAttrs))

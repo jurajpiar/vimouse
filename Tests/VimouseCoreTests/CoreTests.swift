@@ -75,9 +75,39 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.session?.depth, 0)
         XCTAssertEqual(e.handle(KeyPress(.tab)), [.warp(Point(x: 500, y: 300)), .redraw]) // wraps
         XCTAssertEqual(e.handle(KeyPress(.tab, [.shift])), [.warp(Point(x: 1400, y: 200)), .redraw])
-        XCTAssertEqual(e.handle(KeyPress(.two)), []) // already there
-        XCTAssertEqual(e.handle(KeyPress(.nine)), []) // no such screen
-        XCTAssertEqual(e.handle(KeyPress(.one)), [.warp(Point(x: 500, y: 300)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.two)), [.redraw]) // count prefix
+        XCTAssertEqual(e.handle(KeyPress(.tab)), []) // 2⇥: already on screen 2
+        _ = e.handle(KeyPress(.nine))
+        XCTAssertEqual(e.handle(KeyPress(.tab)), []) // 9⇥: no such screen
+        _ = e.handle(KeyPress(.one))
+        XCTAssertEqual(e.handle(KeyPress(.tab)), [.warp(Point(x: 500, y: 300)), .redraw]) // 1⇥
+    }
+
+    func testCountPrefix() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.s))
+        _ = e.handle(KeyPress(.four))
+        XCTAssertEqual(e.handle(KeyPress(.five)), [.redraw])
+        XCTAssertEqual(e.pendingCount, 45)
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scroll(dx: 0, dy: 45 * 60)])
+        XCTAssertNil(e.pendingCount)
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scroll(dx: 0, dy: 60)]) // count consumed
+        // Escape with a pending count cancels the count, not the mode.
+        _ = e.handle(KeyPress(.three))
+        XCTAssertEqual(e.handle(KeyPress(.escape)), [.redraw])
+        XCTAssertTrue(e.isActive)
+        XCTAssertNil(e.pendingCount)
+        // Counts in pointer mode: repeat a quadrant, go up several levels, multi-click.
+        _ = e.handle(KeyPress(.s))
+        _ = e.handle(KeyPress(.three))
+        _ = e.handle(KeyPress(.i))
+        XCTAssertEqual(e.session?.depth, 3)
+        _ = e.handle(KeyPress(.two))
+        _ = e.handle(KeyPress(.delete))
+        XCTAssertEqual(e.session?.depth, 1)
+        _ = e.handle(KeyPress(.three))
+        XCTAssertEqual(e.handle(KeyPress(.return)), [.click(.left, count: 3, modifiers: []), .hideOverlay])
     }
 
     func testModifierClickAndClickStay() {
