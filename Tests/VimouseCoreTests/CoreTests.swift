@@ -44,6 +44,77 @@ final class BisectTests: XCTestCase {
     }
 }
 
+final class ConfigTests: XCTestCase {
+    func testDefaultTemplateReproducesDefaults() throws {
+        XCTAssertEqual(try Config.parse(Config.defaultTOML), Config())
+    }
+
+    func testEmptyFileIsDefaults() throws {
+        XCTAssertEqual(try Config.parse(""), Config())
+    }
+
+    func testOverridesAndKeySpecs() throws {
+        let c = try Config.parse("""
+        [hotkey]
+        activate = "ctrl+alt+m"
+        [keys]
+        top_left = "q"
+        top_right = "w"
+        bottom_left = "a"
+        bottom_right = "s"
+        left_click = "space"
+        [scroll]
+        step = 24
+        [ruler]
+        dim = 2   # clamped
+        [snap]
+        enabled = false
+        """)
+        XCTAssertEqual(c.keymap.activate, KeyPress(.m, [.control, .option]))
+        XCTAssertEqual(c.keymap.quadrants[KeyPress(.q)], .topLeft)
+        XCTAssertEqual(c.keymap.quadrants[KeyPress(.s)], .bottomRight)
+        XCTAssertEqual(c.keymap.leftClick, [KeyPress(.space)])
+        XCTAssertEqual(c.scrollStep, 24)
+        XCTAssertEqual(c.rulerDim, 1)
+        XCTAssertFalse(c.snapEnabled)
+        XCTAssertEqual(c.keymap.rightClick, KeyMap.default.rightClick) // untouched
+    }
+
+    func testErrors() {
+        XCTAssertThrowsError(try Config.parse("[keys]\ntop_left = \"q\""))      // incomplete quadrants
+        XCTAssertThrowsError(try Config.parse("[keys]\nexit = \"hyper+q\""))     // unknown modifier
+        XCTAssertThrowsError(try Config.parse("[scroll]\nstep = \"fast\""))     // wrong type
+        XCTAssertThrowsError(try Config.parse("garbage"))                         // not TOML
+    }
+
+    func testKeySpecs() {
+        XCTAssertEqual(KeyPress.parse("cmd+shift+space"), KeyPress(.space, [.command, .shift]))
+        XCTAssertEqual(KeyPress.parse("]"), KeyPress(.rightBracket))
+        XCTAssertEqual(KeyPress.parse("Shift+Tab"), KeyPress(.tab, [.shift]))
+        XCTAssertNil(KeyPress.parse("f13"))
+    }
+}
+
+final class TOMLTests: XCTestCase {
+    func testSubset() throws {
+        let t = try TOML.parse("""
+        # comment
+        name = "a # not a comment"
+        [s]
+        n = 1_000
+        f = 2.5
+        b = true
+        list = ["x", "y, z"]
+        """)
+        XCTAssertEqual(t[""]?["name"], .string("a # not a comment"))
+        XCTAssertEqual(t["s"]?["n"], .int(1000))
+        XCTAssertEqual(t["s"]?["f"], .double(2.5))
+        XCTAssertEqual(t["s"]?["b"], .bool(true))
+        XCTAssertEqual(t["s"]?["list"], .array([.string("x"), .string("y, z")]))
+        XCTAssertEqual(t["s"]?["list"]?.strings, ["x", "y, z"])
+    }
+}
+
 final class FakeSnap: SnapProvider {
     var points: [Point] = []
     var prepared = 0

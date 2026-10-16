@@ -54,7 +54,7 @@ public final class PointerEngine {
     }
 
     public private(set) var state: State = .idle
-    public let keymap: KeyMap
+    public var keymap: KeyMap
 
     /// All displays (CG coordinates) and which one the session is on.
     public private(set) var screens: [Rect] = []
@@ -83,6 +83,16 @@ public final class PointerEngine {
         self.keymap = keymap
         self.snapping = snapping
         self.snapProvider = snapProvider
+    }
+
+    /// Apply a (re)loaded configuration. Safe at any time; an existing ruler keeps its size.
+    public func apply(_ c: Config) {
+        keymap = c.keymap
+        scrollStep = c.scrollStep
+        rulerDefaultHeight = c.rulerHeight
+        rulerStep = c.rulerStep
+        rulerHeightStep = c.rulerHeightStep
+        if !isActive { snapping = c.snapEnabled }
     }
 
     public var isActive: Bool {

@@ -8,9 +8,17 @@ final class Controller {
     private let engine: PointerEngine
     private let tap = InputTap()
     private let overlay = Overlay()
+    private var rulerDim: Double = Config().rulerDim
 
-    init(snapByDefault: Bool = true) {
-        engine = PointerEngine(keymap: .default, snapping: snapByDefault, snapProvider: snapper)
+    init() {
+        engine = PointerEngine(keymap: .default, snapping: true, snapProvider: snapper)
+    }
+
+    /// Called on load and on every reload of config.toml.
+    func apply(_ config: Config) {
+        engine.apply(config)
+        rulerDim = config.rulerDim
+        overlay.render(model())
     }
 
     func start() throws {
@@ -91,7 +99,7 @@ final class Controller {
                 hints: engine.hints
             )
         }
-        let ruler = engine.ruler.map { RulerModel(screenIndex: $0.screenIndex, band: $0.band(on: engine.screens[$0.screenIndex])) }
+        let ruler = engine.ruler.map { RulerModel(screenIndex: $0.screenIndex, band: $0.band(on: engine.screens[$0.screenIndex]), dim: rulerDim) }
         return OverlayModel(pointer: pointer, ruler: ruler, screens: engine.screens, activeScreen: engine.screenIndex)
     }
 }

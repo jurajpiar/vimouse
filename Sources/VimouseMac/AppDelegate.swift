@@ -5,10 +5,16 @@ import VimouseCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var controller: Controller!
+    private let configStore = ConfigStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = Controller()
         setUpStatusItem()
+        configStore.onChange = { [weak self] config in
+            self?.controller.apply(config)
+            self?.statusItem.button?.title = self?.configStore.lastError == nil ? "vm" : "vm!"
+        }
+        configStore.start()
 
         guard Permissions.ensureAccessibility() else {
             NSLog("vimouse: waiting for Accessibility permission (System Settings > Privacy & Security > Accessibility)")
@@ -31,7 +37,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "vm"
         let menu = NSMenu()
-        menu.addItem(withTitle: "Activate pointer (⌘⇧Space)", action: #selector(activate), keyEquivalent: "")
+        menu.addItem(withTitle: "Activate pointer", action: #selector(activate), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Open config file", action: #selector(openConfig), keyEquivalent: "")
+        menu.addItem(withTitle: "Reload config", action: #selector(reloadConfig), keyEquivalent: "")
+        menu.addItem(withTitle: "Show config error", action: #selector(showConfigError), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit vimouse", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
@@ -39,6 +49,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func activate() { controller.activateFromMenu() }
+    @objc private func openConfig() { NSWorkspace.shared.open(ConfigStore.file) }
+    @objc private func reloadConfig() { configStore.reload() }
+
+    @objc private func showConfigError() {
+        let alert = NSAlert()
+        alert.messageText = configStore.lastError == nil ? "Config is fine" : "Config error"
+        alert.informativeText = configStore.lastError ?? "\(ConfigStore.file.path) parsed without errors."
+        alert.runModal()
+    }
     @objc private func quit() { NSApp.terminate(nil) }
 
     func applicationWillTerminate(_ notification: Notification) {

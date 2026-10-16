@@ -76,7 +76,7 @@ public struct KeyPress: Hashable, Sendable {
 
 /// Bindings for Pointer mode. Will be loaded from config.toml later; the
 /// defaults match docs/PLAN.md.
-public struct KeyMap: Sendable {
+public struct KeyMap: Sendable, Equatable {
     public var activate: KeyPress
     public var quadrants: [KeyPress: Quadrant]
     public var up: Set<KeyPress>

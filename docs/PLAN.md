@@ -110,6 +110,8 @@ AX snapping, to verify on real apps: native (Finder, System Settings), Safari/Ch
 
 2026-10-16: Ruler mode v1 implemented (persistent band, dimming, j/k, [ ], R removes). Shan: it works but needs more work; parked for later. Intent to return to: tune defaults (band height, step, dim level, scroll step near line height), consider dimming only the frontmost window, and the planned AX text-line snapping so the band follows real lines. Next: config file (ruler/scroll parameters are the first entries), then Nudge, hold-? map, then Phase 2 robustness (permission revocation, secure input).
 
+2026-10-16: config file implemented (~/.config/vimouse/config.toml, written with comments on first run, hot reload, TOML-subset parser in Core with tests). Shan: drag/drop (v) will need work; parked, intent recorded alongside the ruler.
+
 Open: none.
 
 ## Sources

@@ -19,6 +19,8 @@ struct PointerModel {
 struct RulerModel {
     var screenIndex: Int
     var band: Rect
+    /// Darkening outside the band, 0 to 1.
+    var dim: Double
 }
 
 struct OverlayModel {
@@ -78,9 +80,6 @@ final class OverlayView: NSView {
     var model: OverlayModel?
     let screenIndex: Int
 
-    /// Dimming outside the ruler band.
-    var rulerDimAlpha: CGFloat = 0.35
-
     init(screenIndex: Int) {
         self.screenIndex = screenIndex
         super.init(frame: .zero)
@@ -101,7 +100,7 @@ final class OverlayView: NSView {
         let toLocal = { (r: Rect) in Coordinates.localRect(r, inWindow: windowFrame) }
 
         if let ruler = model.ruler, ruler.screenIndex == screenIndex {
-            drawRuler(ruler.band, screen: model.screens[screenIndex], toLocal: toLocal, adjusting: model.pointer?.mode == .ruler)
+            drawRuler(ruler, screen: model.screens[screenIndex], toLocal: toLocal, adjusting: model.pointer?.mode == .ruler)
         }
 
         guard let p = model.pointer else { return }
@@ -167,10 +166,11 @@ final class OverlayView: NSView {
         drawStatusStrip(p, colour: colour, awayFrom: cur)
     }
 
-    private func drawRuler(_ band: Rect, screen: Rect, toLocal: (Rect) -> NSRect, adjusting: Bool) {
+    private func drawRuler(_ ruler: RulerModel, screen: Rect, toLocal: (Rect) -> NSRect, adjusting: Bool) {
+        let band = ruler.band
         let above = Rect(x: screen.x, y: screen.y, width: screen.width, height: max(0, band.y - screen.y))
         let below = Rect(x: screen.x, y: band.maxY, width: screen.width, height: max(0, screen.maxY - band.maxY))
-        NSColor.black.withAlphaComponent(rulerDimAlpha).setFill()
+        NSColor.black.withAlphaComponent(CGFloat(ruler.dim)).setFill()
         toLocal(above).fill()
         toLocal(below).fill()
         let edge = NSBezierPath(rect: toLocal(band))

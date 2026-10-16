@@ -38,6 +38,13 @@ steps, 3⌫ goes up three levels, 3⏎ triple-clicks, and with several displays 
 jumps to screen 2 (bare Tab / Shift+Tab cycle). Escape with a count pending cancels
 the count.
 
+## Configuration
+
+On first run vimouse writes a commented `~/.config/vimouse/config.toml` with every
+binding and tunable (scroll step, ruler height/step/dimming, snapping default).
+Edit and save; the app reloads it. A parse error keeps the previous settings and
+turns the menu bar item into "vm!"; "Show config error" in the menu says why.
+
 ## Accessibility permission
 
 The event tap needs Accessibility access. When run from a terminal with
