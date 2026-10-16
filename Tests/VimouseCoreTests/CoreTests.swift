@@ -259,7 +259,7 @@ final class ConfigTests: XCTestCase {
         // The engine ignores side bits unless a binding names a side.
         let e = PointerEngine()
         _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
-        XCTAssertEqual(e.handle(KeyPress(.i, [.leftShift])), []) // side bit without generic: not a plain i
+        XCTAssertEqual(e.handle(KeyPress(.i, [.shift, .leftShift])), []) // shifted i is not a plain i
         XCTAssertEqual(e.handle(KeyPress(.i)), [.warp(Point(x: 25, y: 25)), .redraw])
     }
 

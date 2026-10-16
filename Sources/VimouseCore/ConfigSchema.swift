@@ -20,7 +20,9 @@ public enum ConfigSchema {
     # Key names (US layout positions): letters a-z, digits 0-9, space, return, tab,
     # escape, backspace, left, right, up, down, pageup, pagedown, home, end, comma,
     # period, slash, leftbracket, rightbracket, minus, equal.
-    # Modifiers cmd, shift, ctrl, alt are joined with "+", e.g. "cmd+shift+space".
+    # Modifiers cmd, shift, ctrl, alt are joined with "+", e.g. "cmd+shift+space"; a
+    # side can be named: left_shift, right_cmd, right_alt, left_ctrl (plain names match
+    # either side).
     # A list binds several keys to one action, e.g. ["j", "down"].
     #
     # On start (unless [config] update = false) settings missing from this file are
