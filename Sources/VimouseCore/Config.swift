@@ -34,8 +34,11 @@ public struct Config: Equatable {
     public var scrollSmooth: Bool = true
     /// Speed launched by a double tap, px/s; 0 disables.
     public var scrollFlick: Double = 4000
-    /// Double tap of a scroll key flicks.
-    public var scrollFlickDoubleTap: Bool = true
+    /// Double tap of a scroll key flicks: nil = auto (only when no flick modifier is set).
+    public var scrollFlickDoubleTap: Bool? = nil
+
+    /// The effective double-tap setting.
+    public var flickDoubleTapEnabled: Bool { scrollFlickDoubleTap ?? (keymap.flickWith == nil) }
     /// Fraction of speed lost per second while coasting.
     public var scrollFriction: Double = 0.85
     public var rulerHeight: Double = 32
@@ -144,8 +147,9 @@ public struct Config: Equatable {
         if let v = try number("scroll", "acceleration") { c.scrollAcceleration = max(0.05, v) }
         if let v = try number("scroll", "flick") { c.scrollFlick = max(0, v) }
         if let v = t["scroll"]?["flick_double_tap"] {
-            guard let b = v.bool else { throw ParseError(description: "[scroll] flick_double_tap: expected true or false") }
-            c.scrollFlickDoubleTap = b
+            if let b = v.bool { c.scrollFlickDoubleTap = b }
+            else if v.string?.lowercased() == "auto" { c.scrollFlickDoubleTap = nil }
+            else { throw ParseError(description: "[scroll] flick_double_tap: expected true, false or \"auto\"") }
         }
         if let v = t["scroll"]?["flick_with"] {
             guard let s = v.string else { throw ParseError(description: "[scroll] flick_with: expected modifiers like \"alt\" or \"\"") }

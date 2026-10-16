@@ -187,7 +187,11 @@ final class ConfigTests: XCTestCase {
     func testFlickModifier() throws {
         let c = try Config.parse("[scroll]\nflick_with = \"alt\"\nflick_double_tap = false")
         XCTAssertEqual(c.keymap.flickWith, [.option])
-        XCTAssertFalse(c.scrollFlickDoubleTap)
+        XCTAssertFalse(c.flickDoubleTapEnabled)
+        XCTAssertTrue(Config().flickDoubleTapEnabled)                                                        // auto, no modifier
+        XCTAssertFalse(try Config.parse("[scroll]\nflick_with = \"alt\"").flickDoubleTapEnabled)          // auto, modifier set
+        XCTAssertTrue(try Config.parse("[scroll]\nflick_with = \"alt\"\nflick_double_tap = true").flickDoubleTapEnabled)
+        XCTAssertThrowsError(try Config.parse("[scroll]\nflick_double_tap = \"maybe\""))
         XCTAssertThrowsError(try Config.parse("[scroll]\nflick_with = \"j\""))
         let e = PointerEngine(keymap: c.keymap)
         _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))

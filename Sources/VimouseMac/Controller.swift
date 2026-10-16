@@ -32,7 +32,7 @@ final class Controller {
         scroller.smooth = config.scrollSmooth
         scroller.flick = config.scrollFlick
         scroller.friction = config.scrollFriction
-        scroller.doubleTapFlicks = config.scrollFlickDoubleTap
+        scroller.doubleTapFlicks = config.flickDoubleTapEnabled
         colours = config.colours
         dragRamp = config.dragRamp
         activateMode = config.activateMode
