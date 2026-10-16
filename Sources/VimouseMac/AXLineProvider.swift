@@ -350,11 +350,13 @@ final class AXLineProvider: LineProvider {
         }
         let asCG = normalisedBounds(element, firstRange, flipped: false)
         let flipped = frame.intersects(asCocoa) || asCG.map { !frame.intersects($0) } ?? true
+        log("marker route: first line \(asCocoa) (flipped) / \(asCG.map { "\($0)" } ?? "nil") (unflipped), frame \(frame)")
         var range: AnyObject = firstRange
         var lastMid = -Double.infinity
-        for _ in 0..<80 {
+        for i in 0..<80 {
             guard Date() < deadline else { log("out of time walking lines"); return nil }
             if let b = normalisedBounds(element, range, flipped: flipped), b.width > 0 {
+                if i < 4 { log("marker route: line \(i) \(b)") }
                 if y >= b.y - 1, y < b.maxY + 1 {
                     log("line by start marker (\(flipped ? "flipped" : "unflipped")): \(b)")
                     return Found(element: element, line: nil, rect: b, markerHost: element, lineStart: m, flipped: flipped)
@@ -414,7 +416,8 @@ final class AXLineProvider: LineProvider {
             for j in i..<min(n, i + 4) { if let r = rect(j) { return r } }
             return nil
         }
-        guard let first = charRect(0) else { return nil }
+        guard let first = charRect(0) else { log("char route: no rectangle for character 0 of \(n)"); return nil }
+        log("char route: character 0 at \(first), element frame \(frame)")
         guard y >= first.y - 1 else { return nil }
         // The first character whose row ends below y.
         var lo = 0, hi = n - 1
