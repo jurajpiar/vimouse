@@ -38,6 +38,7 @@ final class ScrollDriver {
     private var lastTap: (at: Date, dx: Double, dy: Double)?
 
     var isHeld: Bool { held }
+    var isCoasting: Bool { coasting }
 
     func start(dx: Double, dy: Double, multiplier: Double) {
         // A press while coasting is a brake, like touching the trackpad: it stops the

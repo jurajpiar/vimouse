@@ -61,6 +61,21 @@ public extension KeyCode {
     static let rightControl = KeyCode(rawValue: 62)
     static let function = KeyCode(rawValue: 63)
 
+    /// The side-specific bit of a modifier key.
+    var sideBit: Modifiers? {
+        switch self {
+        case .leftCommand: return .leftCommand
+        case .rightCommand: return .rightCommand
+        case .leftShift: return .leftShift
+        case .rightShift: return .rightShift
+        case .leftOption: return .leftOption
+        case .rightOption: return .rightOption
+        case .leftControl: return .leftControl
+        case .rightControl: return .rightControl
+        default: return nil
+        }
+    }
+
     /// The modifier bit a modifier key sets, for stripping it while it is used as a hold key.
     var modifierBit: Modifiers? {
         switch self {

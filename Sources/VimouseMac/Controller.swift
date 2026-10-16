@@ -62,6 +62,12 @@ final class Controller {
     /// Quasi-mode: the hold key enters Pointer mode on press and leaves on release.
     /// Other modifier changes pass through.
     private func handleModifier(_ key: KeyPress, isDown: Bool) -> Bool {
+        // Releasing the flick modifier while the page coasts brakes it.
+        if !isDown, scroller.isCoasting, let fm = engine.keymap.flickWith,
+           let generic = key.code.modifierBit, let side = key.code.sideBit,
+           !fm.intersection([generic, side]).isEmpty {
+            scroller.brake()
+        }
         guard let hold = engine.keymap.hold else { return false }
         // Is the trigger satisfied after this change? A specific key: that key's state.
         // A chord: every modifier of the chord present in the flags.
