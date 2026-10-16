@@ -894,7 +894,7 @@ final class PluginTests: XCTestCase {
     func testExpandMode() {
         let e = PointerEngine()
         _ = e.activate(screen: screen, pointer: Point(x: 100, y: 100))
-        _ = e.handle(KeyPress(.e))
+        _ = e.handle(KeyPress(.e, [.shift]))
         XCTAssertEqual(e.mode, "expand")
         XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 108, y: 100)), .redraw])   // base 8
         XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 124, y: 100)), .redraw])   // 16

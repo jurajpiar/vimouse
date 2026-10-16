@@ -7,7 +7,7 @@ import VimouseCore
 /// the base step. Experimental.
 public final class ExpandMode: Mode {
     public struct Settings: ModeSettings, Equatable {
-        public var toggle: Set<KeyPress> = [KeyPress(.e)]
+        public var toggle: Set<KeyPress> = [KeyPress(.e, [.shift])]
         public var base: Double = 8
         public var factor: Double = 2
         public var max: Double = 1024
@@ -31,7 +31,7 @@ public final class ExpandMode: Mode {
 
     public var schema: [ConfigEntry] {
         [
-            .init(section: id, key: "toggle", defaultValue: "\"e\"", comment: "Enter or leave Expand mode, e.g. \"e\"."),
+            .init(section: id, key: "toggle", defaultValue: "\"shift+e\"", comment: "Enter or leave Expand mode, e.g. \"shift+e\" (plain e extends the ruler)."),
             .init(section: id, key: "base", defaultValue: "8", comment: "Pixels of the first press in a direction, e.g. 4, 8, 16."),
             .init(section: id, key: "factor", defaultValue: "2", comment: "Growth per press in the same direction (and shrink when reversing), e.g. 2, 1.5."),
             .init(section: id, key: "max", defaultValue: "1024", comment: "Largest step in pixels, e.g. 512, 1024."),

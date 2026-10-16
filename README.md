@@ -48,7 +48,7 @@ Hints: f labels every clickable element the frontmost app exposes through
 accessibility with a letter or two; type the label to click it (or only move there
 with `[hints] click = false`). Backspace deletes a letter, f or Escape leaves.
 
-Expand (work in progress; add `"expand"` to `[modes] enabled`): e enters it;
+Expand (work in progress; add `"expand"` to `[modes] enabled`): E enters it;
 h/j/k/l or the arrows move 8 px, each further press the same way doubles the step,
 the opposite direction halves it, so you overshoot and home in.
 
