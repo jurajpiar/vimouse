@@ -74,7 +74,8 @@ public final class HintsMode: Mode {
         let chars = Array(letters)
         guard count > 0, chars.count >= 2 else { return [] }
         var length = 1
-        while Int(pow(Double(chars.count), Double(length))) < count { length += 1 }
+        var capacity = chars.count
+        while capacity < count { capacity *= chars.count; length += 1 }
         var out: [String] = []
         var indices = [Int](repeating: 0, count: length)
         while out.count < count {
@@ -97,7 +98,8 @@ public final class HintsMode: Mode {
             return [.redraw]
         }
         // A letter of the label alphabet, typed without modifiers.
-        guard key.modifiers.generic.isEmpty, let letter = key.code.label.first, settings.letters.contains(letter) else { return nil }
+        let label = key.code.label
+        guard key.modifiers.generic.isEmpty, label.count == 1, let letter = label.first, settings.letters.contains(letter) else { return nil }
         let next = typed + String(letter)
         let matches = targets.filter { $0.label.hasPrefix(next) }
         guard !matches.isEmpty else { return [.redraw] } // no such label: ignore the letter
@@ -105,10 +107,9 @@ public final class HintsMode: Mode {
         if matches.count == 1, matches[0].label == typed {
             ctx.target = matches[0].frame.center
             if settings.click {
-                // Warp, then the click lands there; the engine exits after a click key, so
-                // do the exit ourselves: hand back and let the platform release everything.
-                ctx.switchMode(to: nil)
-                return [.warp(ctx.target), .click(.left, count: 1, modifiers: []), .redraw]
+                // Warp, click, and leave, as a click key would.
+                ctx.requestExit()
+                return [.warp(ctx.target), .click(.left, count: 1, modifiers: [])]
             }
             ctx.switchMode(to: nil)
             return [.warp(ctx.target), .redraw]

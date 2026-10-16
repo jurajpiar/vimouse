@@ -178,6 +178,9 @@ public final class ModeContext {
     /// the previous mode (the default when there is none).
     public func switchMode(to id: String?) { requestedMode = .some(id) }
     var requestedMode: String?? = nil
+    /// Ask the engine to leave altogether once the current key is handled.
+    public func requestExit() { exitRequested = true }
+    var exitRequested = false
 
     /// `target` clamped to the current display.
     public func clamped(_ p: Point) -> Point {

@@ -222,6 +222,11 @@ public final class PointerEngine {
 
     /// A mode asked for a switch while handling a key.
     private func requestedSwitch() -> [Effect] {
+        if context.exitRequested {
+            context.exitRequested = false
+            context.requestedMode = nil
+            return deactivate()
+        }
         guard let request = context.requestedMode else { return [] }
         context.requestedMode = nil
         return enter(mode: request ?? returnMode, reason: .toggledOff)

@@ -845,8 +845,9 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(hints.targets.map(\.label), ["a", "s", "d"])
         XCTAssertEqual(e.handle(KeyPress(.m)), [.redraw])                    // m is a click key elsewhere; here an unused letter: ignored
         XCTAssertEqual(e.mode, "hints")
-        XCTAssertEqual(e.handle(KeyPress(.s)), [.warp(Point(x: 120, y: 110)), .click(.left, count: 1, modifiers: []), .redraw, .redraw])
-        XCTAssertEqual(e.mode, "pointer")                                    // handed back after the click
+        XCTAssertEqual(e.handle(KeyPress(.s)), [.warp(Point(x: 120, y: 110)), .click(.left, count: 1, modifiers: []), .hideOverlay])
+        XCTAssertFalse(e.isActive)                                           // a click leaves, as a click key would
+        _ = e.activate(screen: screen)
         // Two-letter labels: a prefix narrows, Backspace widens, no-click variant just moves.
         els.frames = (0..<12).map { Rect(x: Double($0) * 50, y: 0, width: 40, height: 20) }
         e.apply(try Config.parse("[hints]\nletters = \"abc\"\nclick = false"))
