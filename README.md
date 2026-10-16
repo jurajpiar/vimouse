@@ -38,7 +38,8 @@ step sends the pointer to the nearest clickable element inside the chosen rectan
 (read from the frontmost app's accessibility tree) instead of its centre; a pink
 ring marks the snap target. Escape exits (releasing any drag).
 
-Half: b enters a second way of narrowing down, starting from the whole screen:
+Half (work in progress; add `"half"` to `[modes] enabled` to try it): b enters a
+second way of narrowing down, starting from the whole screen:
 h/j/k/l or the arrows keep the left/bottom/top/right half of the current rectangle,
 Backspace or u go up a level, Shift+u back to the whole screen, b back to Pointer
 (whose descent is kept).

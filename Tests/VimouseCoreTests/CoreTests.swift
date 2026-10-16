@@ -12,7 +12,8 @@ func standardModes() -> [Mode] { [PointerMode(), HalfMode(), NudgeMode(), Scroll
 let standardCursors: [CursorStyle] = [RingCursor(), CrosshairCursor(), DotCursor()]
 
 extension PointerEngine {
-    convenience init(keymap: KeyMap = .default) { self.init(modes: standardModes(), cursors: standardCursors, keymap: keymap) }
+    /// Every standard mode enabled, the experimental ones included.
+    convenience init(keymap: KeyMap = .default) { self.init(modes: standardModes(), cursors: standardCursors, keymap: keymap, enabled: standardModes().map(\.id)) }
     var pointer: PointerMode { mode("pointer") as! PointerMode }
     var rulerMode: RulerMode { mode("ruler") as! RulerMode }
     var ruler: Ruler? { rulerMode.ruler }
@@ -437,6 +438,9 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.b)), [.redraw])
         XCTAssertEqual(e.mode, "pointer")
         XCTAssertEqual(e.session?.depth, 1) // the quadrant descent survived the detour
+        // Experimental: not in the default enabled list, so unreachable until opted into.
+        XCTAssertFalse(Config.defaults.enabledModes!.contains("half"))
+        XCTAssertTrue(try Config.parse("[modes]\nenabled = [\"pointer\", \"half\"]").enabledModes!.contains("half"))
     }
 
     func testUnboundKeyIsSwallowedSilently() {

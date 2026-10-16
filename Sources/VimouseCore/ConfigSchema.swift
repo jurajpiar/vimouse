@@ -75,7 +75,7 @@ public struct ConfigSchema {
             .init(section: "hotkey", key: "hold", defaultValue: "\"\"", comment: "Quasi-mode: the mode is active while this is held and left on release; these modifiers are ignored on the keys you type meanwhile, unless you also press the key on the other side (a left-hand hyper plus right shift still shifts). A chord like \"cmd+ctrl+alt\" or \"cmd+ctrl+alt+shift\", one key such as right_cmd, left_alt, right_ctrl, fn, or \"\" for none. The activate hotkey pins a held activation."),
             .init(section: "hotkey", key: "hold_mode", defaultValue: "\"\(first)\"", comment: "Mode the hold key starts in: \(list)."),
 
-            .init(section: "modes", key: "enabled", defaultValue: "[" + ids.map { "\"\($0)\"" }.joined(separator: ", ") + "]", comment: "Modes that can be entered, in order; the first is the default that mode toggles return to. Available: \(list)."),
+            .init(section: "modes", key: "enabled", defaultValue: "[" + modes.filter(\.enabledByDefault).map { "\"\($0.id)\"" }.joined(separator: ", ") + "]", comment: "Modes that can be entered, in order; the first is the default that mode toggles return to. Available: \(list)."),
 
             .init(section: "global", key: "exit", defaultValue: "\"escape\"", comment: "Leave the active mode (releases a drag; keeps a ruler), e.g. \"escape\", \"ctrl+c\"."),
             .init(section: "global", key: "next_screen", defaultValue: "\"tab\"", comment: "Next display; with a count, that display (2 then tab = display 2), e.g. \"tab\"."),

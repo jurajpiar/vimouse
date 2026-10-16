@@ -57,7 +57,7 @@ public final class PointerEngine {
         self.modes = modes
         self.cursors = cursors
         self.keymap = keymap
-        self.enabled = enabled ?? modes.map(\.id)
+        self.enabled = enabled ?? modes.filter(\.enabledByDefault).map(\.id)
         for m in modes { context.colours.modes[m.id] = m.defaultColour }
     }
 

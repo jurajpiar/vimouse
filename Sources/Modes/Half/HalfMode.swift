@@ -21,7 +21,8 @@ public final class HalfMode: Mode {
 
     public let id = "half"
     public let name = "HALF"
-    public let summary = "Half mode: narrowing down by keeping the left, right, top or bottom half of the rectangle."
+    public let summary = "Half mode (work in progress, off unless listed in [modes] enabled): narrowing down by keeping the left, right, top or bottom half of the rectangle."
+    public let enabledByDefault = false
     public let defaultColour = "#64D2FF"
     public var settings = Settings()
     public private(set) var session: BisectSession?

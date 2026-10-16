@@ -16,6 +16,8 @@ public protocol Mode: AnyObject {
     var defaultColour: String { get }
     /// Settings of the `[<id>]` section, in file order, with comments and defaults.
     var schema: [ConfigEntry] { get }
+    /// Listed in the default `[modes] enabled`. False for an experimental mode the user opts into.
+    var enabledByDefault: Bool { get }
 
     /// Parse the section into a settings value, throwing `Config.ParseError` with the
     /// `[section] key: ...` wording on a bad value. Called when the file is read.
@@ -80,6 +82,7 @@ public extension ModeSettings where Self: Equatable {
 }
 
 public extension Mode {
+    var enabledByDefault: Bool { true }
     var acceptsKeyRepeat: Bool { true }
     var showsDragLine: Bool { false }
     var drawsWhileIdle: Bool { false }
