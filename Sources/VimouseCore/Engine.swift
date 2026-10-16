@@ -285,7 +285,7 @@ public final class PointerEngine {
             let half = screens[screenIndex].height / 2
             // A scroll key with the flick modifier held flicks instead of scrolling.
             if let fm = keymap.flickWith, fm.matchesHeld(in: key.modifiers) {
-                let bare = KeyPress(key.code, key.modifiers.subtracting(fm))
+                let bare = KeyPress(key.code, key.modifiers.subtracting(fm).subtracting(fm.generic))
                 if keymap.scrollDown.has(bare) { return [.scrollFlick(dx: 0, dy: 1, multiplier: n)] }
                 if keymap.scrollUp.has(bare) { return [.scrollFlick(dx: 0, dy: -1, multiplier: n)] }
                 if keymap.scrollLeft.has(bare) { return [.scrollFlick(dx: -1, dy: 0, multiplier: n)] }
