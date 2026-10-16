@@ -100,7 +100,9 @@ Accessibility permission flow and revocation hang (mitigation in section 4). Sec
 
 2026-10-16: Phase 0 verified on Shan's Mac: event tap, overlay over full-screen apps, cursor warp and click all work; display switching added (Tab/Shift+Tab, digits 1-9, bisect resets on switch). Phase 0 closed.
 
-2026-10-16: 2x2 confirmed as the default after real use (3x3 would make the new navigation habit harder). Scroll mode, drag, modifier clicks, double click, click-and-stay and a first status strip implemented.
+2026-10-16: 2x2 confirmed as the default after real use (3x3 would make the new navigation habit harder). Scroll mode, drag, modifier clicks, double click, click-and-stay and a first status strip implemented and verified on Shan's Mac (all tests green, status strip approved).
+
+Phase 1 remaining: Nudge sub-mode, hold-? key map, config file. Phase 3 (ruler) may be pulled forward since it serves the reading goal directly.
 
 Open: none.
 
