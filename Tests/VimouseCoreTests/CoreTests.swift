@@ -786,7 +786,12 @@ final class PluginTests: XCTestCase {
         e.apply(try Config.parse("[cursor]\nstyle = \"crosshair\"\nsize = 20\ncolour = \"#ffffff\""))
         XCTAssertTrue(e.scene()!.drawables.contains(.crosshair(Point(x: 10, y: 10), size: 20, colour: "#FFFFFF", alpha: 1, width: 2)))
         e.apply(try Config.parse("[cursor]\nstyle = \"\""))
-        XCTAssertFalse(e.scene()!.drawables.contains { if case .ring = $0 { return true }; if case .crosshair = $0 { return true }; return false })
+        // Nothing at the pointer any more (the snap-target ring in the snap colour is a different marker).
+        XCTAssertFalse(e.scene()!.drawables.contains { d in
+            if case .ring(_, _, let c, _, _) = d { return c != Colours().snap }
+            if case .crosshair = d { return true }
+            return false
+        })
         XCTAssertThrowsError(try Config.parse("[cursor]\nstyle = \"arrow\""))
         XCTAssertThrowsError(try Config.parse("[cursor]\ncolour = \"red\""))
     }
