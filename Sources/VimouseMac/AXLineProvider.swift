@@ -100,7 +100,7 @@ final class AXLineProvider: LineProvider {
                    let range = markerValue(host, Marker.lineRange, m),
                    let b = normalisedBounds(host, range, flipped: cur.flipped), b.width > 0,
                    sign > 0 ? b.midY > cur.rect.midY : b.midY < cur.rect.midY {
-                    last = Found(element: cur.element, line: nil, rect: b, markerHost: host, flipped: cur.flipped, lineStart: m)
+                    last = Found(element: cur.element, line: nil, rect: b, markerHost: host, lineStart: m, flipped: cur.flipped)
                     log("next by line marker: \(b)")
                     return b
                 }
@@ -341,7 +341,7 @@ final class AXLineProvider: LineProvider {
             if let b = normalisedBounds(element, range, flipped: flipped), b.width > 0 {
                 if y >= b.y - 1, y < b.maxY + 1 {
                     log("line by start marker (\(flipped ? "flipped" : "unflipped")): \(b)")
-                    return Found(element: element, line: nil, rect: b, markerHost: element, flipped: flipped, lineStart: m)
+                    return Found(element: element, line: nil, rect: b, markerHost: element, lineStart: m, flipped: flipped)
                 }
                 if b.y > y || b.midY <= lastMid { break }
                 lastMid = b.midY
