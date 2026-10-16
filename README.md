@@ -73,14 +73,34 @@ the menu) are rewritten on every start. Arrow keys, page up/down, home and end c
 (`down = ["j", "down"]`), and the legend and in-rectangle labels show whatever is
 bound.
 
+## Installing as an app
+
+`swift run` is fine for development, but macOS then attributes the Accessibility
+permission to your terminal. For daily use build the bundle:
+
+```
+./scripts/install.sh            # builds, signs, installs ~/Applications/vimouse.app, launches it
+```
+
+On first launch macOS asks for Accessibility access for vimouse itself; grant it
+under System Settings > Privacy & Security > Accessibility. "Launch at login" in
+the menu bar menu registers the app with the system (it is greyed out when running
+from a terminal).
+
+The grant is tied to the code signature. To keep it across rebuilds, sign with a
+stable identity: either set `SIGN_IDENTITY` to a Developer ID certificate, or create
+a self-signed code-signing certificate once, in Keychain Access > Certificate
+Assistant > Create a Certificate, with name `vimouse-dev`, identity type
+"Self Signed Root", certificate type "Code Signing". `scripts/bundle.sh` picks it up
+by name. Without either, the build is signed ad-hoc and the permission has to be
+re-granted after every rebuild.
+
 ## Accessibility permission
 
 The event tap needs Accessibility access. When run from a terminal with
 `swift run`, macOS attributes the permission to the terminal app (the
 "responsible process"), so grant it to Terminal or iTerm under System Settings >
-Privacy & Security > Accessibility. For a standalone build, grant it to the
-`vimouse` binary instead; note that an unsigned or re-signed binary loses the
-grant on every rebuild. A stable signing identity fixes that (Phase 5).
+Privacy & Security > Accessibility. For the installed app, grant it to vimouse.
 
 If the pointer stops responding after revoking the permission while vimouse is
 running, quit vimouse. That is a known macOS behaviour with active event taps

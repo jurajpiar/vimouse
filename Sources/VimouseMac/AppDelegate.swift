@@ -1,5 +1,6 @@
 #if canImport(AppKit)
 import AppKit
+import ServiceManagement
 import VimouseCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -45,6 +46,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Open example config", action: #selector(openExample), keyEquivalent: "")
         menu.addItem(withTitle: "Open manual", action: #selector(openManual), keyEquivalent: "")
         menu.addItem(.separator())
+        let login = NSMenuItem(title: "Launch at login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        login.isEnabled = Bundle.main.bundleURL.pathExtension == "app"
+        login.toolTip = login.isEnabled ? nil : "Available when running as vimouse.app (scripts/install.sh)"
+        menu.addItem(login)
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Quit vimouse", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         statusItem.menu = menu
@@ -69,6 +76,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.informativeText = configStore.lastError ?? "\(ConfigStore.file.path) parsed without errors."
         alert.runModal()
     }
+    /// Launch at login through SMAppService; works only for an installed .app bundle.
+    @objc private func toggleLaunchAtLogin(_ item: NSMenuItem) {
+        do {
+            if SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            } else {
+                try SMAppService.mainApp.register()
+            }
+        } catch {
+            NSLog("vimouse: launch at login: \(error)")
+            let alert = NSAlert()
+            alert.messageText = "Could not change launch at login"
+            alert.informativeText = "\(error)"
+            alert.runModal()
+        }
+        item.state = SMAppService.mainApp.status == .enabled ? .on : .off
+    }
+
     @objc private func quit() { NSApp.terminate(nil) }
 
     func applicationWillTerminate(_ notification: Notification) {
