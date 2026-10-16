@@ -149,14 +149,15 @@ public enum ConfigSchema {
     /// Short comments go on the key's line, longer ones above it.
     public static let inlineCommentLimit = 48
 
-    /// One setting as written to the file: a comment line above and the key, or the
-    /// key with the comment on the same line when it is short.
+    /// One setting as written to the file: the key with the comment on the same line
+    /// when it is short, otherwise a blank line, the comment line, then the key, so the
+    /// comment reads as belonging to what follows.
     public static func render(_ e: ConfigEntry, value: String? = nil) -> [String] {
         let v = value ?? e.defaultValue
         if e.comment.count <= inlineCommentLimit {
             return ["\(e.key) = \(v)   # \(e.comment)"]
         }
-        return ["# \(e.comment)", "\(e.key) = \(v)"]
+        return ["", "# \(e.comment)", "\(e.key) = \(v)"]
     }
 
     /// The complete default file.
@@ -165,7 +166,7 @@ public enum ConfigSchema {
         for section in sections {
             out += "\n# \(sectionComments[section] ?? section)\n[\(section)]\n"
             for e in entries where e.section == section {
-                out += "\n" + render(e).joined(separator: "\n") + "\n"
+                out += render(e).joined(separator: "\n") + "\n"
             }
         }
         return out
@@ -218,7 +219,7 @@ public enum ConfigSchema {
         struct SectionInfo { var start: Int; var end: Int; var keys: Set<String>; var keyLines: Int }
         var sections: [String: SectionInfo] = [:]
         var current: String? = nil
-        var commentsToInsert: [(before: Int, text: String)] = []
+        var commentsToInsert: [(before: Int, text: [String])] = []
         var removals = Set<Int>()
         var carried: [String: String] = [:]
         func hasComment(_ comment: String, above i: Int) -> Bool {
@@ -238,7 +239,7 @@ public enum ConfigSchema {
                 current = name
                 sections[name] = SectionInfo(start: i, end: i, keys: [], keyLines: 0)
                 if let c = sectionComments[name], !hasComment("# \(c)", above: i) {
-                    commentsToInsert.append((before: i, text: "# \(c)"))
+                    commentsToInsert.append((before: i, text: ["# \(c)"]))
                 }
                 continue
             }
@@ -255,7 +256,10 @@ public enum ConfigSchema {
                     if entry.comment.count <= inlineCommentLimit {
                         lines[i] = "\(raw)   # \(entry.comment)"
                     } else {
-                        commentsToInsert.append((before: i, text: "# \(entry.comment)"))
+                        // Blank line first unless the key already follows a blank line or the header.
+                        let prev = i > 0 ? lines[i - 1].trimmingCharacters(in: .whitespaces) : ""
+                        let separated = prev.isEmpty || prev.hasPrefix("[") || prev.hasPrefix("#")
+                        commentsToInsert.append((before: i, text: (separated ? [] : [""]) + ["# \(entry.comment)"]))
                     }
                 }
             } else if let target = renamed["\(sec).\(key)"] {
@@ -276,7 +280,7 @@ public enum ConfigSchema {
         for section in self.sections {
             let missing = entries.filter { $0.section == section && !(sections[section]?.keys.contains($0.key) ?? false) }
             guard !missing.isEmpty else { continue }
-            let block = missing.flatMap { [""] + render($0, value: carried["\($0.section).\($0.key)"]) }
+            let block = missing.flatMap { render($0, value: carried["\($0.section).\($0.key)"]) }
             if let info = sections[section] {
                 insertions.append((after: info.end, text: block))
             } else {
@@ -306,7 +310,7 @@ public enum ConfigSchema {
         // first so their indices are not shifted.
         for i in removals { lines[i] = "\u{0}" }
         var inserts: [(at: Int, isComment: Bool, text: [String])] =
-            commentsToInsert.map { (at: $0.before, isComment: true, text: [$0.text]) }
+            commentsToInsert.map { (at: $0.before, isComment: true, text: $0.text) }
             + insertions.map { (at: $0.after + 1, isComment: false, text: $0.text) }
         inserts.sort { a, b in a.at != b.at ? a.at > b.at : (a.isComment && !b.isComment) }
         for ins in inserts {
