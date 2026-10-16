@@ -26,8 +26,8 @@ final class Controller {
     private var healthTimer: Timer?
     private var tapRunning = false
 
-    init(modes: [Mode]) {
-        engine = PointerEngine(modes: modes)
+    init(modes: [Mode], cursors: [CursorStyle]) {
+        engine = PointerEngine(modes: modes, cursors: cursors)
         engine.context.services.snap = snapper
         engine.context.services.lines = lines
         activateMode = engine.defaultMode

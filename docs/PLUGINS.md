@@ -38,6 +38,15 @@ Removing a mode is the reverse. At run time `[modes] enabled` in `config.toml`
 picks which registered modes can be entered, in order; the first is the default
 mode that toggles return to.
 
+## Cursor styles
+
+The marker drawn at the pointer is the second plugin kind: a `CursorStyle`
+(`Sources/VimouseCore/Cursor.swift`) has an `id`, a `summary` and
+`draw(at:size:colour:)` returning `Drawable`s. Ring, crosshair and dot ship in
+the core; register yours in the `cursors` array in `main.swift`. `[cursor] style`
+picks one by id, `""` draws nothing; `size` and `colour` (`""` = the active
+mode's colour) tune it.
+
 ## Limits
 
 Effects are the platform's vocabulary: a mode can only ask for what `Effect`

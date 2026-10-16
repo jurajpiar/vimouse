@@ -144,12 +144,6 @@ public final class ScrollMode: Mode {
         ]
     }
 
-    public func draw(_ ctx: ModeContext, active: Bool) -> [Drawable] {
-        guard active else { return [] }
-        // A ring around the pointer, which is where scrolling happens.
-        return [.ring(ctx.target, radius: 18, colour: ctx.colour(of: id), alpha: 1, width: 3)]
-    }
-
     public var manual: String {
         let s = Settings()
         func keys(_ set: Set<KeyPress>) -> String { set.map(\.label).sorted().joined(separator: ", ") }

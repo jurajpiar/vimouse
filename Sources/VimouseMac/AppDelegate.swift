@@ -8,15 +8,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controller: Controller!
     private let configStore: ConfigStore
     private let modes: [Mode]
+    private let cursors: [CursorStyle]
 
-    init(modes: [Mode]) {
+    init(modes: [Mode], cursors: [CursorStyle]) {
         self.modes = modes
-        configStore = ConfigStore(modes: modes)
+        self.cursors = cursors
+        configStore = ConfigStore(modes: modes, cursors: cursors)
         super.init()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        controller = Controller(modes: modes)
+        controller = Controller(modes: modes, cursors: cursors)
         setUpStatusItem()
         configStore.onChange = { [weak self] config in
             self?.controller.apply(config)

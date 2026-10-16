@@ -15,6 +15,7 @@ final class ConfigStore {
     static let manualFile = directory.appendingPathComponent("vimouse.1")
 
     let modes: [Mode]
+    let cursors: [CursorStyle]
     private let schema: ConfigSchema
     private(set) var config: Config
     /// Last load error, shown in the menu bar; nil when the file parsed.
@@ -24,9 +25,10 @@ final class ConfigStore {
     private var timer: Timer?
     private var lastModified: Date?
 
-    init(modes: [Mode]) {
+    init(modes: [Mode], cursors: [CursorStyle]) {
         self.modes = modes
-        schema = ConfigSchema(modes: modes)
+        self.cursors = cursors
+        schema = ConfigSchema(modes: modes, cursors: cursors)
         config = Config(modes: modes)
     }
 
@@ -42,7 +44,7 @@ final class ConfigStore {
     private func writeReference() {
         do {
             try schema.template().write(to: ConfigStore.exampleFile, atomically: true, encoding: .utf8)
-            try Manual.roff(modes: modes).write(to: ConfigStore.manualFile, atomically: true, encoding: .utf8)
+            try Manual.roff(modes: modes, cursors: cursors).write(to: ConfigStore.manualFile, atomically: true, encoding: .utf8)
         } catch {
             NSLog("vimouse: could not write reference files: \(error)")
         }
@@ -86,7 +88,7 @@ final class ConfigStore {
         lastModified = modificationDate()
         do {
             let text = try String(contentsOf: ConfigStore.file, encoding: .utf8)
-            config = try Config.parse(text, modes: modes)
+            config = try Config.parse(text, modes: modes, cursors: cursors)
             lastError = nil
             if case .chord(let m)? = config.keymap.hold, m.contains(.shift) {
                 NSLog("vimouse: [hotkey] hold includes shift; use the shift key on the other side for shifted bindings while it is held")

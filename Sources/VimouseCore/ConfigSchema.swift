@@ -42,12 +42,14 @@ public struct ConfigSchema {
     """
 
     public let modes: [Mode]
+    public let cursors: [CursorStyle]
     /// One line above each section header.
     public let sectionComments: [String: String]
     public let entries: [ConfigEntry]
 
-    public init(modes: [Mode]) {
+    public init(modes: [Mode], cursors: [CursorStyle] = []) {
         self.modes = modes
+        self.cursors = cursors
         let ids = modes.map(\.id)
         let list = ids.joined(separator: ", ")
         let first = ids.first ?? "pointer"
@@ -58,6 +60,7 @@ public struct ConfigSchema {
             "global": "Bindings that work in every mode: leaving, help, switching displays.",
             "actions": "Clicking and dragging, available in every mode.",
             "drag": "Dragging: holding the left button while navigating, for text selection and drag-and-drop.",
+            "cursor": "The marker drawn at the pointer while a mode is active.",
             "colours.modes": "Overlay colour of each mode (its drawings and status strip), as \"#RRGGBB\".",
             "colours.markers": "Overlay colours of markers that appear in any mode, as \"#RRGGBB\".",
         ]
@@ -92,6 +95,10 @@ public struct ConfigSchema {
                 e.append(entry)
             }
         }
+        let styles = cursors.map { "\"\($0.id)\" (\($0.summary))" }.joined(separator: ", ")
+        e.append(.init(section: "cursor", key: "style", defaultValue: "\"ring\"", comment: "Marker at the pointer: \(styles), or \"\" for none (the real pointer only)."))
+        e.append(.init(section: "cursor", key: "size", defaultValue: "36", comment: "Marker size in pixels, e.g. 24, 36, 60."))
+        e.append(.init(section: "cursor", key: "colour", defaultValue: "\"\"", comment: "Marker colour as \"#RRGGBB\", or \"\" for the active mode's colour."))
         e.append(.init(section: "drag", key: "ramp", defaultValue: "false", comment: "After pressing the button, wiggle the pointer a few pixels so apps that need movement before starting a drag-and-drop session do so. Breaks text drags in Chromium-based apps, so off unless an app needs it: true or false."))
         for m in modes {
             e.append(.init(section: "colours.modes", key: m.id, defaultValue: "\"\(m.defaultColour)\"", comment: "\(m.name.capitalized) mode."))

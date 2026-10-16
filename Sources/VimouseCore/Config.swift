@@ -24,7 +24,7 @@ public struct Config: Equatable {
     public static func == (a: Config, b: Config) -> Bool {
         a.keymap == b.keymap && a.activateMode == b.activateMode && a.holdMode == b.holdMode
             && a.colours == b.colours && a.enabledModes == b.enabledModes && a.autoUpdate == b.autoUpdate
-            && a.dragRamp == b.dragRamp && Set(a.modeSettings.keys) == Set(b.modeSettings.keys)
+            && a.dragRamp == b.dragRamp && a.cursor == b.cursor && Set(a.modeSettings.keys) == Set(b.modeSettings.keys)
             && a.modeSettings.allSatisfy { id, s in b.modeSettings[id].map(s.isEqual(to:)) ?? false }
     }
 
@@ -38,6 +38,7 @@ public struct Config: Equatable {
     /// Whether the app may rewrite config.toml on start (migration).
     public var autoUpdate: Bool = true
     public var dragRamp: Bool = false
+    public var cursor = CursorConfig()
     /// Each mode's settings, keyed by mode id, as parsed by the mode.
     public var modeSettings: [String: ModeSettings] = [:]
 
@@ -58,7 +59,7 @@ public struct Config: Equatable {
 
     /// The whole file, with the modes' sections. Parsing it must reproduce the defaults
     /// (there is a test).
-    public static func parse(_ text: String, modes: [Mode]) throws -> Config {
+    public static func parse(_ text: String, modes: [Mode], cursors: [CursorStyle] = []) throws -> Config {
         let t: TOMLTable
         do { t = try TOML.parse(text) } catch let e as TOMLError { throw ParseError(description: e.description) }
         var c = Config(modes: modes)
@@ -118,6 +119,20 @@ public struct Config: Equatable {
         if let v = try actions.keys("drag") { k.dragToggle = v }
 
         if let v = try ConfigReader(t, section: "drag").bool("ramp") { c.dragRamp = v }
+
+        let cursor = ConfigReader(t, section: "cursor")
+        if let v = try cursor.string("style") {
+            let id = v.lowercased()
+            guard id.isEmpty || cursors.contains(where: { $0.id == id }) else {
+                throw cursor.fail("style", "unknown style \"\(v)\"; available: \(cursors.map(\.id).joined(separator: ", ")), or \"\" for none")
+            }
+            c.cursor.style = id
+        }
+        if let v = try cursor.number("size") { c.cursor.size = max(4, v) }
+        if let v = try cursor.string("colour") {
+            guard v.isEmpty || Colours.isValid(v) else { throw cursor.fail("colour", "expected \"#RRGGBB\" or \"\"") }
+            c.cursor.colour = v.uppercased()
+        }
 
         func colour(_ section: String, _ name: String, _ set: (inout Colours, String) -> Void) throws {
             guard let v = t[section]?[name] else { return }

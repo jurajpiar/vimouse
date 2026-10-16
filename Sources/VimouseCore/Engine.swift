@@ -40,6 +40,8 @@ public final class PointerEngine {
     public private(set) var enabled: [String]
     public var keymap: KeyMap
     public let context = ModeContext()
+    public private(set) var cursors: [CursorStyle]
+    public private(set) var cursor = CursorConfig()
 
     /// vi-style count prefix typed so far; nil when none. Consumed by the next command.
     public private(set) var pendingCount: Int?
@@ -50,9 +52,10 @@ public final class PointerEngine {
     public var heldActivation = false
 
     /// `modes` in registration order; `enabled` defaults to all of them.
-    public init(modes: [Mode], keymap: KeyMap = .default, enabled: [String]? = nil) {
+    public init(modes: [Mode], cursors: [CursorStyle] = [], keymap: KeyMap = .default, enabled: [String]? = nil) {
         precondition(!modes.isEmpty, "at least one mode")
         self.modes = modes
+        self.cursors = cursors
         self.keymap = keymap
         self.enabled = enabled ?? modes.map(\.id)
         for m in modes { context.colours.modes[m.id] = m.defaultColour }
@@ -62,6 +65,7 @@ public final class PointerEngine {
     public func apply(_ c: Config) {
         keymap = c.keymap
         context.colours = c.colours
+        cursor = c.cursor
         if let e = c.enabledModes { enabled = e.filter { id in modes.contains { $0.id == id } } }
         if enabled.isEmpty { enabled = [modes[0].id] }
         for m in modes {
@@ -327,6 +331,10 @@ public final class PointerEngine {
         let active = activeMode
         if let active {
             drawables += active.draw(context, active: true)
+            if let style = cursors.first(where: { $0.id == cursor.style }) {
+                let colour = cursor.colour.isEmpty ? context.colour(of: active.id) : cursor.colour
+                drawables += style.draw(at: context.target, size: cursor.size, colour: colour)
+            }
             if context.dragging, let o = context.dragOrigin {
                 if active.showsDragLine {
                     drawables.append(.line(o, context.target, colour: context.colours.drag, alpha: 0.4, width: 1, dashed: true))

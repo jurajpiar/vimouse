@@ -112,11 +112,6 @@ public final class NudgeMode: Mode {
         ]
     }
 
-    public func draw(_ ctx: ModeContext, active: Bool) -> [Drawable] {
-        guard active else { return [] }
-        return [.crosshair(ctx.target, size: 24, colour: ctx.colour(of: id), alpha: 1, width: 2)]
-    }
-
     public var manual: String {
         let s = Settings()
         func keys(_ set: Set<KeyPress>) -> String { set.map(\.label).sorted().joined(separator: ", ") }

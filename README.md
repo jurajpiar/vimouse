@@ -50,6 +50,9 @@ d/u half a page, s back to Pointer.
 
 Hold ? in any mode for the full key map; release to hide.
 
+A marker is drawn at the pointer while a mode is active: `[cursor] style` picks
+`ring` (default), `crosshair`, `dot` or `""` for none; `size` and `colour` tune it.
+
 Ruler (reading band): r creates a band at the pointer's height, dimming the rest
 of the screen, and enters Ruler mode: j/k move it by its own height (or a fixed number of pixels
 via `[ruler] move`), [ ] change its height, Shift with any of those moves or

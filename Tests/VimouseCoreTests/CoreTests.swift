@@ -8,8 +8,10 @@ import RulerMode
 /// The modes the app ships, fresh for each test.
 func standardModes() -> [Mode] { [PointerMode(), NudgeMode(), ScrollMode(), RulerMode()] }
 
+let standardCursors: [CursorStyle] = [RingCursor(), CrosshairCursor(), DotCursor()]
+
 extension PointerEngine {
-    convenience init(keymap: KeyMap = .default) { self.init(modes: standardModes(), keymap: keymap) }
+    convenience init(keymap: KeyMap = .default) { self.init(modes: standardModes(), cursors: standardCursors, keymap: keymap) }
     var pointer: PointerMode { mode("pointer") as! PointerMode }
     var rulerMode: RulerMode { mode("ruler") as! RulerMode }
     var ruler: Ruler? { rulerMode.ruler }
@@ -18,9 +20,9 @@ extension PointerEngine {
 }
 
 extension Config {
-    static func parse(_ text: String) throws -> Config { try parse(text, modes: standardModes()) }
+    static func parse(_ text: String) throws -> Config { try parse(text, modes: standardModes(), cursors: standardCursors) }
     static var defaults: Config { Config(modes: standardModes()) }
-    static var defaultTOML: String { ConfigSchema(modes: standardModes()).template() }
+    static var defaultTOML: String { ConfigSchema(modes: standardModes(), cursors: standardCursors).template() }
     var scrollStep: Double { settings(ScrollMode.Settings.self, for: "scroll")!.step }
     var rulerDim: Double { settings(RulerMode.Settings.self, for: "ruler")!.dim }
     var snapEnabled: Bool { settings(PointerMode.Settings.self, for: "pointer")!.snap }
@@ -30,7 +32,7 @@ extension Config {
     var rulerRemove: Set<KeyPress> { settings(RulerMode.Settings.self, for: "ruler")!.remove }
 }
 
-let schema = ConfigSchema(modes: standardModes())
+let schema = ConfigSchema(modes: standardModes(), cursors: standardCursors)
 
 final class GeometryTests: XCTestCase {
     func testSubdivisionCoversRect() {
@@ -185,7 +187,7 @@ final class ConfigTests: XCTestCase {
     }
 
     func testManualMentionsEverySetting() {
-        let m = Manual.roff(modes: standardModes())
+        let m = Manual.roff(modes: standardModes(), cursors: standardCursors)
         XCTAssertTrue(m.hasPrefix(".TH VIMOUSE 1"))
         for e in schema.entries { XCTAssertTrue(m.contains(".B \(e.key)"), e.key) }
         XCTAssertTrue(m.contains(".SH DEPRECATIONS"))
@@ -756,6 +758,18 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.r, [.shift])), [.redraw])
         XCTAssertEqual(e.mode, "scroll")
         XCTAssertNil(e.ruler)
+    }
+
+    func testCursorStyle() throws {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen, pointer: Point(x: 10, y: 10))
+        XCTAssertTrue(e.scene()!.drawables.contains(.ring(Point(x: 10, y: 10), radius: 18, colour: PointerMode().defaultColour, alpha: 1, width: 3)))
+        e.apply(try Config.parse("[cursor]\nstyle = \"crosshair\"\nsize = 20\ncolour = \"#ffffff\""))
+        XCTAssertTrue(e.scene()!.drawables.contains(.crosshair(Point(x: 10, y: 10), size: 20, colour: "#FFFFFF", alpha: 1, width: 2)))
+        e.apply(try Config.parse("[cursor]\nstyle = \"\""))
+        XCTAssertFalse(e.scene()!.drawables.contains { if case .ring = $0 { return true }; if case .crosshair = $0 { return true }; return false })
+        XCTAssertThrowsError(try Config.parse("[cursor]\nstyle = \"arrow\""))
+        XCTAssertThrowsError(try Config.parse("[cursor]\ncolour = \"red\""))
     }
 
     func testEveryModeSchemaStaysInItsSection() {

@@ -5,8 +5,8 @@ import Foundation
 public enum Manual {
     public static let version = "0.1-dev"
 
-    public static func roff(modes: [Mode], date: String = "2026-10") -> String {
-        let schema = ConfigSchema(modes: modes)
+    public static func roff(modes: [Mode], cursors: [CursorStyle] = [], date: String = "2026-10") -> String {
+        let schema = ConfigSchema(modes: modes, cursors: cursors)
         var o = ""
         func line(_ s: String) { o += s + "\n" }
         func esc(_ s: String) -> String {
