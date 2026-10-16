@@ -17,6 +17,13 @@ final class Controller {
     /// True while the help key is held.
     private var helpShown = false
 
+    enum Health: Equatable { case ok, noPermission, secureInput }
+    private(set) var health: Health = .ok
+    /// Called whenever `health` changes (menu bar shows it).
+    var onHealthChange: ((Health) -> Void)?
+    private var healthTimer: Timer?
+    private var tapRunning = false
+
     init() {
         engine = PointerEngine(keymap: .default, snapping: true, snapProvider: snapper)
     }
@@ -47,12 +54,51 @@ final class Controller {
             return self.handleKey(key, isDown: isDown, isRepeat: isRepeat, bothSides: bothSides)
         }
         try tap.start()
+        tapRunning = true
+        startHealthMonitor()
     }
 
     func stop() {
+        healthTimer?.invalidate()
         scroller.stop()
         apply(engine.deactivate())
         tap.stop()
+        tapRunning = false
+    }
+
+    /// Every second: secure input state; every third tick: can we still filter events?
+    /// Losing Accessibility access with a live filtering tap can leave the whole system
+    /// unable to click, so the tap comes down the moment the probe fails and goes back
+    /// up when access returns.
+    private func startHealthMonitor() {
+        var tick = 0
+        healthTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            tick += 1
+            if tick % 3 == 0 {
+                let allowed = Permissions.canFilterEvents()
+                if tapRunning, !allowed {
+                    NSLog("vimouse: Accessibility access lost; stopping the event tap")
+                    scroller.stop()
+                    apply(engine.deactivate())
+                    tap.stop()
+                    tapRunning = false
+                } else if !tapRunning, allowed, (try? tap.start()) != nil {
+                    NSLog("vimouse: Accessibility access back; event tap restarted")
+                    tapRunning = true
+                }
+            }
+            let secure = Permissions.secureInputActive
+            if secure, engine.isActive {
+                scroller.stop()
+                apply(engine.deactivate()) // keys would never reach us; do not leave the overlay stuck
+            }
+            let now: Health = !tapRunning ? .noPermission : (secure ? .secureInput : .ok)
+            if now != health {
+                health = now
+                onHealthChange?(now)
+            }
+        }
     }
 
     func activateFromMenu() {

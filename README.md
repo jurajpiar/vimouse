@@ -97,6 +97,14 @@ Assistant > Create a Certificate, with name `vimouse-dev`, identity type
 by name. Without either, the build is signed ad-hoc and the permission has to be
 re-granted after every rebuild.
 
+## Status in the menu bar
+
+`vm` means all is well. `vm⚠︎`: Accessibility access is missing or was revoked; the
+event tap is stopped so the system keeps working, and it restarts by itself once
+access is granted again. `vm🔒`: an app has secure input on (a password field, or a
+terminal with Secure Keyboard Entry), which blocks every event tap system-wide until
+it ends. `vm!`: the config file did not parse. Hover for details.
+
 ## Accessibility permission
 
 The event tap needs Accessibility access. When run from a terminal with

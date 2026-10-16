@@ -13,8 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setUpStatusItem()
         configStore.onChange = { [weak self] config in
             self?.controller.apply(config)
-            self?.statusItem.button?.title = self?.configStore.lastError == nil ? "vm" : "vm!"
+            self?.refreshStatus()
         }
+        controller.onHealthChange = { [weak self] _ in self?.refreshStatus() }
         configStore.start()
 
         guard Permissions.ensureAccessibility() else {
@@ -55,6 +56,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Quit vimouse", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         statusItem.menu = menu
+    }
+
+    /// Menu bar title and tooltip: "vm" when all is well, with a mark for what is wrong.
+    private func refreshStatus() {
+        var title = "vm"
+        var notes: [String] = []
+        switch controller.health {
+        case .noPermission:
+            title += "⚠︎"
+            notes.append("Accessibility access is missing: System Settings > Privacy & Security > Accessibility > vimouse. The event tap restarts by itself once granted.")
+        case .secureInput:
+            title += "🔒"
+            notes.append("Secure input is on (a password field, or a terminal with Secure Keyboard Entry); hotkeys do not work until it ends.")
+        case .ok:
+            break
+        }
+        if let e = configStore.lastError {
+            title += "!"
+            notes.append("Config error: \(e)")
+        }
+        statusItem.button?.title = title
+        statusItem.button?.toolTip = notes.isEmpty ? nil : notes.joined(separator: "\n")
     }
 
     @objc private func activate() { controller.activateFromMenu() }
