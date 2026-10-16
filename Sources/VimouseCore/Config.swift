@@ -6,7 +6,8 @@ public struct Config: Equatable {
     public var keymap: KeyMap = .default
     public var scrollStep: Double = 60
     public var rulerHeight: Double = 32
-    public var rulerStep: Double = 20
+    /// 0 means move by the band's own height.
+    public var rulerMove: Double = 0
     public var rulerHeightStep: Double = 4
     public var rulerDim: Double = 0.35
     public var snapEnabled: Bool = true
@@ -83,7 +84,7 @@ public struct Config: Equatable {
         if let v = try keys("scroll", "half_page_up") { k.scrollHalfUp = v }
 
         if let v = try number("ruler", "height") { c.rulerHeight = v }
-        if let v = try number("ruler", "step") { c.rulerStep = v }
+        if let v = try number("ruler", "move") { c.rulerMove = max(0, v) }
         if let v = try number("ruler", "height_step") { c.rulerHeightStep = v }
         if let v = try number("ruler", "dim") { c.rulerDim = min(max(v, 0), 1) }
         if let v = try keys("ruler", "down") { k.rulerDown = v }

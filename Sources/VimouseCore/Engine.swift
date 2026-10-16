@@ -68,8 +68,8 @@ public final class PointerEngine {
 
     /// Vertical/horizontal scroll per j/k/h/l press, in pixels.
     public var scrollStep: Double = 60
-    /// Ruler movement per j/k press, its height change per [ ] press, and its initial height.
-    public var rulerStep: Double = 20
+    /// Ruler movement per j/k press (0 = the band's own height), its height change per [ ] press, and its initial height.
+    public var rulerMove: Double = 0
     public var rulerHeightStep: Double = 4
     public var rulerDefaultHeight: Double = 32
 
@@ -90,7 +90,7 @@ public final class PointerEngine {
         keymap = c.keymap
         scrollStep = c.scrollStep
         rulerDefaultHeight = c.rulerHeight
-        rulerStep = c.rulerStep
+        rulerMove = c.rulerMove
         rulerHeightStep = c.rulerHeightStep
         if !isActive { snapping = c.snapEnabled }
     }
@@ -240,8 +240,9 @@ public final class PointerEngine {
         case .ruler:
             guard var r = ruler else { break }
             let screen = screens[r.screenIndex]
-            if keymap.rulerDown.contains(key) { r.y += rulerStep * n }
-            else if keymap.rulerUp.contains(key) { r.y -= rulerStep * n }
+            let step = rulerMove > 0 ? rulerMove : r.height
+            if keymap.rulerDown.contains(key) { r.y += step * n }
+            else if keymap.rulerUp.contains(key) { r.y -= step * n }
             else if keymap.rulerGrow.contains(key) { r.height += rulerHeightStep * n }
             else if keymap.rulerShrink.contains(key) { r.height -= rulerHeightStep * n }
             else { break }

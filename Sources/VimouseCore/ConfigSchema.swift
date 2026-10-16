@@ -67,7 +67,7 @@ public enum ConfigSchema {
         .init(section: "scroll", key: "half_page_up", defaultValue: "\"u\"", comment: "Scroll half a screen up, e.g. \"u\", \"pageup\"."),
 
         .init(section: "ruler", key: "height", defaultValue: "32", comment: "Band height in pixels when created; 20 to 40 covers one or two text lines."),
-        .init(section: "ruler", key: "step", defaultValue: "20", comment: "Pixels the band moves per press; a count multiplies. Match your line height, 18 to 24 is typical."),
+        .init(section: "ruler", key: "move", defaultValue: "0", comment: "How far the band moves per press: 0 = its own height (one line when sized to a line), otherwise pixels, e.g. 20. A count multiplies."),
         .init(section: "ruler", key: "height_step", defaultValue: "4", comment: "Pixels added or removed from the band height per press, e.g. 2, 4, 8."),
         .init(section: "ruler", key: "dim", defaultValue: "0.35", comment: "Darkening outside the band, 0 (none) to 1 (black); 0.2 subtle, 0.35 default, 0.6 strong."),
         .init(section: "ruler", key: "down", defaultValue: "\"j\"", comment: "Move the band down, e.g. \"j\", \"down\"."),
@@ -79,7 +79,9 @@ public enum ConfigSchema {
     ]
 
     /// Settings that no longer exist, with a note for the user. Keyed by "section.key".
-    public static let superseded: [String: String] = [:]
+    public static let superseded: [String: String] = [
+        "ruler.step": "superseded by `move` (0 = the band's own height)",
+    ]
 
     public static var sections: [String] {
         var seen: [String] = []

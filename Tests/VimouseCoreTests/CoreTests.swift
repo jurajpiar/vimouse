@@ -108,6 +108,9 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(text.contains("ignored (see CHANGELOG.md in the vimouse repository): mystery = 1"))
         XCTAssertTrue(text.contains("left_click = [\"return\", \"m\"]"))   // missing key appended with default
         XCTAssertTrue(text.contains("[ruler]"))                            // missing section appended
+        let (t2, _) = ConfigSchema.migrate("[ruler]\nstep = 20\n")
+        XCTAssertTrue(t2.contains("# superseded by `move` (0 = the band's own height), ignored (see CHANGELOG.md in the vimouse repository): step = 20"))
+        XCTAssertTrue(t2.contains("\nmove = 0"))
         XCTAssertTrue(text.contains("# Darkening outside the band"))      // with its comment
         let c = try Config.parse(text)
         XCTAssertEqual(c.scrollStep, 24)
@@ -348,9 +351,14 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.ruler?.band(on: screen), Rect(x: 0, y: 134, width: 1000, height: 32))
         _ = e.handle(KeyPress(.five))
         XCTAssertEqual(e.handle(KeyPress(.j)), [.redraw])
-        XCTAssertEqual(e.ruler?.y, 250)
+        XCTAssertEqual(e.ruler?.y, 150 + 5 * 32) // moves by its own height
         _ = e.handle(KeyPress(.rightBracket))
         XCTAssertEqual(e.ruler?.height, 36)
+        _ = e.handle(KeyPress(.k))
+        XCTAssertEqual(e.ruler?.y, 310 - 36)     // and the new height after resizing
+        e.rulerMove = 10
+        _ = e.handle(KeyPress(.k))
+        XCTAssertEqual(e.ruler?.y, 274 - 10)     // explicit pixel step
         // Clamped to the screen.
         _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine))
         _ = e.handle(KeyPress(.j))

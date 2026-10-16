@@ -7,4 +7,7 @@ Settings that were renamed or removed are listed here so a commented-out line in
 
 Initial settings: `[hotkey] activate`; `[keys]` quadrant and action bindings;
 `[scroll]` step and bindings; `[ruler]` height, step, height_step, dim and
-bindings; `[snap] enabled`. Nothing superseded yet.
+bindings; `[snap] enabled`.
+
+Superseded: `[ruler] step` (pixels per press) by `[ruler] move`, where `0` means
+the band moves by its own height and any other value is pixels.
