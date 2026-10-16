@@ -113,7 +113,8 @@ public final class PointerEngine {
     public func enter(mode id: String) -> [Effect] {
         guard let current = context.activeMode, current != id, enabled.contains(id), let next = mode(id) else { return [] }
         mode(current)?.deactivate(context, exiting: false)
-        previousMode = current
+        // Going back to where we came from clears the trail; anything else records it.
+        previousMode = id == previousMode ? nil : current
         context.activeMode = id
         next.activate(context)
         return [.redraw]

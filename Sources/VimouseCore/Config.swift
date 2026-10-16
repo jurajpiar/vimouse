@@ -44,6 +44,7 @@ public struct Config: Equatable {
     public init(modes: [Mode] = []) {
         activateMode = modes.first?.id ?? "pointer"
         holdMode = activateMode
+        enabledModes = modes.isEmpty ? nil : modes.map(\.id)
         for m in modes {
             colours.modes[m.id] = m.defaultColour
             modeSettings[m.id] = try? m.parseSettings([:])
