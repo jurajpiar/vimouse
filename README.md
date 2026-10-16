@@ -62,7 +62,9 @@ release coasts, a double tap flicks the page at speed, a tap during a coast
 stops it),
 d/u half a page, s back to Pointer.
 
-Hold ? in any mode for the full key map; release to hide. The strip shows actions
+Hold ? in any mode for the full key map; release to hide. System shortcuts listed
+in `[global] passthrough` (Cmd-Tab, Spotlight, Spaces, Mission Control and
+screenshots by default) keep working while a mode is active. The strip shows actions
 as glyphs (● click, ⤒ drag, ⇅ scroll, ✕ exit); `[global] legend = "words"` spells
 them out instead.
 

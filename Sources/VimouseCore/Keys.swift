@@ -214,6 +214,8 @@ public struct KeyMap: Sendable, Equatable {
     /// Count prefix digits (vi style): key -> digit value.
     public var digits: [KeyPress: Int]
     public var help: Set<KeyPress>
+    /// Combinations handed to the system untouched while a mode is active.
+    public var passthrough: Set<KeyPress>
 
     public init(
         activate: KeyPress,
@@ -228,7 +230,8 @@ public struct KeyMap: Sendable, Equatable {
         nextScreen: Set<KeyPress> = [],
         previousScreen: Set<KeyPress> = [],
         digits: [KeyPress: Int] = [:],
-        help: Set<KeyPress> = []
+        help: Set<KeyPress> = [],
+        passthrough: Set<KeyPress> = []
     ) {
         self.activate = activate
         self.hold = hold
@@ -243,6 +246,7 @@ public struct KeyMap: Sendable, Equatable {
         self.previousScreen = previousScreen
         self.digits = digits
         self.help = help
+        self.passthrough = passthrough
     }
 
     public static let `default` = KeyMap(
@@ -260,7 +264,12 @@ public struct KeyMap: Sendable, Equatable {
             KeyPress(.zero): 0, KeyPress(.one): 1, KeyPress(.two): 2, KeyPress(.three): 3, KeyPress(.four): 4,
             KeyPress(.five): 5, KeyPress(.six): 6, KeyPress(.seven): 7, KeyPress(.eight): 8, KeyPress(.nine): 9,
         ],
-        help: [KeyPress(.slash, [.shift])]
+        help: [KeyPress(.slash, [.shift])],
+        passthrough: [
+            KeyPress(.tab, [.command]), KeyPress(.tab, [.command, .shift]), KeyPress(.space, [.command]),
+            KeyPress(.upArrow, [.control]), KeyPress(.downArrow, [.control]), KeyPress(.leftArrow, [.control]), KeyPress(.rightArrow, [.control]),
+            KeyPress(.three, [.command, .shift]), KeyPress(.four, [.command, .shift]), KeyPress(.five, [.command, .shift]),
+        ]
     )
 
     public func digit(for event: KeyPress) -> Int? {

@@ -111,6 +111,7 @@ public struct Config: Equatable {
         if let v = try global.keys("next_screen") { k.nextScreen = v }
         if let v = try global.keys("previous_screen") { k.previousScreen = v }
         if let v = try global.keys("help") { k.help = v }
+        if let v = try global.keys("passthrough") { k.passthrough = v }
         if let v = try global.string("legend") {
             switch v.lowercased() {
             case "symbols": c.legendSymbols = true

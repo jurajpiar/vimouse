@@ -194,6 +194,11 @@ final class Controller {
             }
             return true
         }
+        // System shortcuts the user wants kept (Cmd-Tab, Spotlight, Spaces): hand the
+        // event back untouched, key up included so the system sees a whole press.
+        if engine.keymap.passthrough.has(rawKey) || (!isDown && engine.keymap.passthrough.contains { $0.code == rawKey.code }) {
+            return false
+        }
         // While the hold key is down, its own modifiers are not part of what the user
         // typed, unless the other side of that modifier is down too: a hyper key on the
         // left plus right Shift still means Shift.

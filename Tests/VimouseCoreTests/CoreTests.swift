@@ -333,6 +333,13 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.i)), [.warp(Point(x: 25, y: 25)), .redraw])
     }
 
+    func testPassthrough() throws {
+        XCTAssertTrue(KeyMap.default.passthrough.has(KeyPress(.tab, [.command, .leftCommand])))
+        let c = try Config.parse("[global]\npassthrough = [\"cmd+q\"]")
+        XCTAssertEqual(c.keymap.passthrough, [KeyPress(.q, [.command])])
+        XCTAssertTrue(try Config.parse("[global]\npassthrough = []").keymap.passthrough.isEmpty)
+    }
+
     func testKeySpecs() {
         XCTAssertEqual(KeyPress.parse("cmd+shift+space"), KeyPress(.space, [.command, .shift]))
         XCTAssertEqual(KeyPress.parse("]"), KeyPress(.rightBracket))
