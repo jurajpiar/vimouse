@@ -87,9 +87,11 @@ under System Settings > Privacy & Security > Accessibility. "Launch at login" in
 the menu bar menu registers the app with the system (it is greyed out when running
 from a terminal).
 
-The grant is tied to the code signature. To keep it across rebuilds, sign with a
-stable identity: either set `SIGN_IDENTITY` to a Developer ID certificate, or create
-a self-signed code-signing certificate once, in Keychain Access > Certificate
+The grant is tied to the code signature. To keep it across rebuilds the script
+signs with a stable identity: `SIGN_IDENTITY` if set, else a certificate named
+`vimouse-dev`, else a valid Developer ID Application or Apple Development
+certificate from your keychain. Without any of those, create a self-signed
+code-signing certificate once, in Keychain Access > Certificate
 Assistant > Create a Certificate, with name `vimouse-dev`, identity type
 "Self Signed Root", certificate type "Code Signing". `scripts/bundle.sh` picks it up
 by name. Without either, the build is signed ad-hoc and the permission has to be
