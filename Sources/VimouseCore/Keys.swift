@@ -228,6 +228,7 @@ public struct KeyMap: Sendable, Equatable {
     /// Modifiers that turn a scroll key into a flick; nil for none.
     public var flickWith: Modifiers?
     public var snapToggle: Set<KeyPress>
+    public var rulerSnapToggle: Set<KeyPress>
     public var rulerToggle: Set<KeyPress>
     public var rulerRemove: Set<KeyPress>
     public var rulerDown: Set<KeyPress>
@@ -264,6 +265,7 @@ public struct KeyMap: Sendable, Equatable {
         scrollHalfDown: Set<KeyPress> = [],
         scrollHalfUp: Set<KeyPress> = [],
         snapToggle: Set<KeyPress> = [],
+        rulerSnapToggle: Set<KeyPress> = [],
         rulerToggle: Set<KeyPress> = [],
         rulerRemove: Set<KeyPress> = [],
         rulerDown: Set<KeyPress> = [],
@@ -299,6 +301,7 @@ public struct KeyMap: Sendable, Equatable {
         self.scrollHalfDown = scrollHalfDown
         self.scrollHalfUp = scrollHalfUp
         self.snapToggle = snapToggle
+        self.rulerSnapToggle = rulerSnapToggle
         self.rulerToggle = rulerToggle
         self.rulerRemove = rulerRemove
         self.rulerDown = rulerDown
@@ -344,6 +347,7 @@ public struct KeyMap: Sendable, Equatable {
         scrollHalfDown: [KeyPress(.d)],
         scrollHalfUp: [KeyPress(.u)],
         snapToggle: [KeyPress(.a)],
+        rulerSnapToggle: [KeyPress(.a)],
         rulerToggle: [KeyPress(.r)],
         rulerRemove: [KeyPress(.r, [.shift])],
         rulerDown: [KeyPress(.j)],

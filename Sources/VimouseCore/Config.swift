@@ -48,6 +48,9 @@ public struct Config: Equatable {
     /// Pixels per press with Shift held, for move and resize.
     public var rulerFine: Double = 1
     public var rulerDim: Double = 0.35
+    /// The band follows lines of text found via accessibility; pixels added above and below.
+    public var rulerSnap = true
+    public var rulerPad: Double = 2
     public var snapEnabled: Bool = true
     public var nudgeStep: Double = 5
     /// Full speed while a nudge key is held, px/s; seconds to reach it.
@@ -183,6 +186,12 @@ public struct Config: Equatable {
         if let v = try keys("ruler", "up") { k.rulerUp = v }
         if let v = try keys("ruler", "grow") { k.rulerGrow = v }
         if let v = try keys("ruler", "shrink") { k.rulerShrink = v }
+        if let v = t["ruler"]?["snap"] {
+            guard let b = v.bool else { throw ParseError(description: "[ruler] snap: expected true or false") }
+            c.rulerSnap = b
+        }
+        if let v = try number("ruler", "pad") { c.rulerPad = max(0, v) }
+        if let v = try keys("ruler", "snap_toggle") { k.rulerSnapToggle = v }
 
         if let v = try keys("global", "help") { k.help = v }
         if let v = try number("nudge", "step") { c.nudgeStep = max(1, v) }

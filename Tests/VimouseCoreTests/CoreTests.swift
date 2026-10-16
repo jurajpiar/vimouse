@@ -549,13 +549,59 @@ final class EngineTests: XCTestCase {
         XCTAssertTrue(e.help.flatMap(\.rows).contains { $0.keys.contains("←") })
     }
 
+    /// Lines 20 px tall every 24 px from y = 100 to 300, only in the column x < 500.
+    final class FakeLines: LineProvider {
+        func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
+            guard x < 500 else { return nil }
+            let lines = stride(from: 100.0, through: 300, by: 24).map { Rect(x: 0, y: $0, width: 400, height: 20) }
+            switch direction {
+            case 0: return lines.first { y >= $0.y && y < $0.maxY }
+            case 1: return lines.first { $0.y > y }
+            default: return lines.last { $0.maxY <= y }
+            }
+        }
+    }
+
+    func testRulerFollowsTextLines() {
+        let e = PointerEngine()
+        let fake = FakeLines()
+        e.lineProvider = fake
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.i)) // (250,150): on the line at y 148..168
+        _ = e.handle(KeyPress(.r))
+        XCTAssertEqual(e.ruler?.y, 158)
+        XCTAssertEqual(e.ruler?.height, 24) // 20 + 2 px padding each side
+        _ = e.handle(KeyPress(.j))
+        XCTAssertEqual(e.ruler?.y, 182)
+        _ = e.handle(KeyPress(.two)); _ = e.handle(KeyPress(.k))
+        XCTAssertEqual(e.ruler?.y, 134)
+        _ = e.handle(KeyPress(.j, [.shift])) // fine moves ignore lines
+        XCTAssertEqual(e.ruler?.y, 135)
+        _ = e.handle(KeyPress(.a)) // lines off: back to stepping by height
+        XCTAssertFalse(e.rulerSnap)
+        _ = e.handle(KeyPress(.j))
+        XCTAssertEqual(e.ruler?.y, 135 + 24)
+        _ = e.handle(KeyPress(.a)) // on again: re-seat on the line under the band
+        XCTAssertEqual(e.ruler?.y, 158)
+        // Past the last line: fall back to a height step.
+        for _ in 0..<10 { _ = e.handle(KeyPress(.j)) }
+        XCTAssertEqual(e.ruler?.y, 310 + 24)
+        // No text under the column: plain steps from the start.
+        let e2 = PointerEngine()
+        e2.lineProvider = fake
+        _ = e2.activate(screen: screen)
+        _ = e2.handle(KeyPress(.o)) // (750,150)
+        _ = e2.handle(KeyPress(.r))
+        XCTAssertEqual(e2.ruler, Ruler(screenIndex: 0, x: 750, y: 150, height: 32))
+    }
+
     func testRulerLifecycle() {
         let e = PointerEngine()
         _ = e.activate(screen: screen)
         _ = e.handle(KeyPress(.i)) // target (250,150)
         XCTAssertEqual(e.handle(KeyPress(.r)), [.redraw])
         XCTAssertEqual(e.mode, .ruler)
-        XCTAssertEqual(e.ruler, Ruler(screenIndex: 0, y: 150, height: 32))
+        XCTAssertEqual(e.ruler, Ruler(screenIndex: 0, x: 250, y: 150, height: 32))
         XCTAssertEqual(e.ruler?.band(on: screen), Rect(x: 0, y: 134, width: 1000, height: 32))
         _ = e.handle(KeyPress(.five))
         XCTAssertEqual(e.handle(KeyPress(.j)), [.redraw])

@@ -5,6 +5,7 @@ import VimouseCore
 /// Wires the pure engine to the platform: event tap in, effects out.
 final class Controller {
     private let snapper = AXSnapper()
+    private let lines = AXLineProvider()
     private let engine: PointerEngine
     private let tap = InputTap()
     private let overlay = Overlay()
@@ -27,6 +28,7 @@ final class Controller {
 
     init() {
         engine = PointerEngine(keymap: .default, snapping: true, snapProvider: snapper)
+        engine.lineProvider = lines
     }
 
     /// Called on load and on every reload of config.toml.

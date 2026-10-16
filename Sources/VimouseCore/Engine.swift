@@ -38,12 +38,15 @@ public enum Mode: String, Equatable, Sendable, CaseIterable {
 /// A horizontal reading band. Persists after Pointer mode exits until removed.
 public struct Ruler: Equatable, Sendable {
     public var screenIndex: Int
+    /// Where the pointer was when the band was created: the text column line snapping probes.
+    public var x: Double
     /// Vertical centre of the band, CG coordinates.
     public var y: Double
     public var height: Double
 
-    public init(screenIndex: Int, y: Double, height: Double) {
+    public init(screenIndex: Int, x: Double = 0, y: Double, height: Double) {
         self.screenIndex = screenIndex
+        self.x = x
         self.y = y
         self.height = height
     }
@@ -59,6 +62,14 @@ public protocol SnapProvider: AnyObject {
     /// Called once when Pointer mode starts on a screen; a chance to cache.
     func prepare(screen: Rect)
     func snapPoint(in rect: Rect) -> Point?
+}
+
+/// Supplies the bounds of lines of text (from the accessibility API) so the reading band
+/// can follow real lines instead of a fixed step.
+public protocol LineProvider: AnyObject {
+    /// The line containing (x, y) when `direction` is 0, the first line below it when 1,
+    /// the first line above it when -1. nil when no text is found there.
+    func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect?
 }
 
 /// Modal state machine for Pointer mode. Pure: no platform calls, fully testable.
@@ -99,6 +110,11 @@ public final class PointerEngine {
     /// Snap the pointer to UI elements (needs a `snapProvider`). Toggled in Pointer mode.
     public var snapping: Bool
     public weak var snapProvider: SnapProvider?
+    /// The reading band follows lines of text (needs a `lineProvider`). Toggled in Ruler mode.
+    public var rulerSnap = true
+    /// Pixels added above and below a snapped line.
+    public var rulerPad: Double = 2
+    public weak var lineProvider: LineProvider?
     /// Where the pointer was last sent (the snap target or the rectangle centre).
     public private(set) var target: Point = Point(x: 0, y: 0)
     /// Nudge keys currently held, by key code, with the direction each contributes.
@@ -118,6 +134,8 @@ public final class PointerEngine {
         rulerMove = c.rulerMove
         rulerHeightStep = c.rulerHeightStep
         rulerFine = c.rulerFine
+        rulerSnap = c.rulerSnap
+        rulerPad = c.rulerPad
         nudgeStep = c.nudgeStep
         dragRestartsSearch = c.dragRestartsSearch
         if !isActive { snapping = c.snapEnabled }
@@ -153,9 +171,7 @@ public final class PointerEngine {
         pendingCount = nil
         snapProvider?.prepare(screen: screens[index])
         target = pointer ?? s.current.center
-        if mode == .ruler, ruler == nil {
-            ruler = Ruler(screenIndex: screenIndex, y: target.y, height: rulerDefaultHeight)
-        }
+        if mode == .ruler, ruler == nil { ruler = makeRuler() }
         state = .active(mode: mode, session: s)
         return [.showOverlay]
     }
@@ -169,9 +185,7 @@ public final class PointerEngine {
     /// hotkey, which carries its own start mode). Ruler mode creates a band if none exists.
     public func enter(mode: Mode) -> [Effect] {
         guard case .active(let current, let s) = state, current != mode else { return [] }
-        if mode == .ruler, ruler == nil {
-            ruler = Ruler(screenIndex: screenIndex, y: target.y, height: rulerDefaultHeight)
-        }
+        if mode == .ruler, ruler == nil { ruler = makeRuler() }
         state = .active(mode: mode, session: s)
         heldNudges = [:]
         return [.redraw]
@@ -240,9 +254,7 @@ public final class PointerEngine {
             if mode == .ruler {
                 state = .active(mode: .pointer, session: s)
             } else {
-                if ruler == nil {
-                    ruler = Ruler(screenIndex: screenIndex, y: target.y, height: rulerDefaultHeight)
-                }
+                if ruler == nil { ruler = makeRuler() }
                 state = .active(mode: .ruler, session: s)
             }
             return [.redraw]
@@ -269,6 +281,14 @@ public final class PointerEngine {
             return [.mouseUp(.left), .redraw]
         }
         if let fx = clickEffects(for: key, count: count) { return fx }
+        if keymap.rulerSnapToggle.has(key), mode == .ruler {
+            rulerSnap.toggle()
+            if rulerSnap, var r = ruler, let line = snappedLine(for: r, direction: 0) {
+                r.y = line.y; r.height = line.height
+                ruler = r
+            }
+            return [.redraw]
+        }
         if keymap.snapToggle.has(key), mode == .pointer {
             snapping.toggle()
             return [.warp(aim(s.current)), .redraw]
@@ -349,8 +369,17 @@ public final class PointerEngine {
             let base = KeyPress(key.code, key.modifiers.subtracting(.shift))
             let move = fine ? rulerFine : (rulerMove > 0 ? rulerMove : r.height)
             let resize = fine ? rulerFine : rulerHeightStep
-            if keymap.rulerDown.has(key) || (fine && keymap.rulerDown.has(base)) { r.y += move * n }
-            else if keymap.rulerUp.has(key) || (fine && keymap.rulerUp.has(base)) { r.y -= move * n }
+            // A coarse move follows the text lines when snapping is on and text is found;
+            // otherwise it steps by the band height (or `move` pixels).
+            func step(_ direction: Double) {
+                if !fine, let line = snappedLine(for: r, direction: Int(direction), count: Int(n)) {
+                    r.y = line.y; r.height = line.height
+                } else {
+                    r.y += direction * move * n
+                }
+            }
+            if keymap.rulerDown.has(key) || (fine && keymap.rulerDown.has(base)) { step(1) }
+            else if keymap.rulerUp.has(key) || (fine && keymap.rulerUp.has(base)) { step(-1) }
             else if keymap.rulerGrow.has(key) || (fine && keymap.rulerGrow.has(base)) { r.height += resize * n }
             else if keymap.rulerShrink.has(key) || (fine && keymap.rulerShrink.has(base)) { r.height -= resize * n }
             else { break }
@@ -375,6 +404,29 @@ public final class PointerEngine {
         default:
             return []
         }
+    }
+
+    private func makeRuler() -> Ruler {
+        var r = Ruler(screenIndex: screenIndex, x: target.x, y: target.y, height: rulerDefaultHeight)
+        if let line = snappedLine(for: r, direction: 0) { r.y = line.y; r.height = line.height }
+        return r
+    }
+
+    /// Centre and height for the band on the text line `count` lines from the current one
+    /// (0: the line under it), padded; nil when snapping is off or no text is there.
+    private func snappedLine(for r: Ruler, direction: Int, count: Int = 1) -> (y: Double, height: Double)? {
+        guard rulerSnap, let provider = lineProvider else { return nil }
+        let screen = screens[r.screenIndex]
+        var y = r.y
+        var found: Rect?
+        for _ in 0..<max(1, count) {
+            guard let line = provider.textLine(at: r.x, y: y, direction: direction, on: screen) else { break }
+            found = line
+            y = line.midY
+            if direction == 0 { break }
+        }
+        guard let line = found else { return nil }
+        return (line.midY, line.height + 2 * rulerPad)
     }
 
     /// Combined direction of the held nudge keys, normalised so a diagonal is no faster.
@@ -471,6 +523,7 @@ public final class PointerEngine {
             h.append((l(k.rulerDown) + l(k.rulerUp), "move"))
             h.append((l(k.rulerShrink) + " " + l(k.rulerGrow), "height"))
             h.append(("⇧", "fine"))
+            if lineProvider != nil { h.append((l(k.rulerSnapToggle), rulerSnap ? "lines on" : "lines off")) }
             h.append((l(k.scrollToggle), "scroll"))
             h.append((l(k.rulerToggle), "pointer"))
             h.append((l(k.rulerRemove), "remove"))
@@ -505,6 +558,7 @@ public final class PointerEngine {
             ("⇧ ⌘ ⌥ + click key", "modifier click"),
             (all(k.dragToggle), "press / release left button (drag, select)"),
             (all(k.snapToggle), "toggle snapping to UI elements"),
+            (all(k.rulerSnapToggle), "ruler: toggle following lines of text"),
             (all(k.nudgeToggle), "nudge mode"),
             (all(k.scrollToggle), "scroll mode"),
             (all(k.rulerToggle), "ruler mode"),

@@ -51,7 +51,11 @@ of the screen, and enters Ruler mode: j/k move it by its own height (or a fixed 
 via `[ruler] move`), [ ] change its height, Shift with any of those moves or
 resizes by one pixel, s goes to
 Scroll mode (scroll the text under a fixed band), r back to Pointer. The band stays
-after Escape; Shift+r removes it.
+after Escape; Shift+r removes it. With `[ruler] snap = true` (the default) the band
+reads the lines of text under the pointer's column through the accessibility API: it
+is created on the line under the pointer, sized to it (plus `[ruler] pad`), and j/k
+move it a line at a time, falling back to height steps where no text is found; a
+toggles this in Ruler mode.
 
 Counts work as in vi: digits before a command repeat or scale it. 45j scrolls 45
 steps, 3⌫ goes up three levels, 3⏎ triple-clicks, and with several displays 2⇥
