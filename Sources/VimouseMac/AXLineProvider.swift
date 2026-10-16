@@ -67,6 +67,9 @@ final class AXLineProvider: LineProvider {
     private var last: Found?
     /// The web area (WebKit, Chromium) that answered last time; reused while the point is inside it.
     private var webArea: (element: AXUIElement, frame: Rect)?
+    /// Processes whose text-marker line ranges turned out to span the whole document
+    /// (Chromium without a screen reader): the marker routes are skipped for them.
+    private var hollowMarkers: Set<pid_t> = []
 
     init() {
         AXUIElementSetMessagingTimeout(systemWide, 0.05)
@@ -235,6 +238,12 @@ final class AXLineProvider: LineProvider {
         // Chromium text nodes: no line API, but character rectangles by index.
         if let f = lineFromCharBounds(hit, x: x, y: y, deadline: deadline) { return f }
         // WebKit text nodes: walk the lines from the element's own start marker.
+        var pid: pid_t = 0
+        AXUIElementGetPid(hit, &pid)
+        if hollowMarkers.contains(pid) {
+            if debug, dumped == false { dumped = true; dump(hit, levels: 4) }
+            return nil
+        }
         element = hit
         for _ in 0..<3 {
             if Date() > deadline { return nil }
@@ -354,6 +363,19 @@ final class AXLineProvider: LineProvider {
         guard let firstRange = markerValue(element, Marker.lineRange, m) else { log("start marker but no line range"); return nil }
         // Which way the bounds come: the reading that lands inside the element's frame.
         guard let asCocoa = normalisedBounds(element, firstRange, flipped: true) else {
+            // A "line" as tall as a page is the whole document: no inline text boxes here.
+            var out: CFTypeRef?
+            if AXUIElementCopyParameterizedAttributeValue(element, Marker.bounds as CFString, firstRange, &out) == .success,
+               let v = out, CFGetTypeID(v) == AXValueGetTypeID() {
+                var r = CGRect.zero
+                // swiftlint:disable:next force_cast
+                if AXValueGetValue(v as! AXValue, .cgRect, &r), r.height > 120 {
+                    var pid: pid_t = 0
+                    AXUIElementGetPid(element, &pid)
+                    hollowMarkers.insert(pid)
+                    log("text markers are hollow in process \(pid); skipping them from now on")
+                }
+            }
             if debug { diagnoseBounds(element, firstRange) }
             return nil
         }
@@ -463,8 +485,8 @@ final class AXLineProvider: LineProvider {
         guard let first = text.charRect(0) else { log("char route: no rectangle for character 0 of \(n)"); return nil }
         guard y >= first.y - 1 else { return nil }
         // WebKit answers index ranges with one glyph's geometry whatever the range; Chromium
-        // returns the union. A span of twenty characters no wider than a few glyphs is a lie.
-        if n >= 20, let span = text.rect(0, 20), span.width < first.width * 4 {
+        // returns the union. Twenty characters narrower than seven glyphs is a lie.
+        if n >= 20, let span = text.rect(0, 20), span.width < first.width * 7 {
             log("char route: not trustworthy here (20 characters span \(Int(span.width)) px)")
             return nil
         }
@@ -481,6 +503,11 @@ final class AXLineProvider: LineProvider {
             return nil
         }
         guard let row = text.row(around: lo, deadline: deadline) else { return nil }
+        // The whole text on one row inside an element several rows tall: also a lie.
+        if row.start == 0, row.end == n - 1, frame.height > row.rect.height * 1.8 {
+            log("char route: not trustworthy here (all \(n) characters on one row of a \(Int(frame.height)) px element)")
+            return nil
+        }
         log("line by character rows [\(row.start)..\(row.end)] of \(n): \(row.rect)")
         return Found(element: element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: n)
     }
