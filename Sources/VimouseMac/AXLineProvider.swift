@@ -78,9 +78,9 @@ final class AXLineProvider: LineProvider {
             current = locate(x: x, y: y, deadline: deadline)
         }
         if direction == 0 {
-            last = current
-            log("at (\(Int(x)),\(Int(y))): \(current.map { "\($0.rect) line \($0.line.map(String.init) ?? "?")" } ?? "no text")")
-            return current?.rect
+            last = current.map { widened($0, deadline: deadline) }
+            log("at (\(Int(x)),\(Int(y))): \(last.map { "\($0.rect) line \($0.line.map(String.init) ?? "?")" } ?? "no text")")
+            return last?.rect
         }
         let sign = Double(direction)
         if let cur = current {
@@ -101,9 +101,9 @@ final class AXLineProvider: LineProvider {
                 let py = sign > 0 ? cur.rect.maxY + cur.rect.height / 2 : cur.rect.y - cur.rect.height / 2
                 if let f = lineFromCharBounds(cur.element, x: x, y: py, deadline: deadline),
                    sign > 0 ? f.rect.midY > cur.rect.midY : f.rect.midY < cur.rect.midY {
-                    last = f
-                    log("next by character rows: \(f.rect)")
-                    return f.rect
+                    last = widened(f, deadline: deadline)
+                    log("next by character rows: \(last!.rect)")
+                    return last!.rect
                 }
             } else if let host = cur.markerHost, let start = cur.lineStart {
                 // Walk the element's lines by marker: line end -> next character -> its line.
@@ -189,8 +189,8 @@ final class AXLineProvider: LineProvider {
             guard let found = locate(x: x, y: py, deadline: deadline) else { continue }
             if let a = avoiding, found.rect.intersects(a) { continue }
             if sign > 0 ? found.rect.midY <= start : found.rect.midY >= start { continue }
-            last = found
-            return found.rect
+            last = widened(found, deadline: deadline)
+            return last!.rect
         }
         return nil
     }
@@ -368,6 +368,26 @@ final class AXLineProvider: LineProvider {
         }
         log("no line under y \(Int(y)) by start marker")
         return nil
+    }
+
+    /// A row can be shared by several text nodes (a link in a sentence): take in the
+    /// segments found just left and right of this one at the same height.
+    private func widened(_ f: Found, deadline: Date) -> Found {
+        guard f.charBounds || f.textAPI, f.line == nil else { return f }
+        var out = f
+        for sign in [-1.0, 1.0] {
+            for _ in 0..<4 {
+                guard Date() < deadline else { return out }
+                let px = sign < 0 ? out.rect.x - 6 : out.rect.maxX + 6
+                guard let seg = locate(x: px, y: out.rect.midY, deadline: deadline),
+                      abs(seg.rect.midY - out.rect.midY) < 3, !seg.rect.intersects(out.rect) || seg.rect != out.rect
+                else { break }
+                let minX = min(out.rect.x, seg.rect.x), maxX = max(out.rect.maxX, seg.rect.maxX)
+                guard maxX - minX > out.rect.width else { break }
+                out.rect = Rect(x: minX, y: out.rect.y, width: maxX - minX, height: out.rect.height)
+            }
+        }
+        return out
     }
 
     /// Lines from character rectangles: `AXBoundsForRange` over single characters, whose
