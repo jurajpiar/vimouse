@@ -16,6 +16,8 @@ final class Controller {
     private var holdMode: String
     /// Modifiers that flick in Scroll mode; releasing them brakes a coast.
     private var flickWith: Modifiers?
+    /// Keys whose key-down went to the system (a passthrough shortcut); their key-up must too.
+    private var passedThrough: Set<KeyCode> = []
     /// True while the help key is held.
     private var helpShown = false
 
@@ -195,8 +197,14 @@ final class Controller {
             return true
         }
         // System shortcuts the user wants kept (Cmd-Tab, Spotlight, Spaces): hand the
-        // event back untouched, key up included so the system sees a whole press.
-        if engine.keymap.passthrough.has(rawKey) || (!isDown && engine.keymap.passthrough.contains { $0.code == rawKey.code }) {
+        // event back untouched, and its key-up too, so the system sees a whole press. A
+        // key-up is matched by its key-down, not by key code: a plain arrow's release
+        // must still reach the engine even though ctrl+arrow is passed through.
+        if isDown, engine.keymap.passthrough.has(rawKey) {
+            passedThrough.insert(rawKey.code)
+            return false
+        }
+        if !isDown, passedThrough.remove(rawKey.code) != nil {
             return false
         }
         // While the hold key is down, its own modifiers are not part of what the user

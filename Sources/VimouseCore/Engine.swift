@@ -42,7 +42,7 @@ public final class PointerEngine {
     public let context = ModeContext()
     public private(set) var cursors: [CursorStyle]
     public private(set) var cursor = CursorConfig()
-    public private(set) var legendSymbols = true
+    public private(set) var legendSymbols = false
 
     /// vi-style count prefix typed so far; nil when none. Consumed by the next command.
     public private(set) var pendingCount: Int?

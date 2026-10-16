@@ -40,7 +40,7 @@ public struct Config: Equatable {
     public var dragRamp: Bool = false
     public var cursor = CursorConfig()
     /// Status strip shows glyphs (true) or words (false) for actions.
-    public var legendSymbols = true
+    public var legendSymbols = false
     /// Each mode's settings, keyed by mode id, as parsed by the mode.
     public var modeSettings: [String: ModeSettings] = [:]
 
