@@ -70,7 +70,7 @@ public final class HintsMode: Mode {
     public func screenChanged(_ ctx: ModeContext) { activate(ctx) }
 
     /// Labels of one length, enough for `count` elements, from the given letters.
-    static func labels(count: Int, letters: String) -> [String] {
+    public static func labels(count: Int, letters: String) -> [String] {
         let chars = Array(letters)
         guard count > 0, chars.count >= 2 else { return [] }
         var length = 1
