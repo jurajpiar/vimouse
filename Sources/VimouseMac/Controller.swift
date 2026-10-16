@@ -39,8 +39,8 @@ final class Controller {
         }
         // Active: swallow everything so the focused app sees nothing.
         guard isDown else { return true }
-        // Key repeat is useful only for scrolling.
-        if isRepeat, engine.mode != .scroll { return true }
+        // Key repeat is useful for scrolling and moving the ruler, not for picking quadrants.
+        if isRepeat, engine.mode == .pointer { return true }
         apply(engine.handle(key))
         return true
     }
@@ -56,12 +56,8 @@ final class Controller {
     private func apply(_ effects: [Effect]) {
         for effect in effects {
             switch effect {
-            case .showOverlay:
-                if let m = model() { overlay.show(m) }
-            case .redraw:
-                if let m = model() { overlay.update(m) }
-            case .hideOverlay:
-                overlay.hide()
+            case .showOverlay, .redraw, .hideOverlay:
+                overlay.render(model())
             case .warp(let p):
                 Pointer.warp(to: p, dragging: engine.dragging)
             case .click(let button, let count, let modifiers):
@@ -76,23 +72,27 @@ final class Controller {
         }
     }
 
+    /// nil when there is nothing to draw.
     private func model() -> OverlayModel? {
-        guard let s = engine.session, let mode = engine.mode else { return nil }
-        var labels: [Quadrant: String] = [:]
-        for q in Quadrant.allCases { labels[q] = engine.keymap.label(for: q) }
-        return OverlayModel(
-            mode: mode,
-            current: s.current,
-            ancestors: Array(s.ancestors),
-            labels: labels,
-            screens: engine.screens,
-            activeScreen: engine.screenIndex,
-            dragging: engine.dragging,
-            pendingCount: engine.pendingCount,
-            target: engine.target,
-            snapping: engine.snapping,
-            hints: engine.hints
-        )
+        guard engine.needsOverlay else { return nil }
+        var pointer: PointerModel?
+        if let s = engine.session, let mode = engine.mode {
+            var labels: [Quadrant: String] = [:]
+            for q in Quadrant.allCases { labels[q] = engine.keymap.label(for: q) }
+            pointer = PointerModel(
+                mode: mode,
+                current: s.current,
+                ancestors: Array(s.ancestors),
+                labels: labels,
+                dragging: engine.dragging,
+                pendingCount: engine.pendingCount,
+                target: engine.target,
+                snapping: engine.snapping,
+                hints: engine.hints
+            )
+        }
+        let ruler = engine.ruler.map { RulerModel(screenIndex: $0.screenIndex, band: $0.band(on: engine.screens[$0.screenIndex])) }
+        return OverlayModel(pointer: pointer, ruler: ruler, screens: engine.screens, activeScreen: engine.screenIndex)
     }
 }
 #endif

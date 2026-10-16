@@ -28,6 +28,11 @@ ring marks the snap target. Escape exits (releasing any drag).
 
 Scroll: j/k/h/l scroll at the pointer, d/u half a page, s back to Pointer.
 
+Ruler (reading band): r creates a band at the pointer's height, dimming the rest
+of the screen, and enters Ruler mode: j/k move it, [ ] change its height, s goes to
+Scroll mode (scroll the text under a fixed band), r back to Pointer. The band stays
+after Escape; Shift+r removes it.
+
 Counts work as in vi: digits before a command repeat or scale it. 45j scrolls 45
 steps, 3⌫ goes up three levels, 3⏎ triple-clicks, and with several displays 2⇥
 jumps to screen 2 (bare Tab / Shift+Tab cycle). Escape with a count pending cancels

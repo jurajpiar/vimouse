@@ -50,6 +50,8 @@ public extension KeyCode {
     static let eight = KeyCode(rawValue: 28)
     static let nine = KeyCode(rawValue: 25)
     static let zero = KeyCode(rawValue: 29)
+    static let leftBracket = KeyCode(rawValue: 33)
+    static let rightBracket = KeyCode(rawValue: 30)
 }
 
 public struct Modifiers: OptionSet, Hashable, Sendable {
@@ -97,6 +99,12 @@ public struct KeyMap: Sendable {
     public var scrollHalfDown: Set<KeyPress>
     public var scrollHalfUp: Set<KeyPress>
     public var snapToggle: Set<KeyPress>
+    public var rulerToggle: Set<KeyPress>
+    public var rulerRemove: Set<KeyPress>
+    public var rulerDown: Set<KeyPress>
+    public var rulerUp: Set<KeyPress>
+    public var rulerGrow: Set<KeyPress>
+    public var rulerShrink: Set<KeyPress>
 
     public init(
         activate: KeyPress,
@@ -119,7 +127,13 @@ public struct KeyMap: Sendable {
         scrollRight: Set<KeyPress> = [],
         scrollHalfDown: Set<KeyPress> = [],
         scrollHalfUp: Set<KeyPress> = [],
-        snapToggle: Set<KeyPress> = []
+        snapToggle: Set<KeyPress> = [],
+        rulerToggle: Set<KeyPress> = [],
+        rulerRemove: Set<KeyPress> = [],
+        rulerDown: Set<KeyPress> = [],
+        rulerUp: Set<KeyPress> = [],
+        rulerGrow: Set<KeyPress> = [],
+        rulerShrink: Set<KeyPress> = []
     ) {
         self.activate = activate
         self.quadrants = quadrants
@@ -142,6 +156,12 @@ public struct KeyMap: Sendable {
         self.scrollHalfDown = scrollHalfDown
         self.scrollHalfUp = scrollHalfUp
         self.snapToggle = snapToggle
+        self.rulerToggle = rulerToggle
+        self.rulerRemove = rulerRemove
+        self.rulerDown = rulerDown
+        self.rulerUp = rulerUp
+        self.rulerGrow = rulerGrow
+        self.rulerShrink = rulerShrink
     }
 
     public static let `default` = KeyMap(
@@ -173,7 +193,13 @@ public struct KeyMap: Sendable {
         scrollRight: [KeyPress(.l)],
         scrollHalfDown: [KeyPress(.d)],
         scrollHalfUp: [KeyPress(.u)],
-        snapToggle: [KeyPress(.a)]
+        snapToggle: [KeyPress(.a)],
+        rulerToggle: [KeyPress(.r)],
+        rulerRemove: [KeyPress(.r, [.shift])],
+        rulerDown: [KeyPress(.j)],
+        rulerUp: [KeyPress(.k)],
+        rulerGrow: [KeyPress(.rightBracket)],
+        rulerShrink: [KeyPress(.leftBracket)]
     )
 
     /// Label shown inside each quadrant. Derived from the ANSI key name for now;

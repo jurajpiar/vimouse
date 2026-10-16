@@ -17,7 +17,25 @@ public enum Effect: Equatable, Sendable {
 }
 
 public enum Mode: Equatable, Sendable {
-    case pointer, scroll
+    case pointer, scroll, ruler
+}
+
+/// A horizontal reading band. Persists after Pointer mode exits until removed.
+public struct Ruler: Equatable, Sendable {
+    public var screenIndex: Int
+    /// Vertical centre of the band, CG coordinates.
+    public var y: Double
+    public var height: Double
+
+    public init(screenIndex: Int, y: Double, height: Double) {
+        self.screenIndex = screenIndex
+        self.y = y
+        self.height = height
+    }
+
+    public func band(on screen: Rect) -> Rect {
+        Rect(x: screen.x, y: y - height / 2, width: screen.width, height: height)
+    }
 }
 
 /// Supplies a better pointer target inside a rectangle (for example the centre of
@@ -45,9 +63,15 @@ public final class PointerEngine {
     public private(set) var dragging = false
     /// vi-style count prefix typed so far; nil when none. Consumed by the next command.
     public private(set) var pendingCount: Int?
+    /// The reading band, if one is shown. Survives deactivation.
+    public private(set) var ruler: Ruler?
 
     /// Vertical/horizontal scroll per j/k/h/l press, in pixels.
     public var scrollStep: Double = 60
+    /// Ruler movement per j/k press, its height change per [ ] press, and its initial height.
+    public var rulerStep: Double = 20
+    public var rulerHeightStep: Double = 4
+    public var rulerDefaultHeight: Double = 32
 
     /// Snap the pointer to UI elements (needs a `snapProvider`). Toggled in Pointer mode.
     public var snapping: Bool
@@ -76,6 +100,9 @@ public final class PointerEngine {
         return nil
     }
 
+    /// True when the overlay has anything to draw (an active mode or a ruler).
+    public var needsOverlay: Bool { isActive || ruler != nil }
+
     // MARK: Activation
 
     /// Enter Pointer mode over `screens[index]` (CG coordinates).
@@ -90,6 +117,24 @@ public final class PointerEngine {
         return [.showOverlay, .warp(aim(s.current))]
     }
 
+    /// Convenience for a single screen.
+    public func activate(screen: Rect) -> [Effect] {
+        activate(screens: [screen], index: 0)
+    }
+
+    /// Leave the active mode, releasing a held drag first. A ruler stays on screen.
+    public func deactivate() -> [Effect] {
+        state = .idle
+        pendingCount = nil
+        var fx: [Effect] = []
+        if dragging {
+            dragging = false
+            fx.append(.mouseUp(.left))
+        }
+        fx.append(ruler == nil ? .hideOverlay : .redraw)
+        return fx
+    }
+
     /// The point to send the pointer to for a rectangle: a snapped element if enabled and
     /// available, otherwise the centre.
     private func aim(_ r: Rect) -> Point {
@@ -99,24 +144,6 @@ public final class PointerEngine {
             target = r.center
         }
         return target
-    }
-
-    /// Convenience for a single screen.
-    public func activate(screen: Rect) -> [Effect] {
-        activate(screens: [screen], index: 0)
-    }
-
-    /// Leave Pointer mode, releasing a held drag first.
-    public func deactivate() -> [Effect] {
-        state = .idle
-        pendingCount = nil
-        var fx: [Effect] = []
-        if dragging {
-            dragging = false
-            fx.append(.mouseUp(.left))
-        }
-        fx.append(.hideOverlay)
-        return fx
     }
 
     // MARK: Keys
@@ -142,6 +169,22 @@ public final class PointerEngine {
         }
         if keymap.scrollToggle.contains(key) {
             state = .active(mode: mode == .scroll ? .pointer : .scroll, session: s)
+            return [.redraw]
+        }
+        if keymap.rulerToggle.contains(key) {
+            if mode == .ruler {
+                state = .active(mode: .pointer, session: s)
+            } else {
+                if ruler == nil {
+                    ruler = Ruler(screenIndex: screenIndex, y: target.y, height: rulerDefaultHeight)
+                }
+                state = .active(mode: .ruler, session: s)
+            }
+            return [.redraw]
+        }
+        if keymap.rulerRemove.contains(key) {
+            ruler = nil
+            if mode == .ruler { state = .active(mode: .pointer, session: s) }
             return [.redraw]
         }
         if keymap.dragToggle.contains(key) {
@@ -184,6 +227,18 @@ public final class PointerEngine {
             if keymap.scrollRight.contains(key) { return [.scroll(dx: scrollStep * n, dy: 0)] }
             if keymap.scrollHalfDown.contains(key) { return [.scroll(dx: 0, dy: half * n)] }
             if keymap.scrollHalfUp.contains(key) { return [.scroll(dx: 0, dy: -half * n)] }
+        case .ruler:
+            guard var r = ruler else { break }
+            let screen = screens[r.screenIndex]
+            if keymap.rulerDown.contains(key) { r.y += rulerStep * n }
+            else if keymap.rulerUp.contains(key) { r.y -= rulerStep * n }
+            else if keymap.rulerGrow.contains(key) { r.height += rulerHeightStep * n }
+            else if keymap.rulerShrink.contains(key) { r.height -= rulerHeightStep * n }
+            else { break }
+            r.height = max(8, r.height)
+            r.y = min(max(r.y, screen.y), screen.maxY)
+            ruler = r
+            return [.redraw]
         }
         return count == nil ? [] : [.redraw]
     }
@@ -212,7 +267,7 @@ public final class PointerEngine {
             fx.append(.click(button, count: count, modifiers: mods))
         }
         state = .idle
-        fx.append(.hideOverlay)
+        fx.append(ruler == nil ? .hideOverlay : .redraw)
         return fx
     }
 
@@ -242,12 +297,20 @@ public final class PointerEngine {
             h.append(("x", "double"))
             h.append(("v", dragging ? "drop" : "drag"))
             h.append(("s", "scroll"))
+            h.append(("r", "ruler"))
             if snapProvider != nil { h.append(("a", snapping ? "snap on" : "snap off")) }
         case .scroll:
             h.append(("jk hl", "scroll"))
             h.append(("d u", "half page"))
             h.append(("⏎", "click"))
             h.append(("s", "pointer"))
+            h.append(("r", "ruler"))
+        case .ruler:
+            h.append(("jk", "move"))
+            h.append(("[ ]", "height"))
+            h.append(("s", "scroll"))
+            h.append(("r", "pointer"))
+            h.append(("R", "remove"))
         }
         if screens.count > 1 { h.append(("⇥ / n⇥", "screen")) }
         h.append(("esc", pendingCount == nil ? "exit" : "cancel count"))

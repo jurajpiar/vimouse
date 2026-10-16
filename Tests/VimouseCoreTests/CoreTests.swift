@@ -214,6 +214,40 @@ final class EngineTests: XCTestCase {
         XCTAssertTrue(e.hints.contains { $0.action == "half page" })
     }
 
+    func testRulerLifecycle() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.i)) // target (250,150)
+        XCTAssertEqual(e.handle(KeyPress(.r)), [.redraw])
+        XCTAssertEqual(e.mode, .ruler)
+        XCTAssertEqual(e.ruler, Ruler(screenIndex: 0, y: 150, height: 32))
+        XCTAssertEqual(e.ruler?.band(on: screen), Rect(x: 0, y: 134, width: 1000, height: 32))
+        _ = e.handle(KeyPress(.five))
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.redraw])
+        XCTAssertEqual(e.ruler?.y, 250)
+        _ = e.handle(KeyPress(.rightBracket))
+        XCTAssertEqual(e.ruler?.height, 36)
+        // Clamped to the screen.
+        _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine))
+        _ = e.handle(KeyPress(.j))
+        XCTAssertEqual(e.ruler?.y, 600)
+        // Escape keeps the ruler and only asks for a redraw, not a hide.
+        XCTAssertEqual(e.handle(KeyPress(.escape)), [.redraw])
+        XCTAssertFalse(e.isActive)
+        XCTAssertTrue(e.needsOverlay)
+        XCTAssertNotNil(e.ruler)
+        // Back in, r returns to the existing ruler, R removes it.
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.r))
+        XCTAssertEqual(e.ruler?.y, 600)
+        _ = e.handle(KeyPress(.r))
+        XCTAssertEqual(e.mode, .pointer)
+        _ = e.handle(KeyPress(.r, [.shift]))
+        XCTAssertNil(e.ruler)
+        XCTAssertEqual(e.handle(KeyPress(.escape)), [.hideOverlay])
+        XCTAssertFalse(e.needsOverlay)
+    }
+
     func testEscapeExits() {
         let e = PointerEngine()
         _ = e.activate(screen: screen)
