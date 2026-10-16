@@ -87,6 +87,56 @@ final class ConfigTests: XCTestCase {
         XCTAssertThrowsError(try Config.parse("garbage"))                         // not TOML
     }
 
+    func testMigrationAddsMissingAndCommentsUnknown() throws {
+        let old = """
+        # my notes
+        [keys]
+        top_left = "q"
+        top_right = "w"
+        bottom_left = "a"
+        bottom_right = "s"
+        mystery = 1
+        [scroll]
+        step = 24
+        """
+        let (text, changed) = ConfigSchema.migrate(old)
+        XCTAssertTrue(changed)
+        XCTAssertTrue(text.contains("# my notes"))
+        XCTAssertTrue(text.contains("top_left = \"q\""))                 // user value kept
+        XCTAssertTrue(text.contains("ignored (see CHANGELOG.md in the vimouse repository): mystery = 1"))
+        XCTAssertTrue(text.contains("left_click = [\"return\", \"m\"]"))   // missing key appended with default
+        XCTAssertTrue(text.contains("[ruler]"))                            // missing section appended
+        XCTAssertTrue(text.contains("# Darkening outside the band"))      // with its comment
+        let c = try Config.parse(text)
+        XCTAssertEqual(c.scrollStep, 24)
+        XCTAssertEqual(c.keymap.quadrants[KeyPress(.q)], .topLeft)
+        XCTAssertEqual(c.keymap.leftClick, KeyMap.default.leftClick)
+        // A second migration is a no-op.
+        XCTAssertFalse(ConfigSchema.migrate(text).changed)
+        XCTAssertFalse(ConfigSchema.migrate(Config.defaultTOML).changed)
+        XCTAssertTrue(ConfigSchema.migrate("").changed)
+    }
+
+    func testEverySettingHasAComment() {
+        for e in ConfigSchema.entries { XCTAssertFalse(e.comment.isEmpty, "\(e.section).\(e.key)") }
+    }
+
+    func testArrowKeysAndLabels() throws {
+        let c = try Config.parse("""
+        [scroll]
+        down = "down"
+        up = ["k", "up"]
+        """)
+        let e = PointerEngine(keymap: c.keymap)
+        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
+        _ = e.handle(KeyPress(.s))
+        XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.scroll(dx: 0, dy: 60)])
+        XCTAssertEqual(e.handle(KeyPress(.upArrow)), [.scroll(dx: 0, dy: -60)])
+        XCTAssertEqual(e.hints.first?.key, "↓k hl")
+        XCTAssertEqual(KeyPress(.tab, [.shift]).label, "⇧⇥")
+        XCTAssertEqual(KeyPress(.space, [.command, .shift]).label, "⇧⌘␣")
+    }
+
     func testKeySpecs() {
         XCTAssertEqual(KeyPress.parse("cmd+shift+space"), KeyPress(.space, [.command, .shift]))
         XCTAssertEqual(KeyPress.parse("]"), KeyPress(.rightBracket))

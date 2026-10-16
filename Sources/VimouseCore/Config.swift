@@ -17,60 +17,9 @@ public struct Config: Equatable {
         public let description: String
     }
 
-    /// The file written on first run. Parsing it must reproduce `Config()` (there is a test).
-    public static let defaultTOML = """
-    # vimouse configuration. Edit and save; the app reloads it.
-    # Keys are named by their position on a US layout: letters, digits, "space",
-    # "return", "tab", "escape", "backspace", "comma", "period", "slash",
-    # "leftbracket", "rightbracket", "minus", "equal". Modifiers: cmd, shift, ctrl, alt,
-    # joined with "+", e.g. "cmd+shift+space". A list gives several keys the same action.
-
-    [hotkey]
-    activate = "cmd+shift+space"
-
-    [keys]
-    # Quadrants.
-    top_left = "i"
-    top_right = "o"
-    bottom_left = "j"
-    bottom_right = "k"
-    up = ["backspace", "u"]
-    left_click = ["return", "m"]
-    click_stay = "space"
-    double_click = "x"
-    right_click = "period"
-    middle_click = "comma"
-    drag = "v"
-    exit = "escape"
-    next_screen = "tab"
-    previous_screen = "shift+tab"
-    snap_toggle = "a"
-    scroll_toggle = "s"
-    ruler_toggle = "r"
-    ruler_remove = "shift+r"
-
-    [scroll]
-    step = 60          # pixels per j/k/h/l press
-    down = "j"
-    up = "k"
-    left = "h"
-    right = "l"
-    half_page_down = "d"
-    half_page_up = "u"
-
-    [ruler]
-    height = 32        # band height in pixels
-    step = 20          # pixels per j/k press
-    height_step = 4    # pixels per [ ] press
-    dim = 0.35         # darkening outside the band, 0 to 1
-    down = "j"
-    up = "k"
-    grow = "rightbracket"
-    shrink = "leftbracket"
-
-    [snap]
-    enabled = true     # snap to UI elements by default ("a" toggles)
-    """
+    /// The file written on first run. Generated from `ConfigSchema`; parsing it must
+    /// reproduce `Config()` (there is a test).
+    public static var defaultTOML: String { ConfigSchema.template() }
 
     public static func parse(_ text: String) throws -> Config {
         let t: TOMLTable
@@ -155,6 +104,16 @@ public struct Config: Equatable {
 // MARK: - Key specs
 
 public extension KeyPress {
+    /// Display form: modifier symbols then the key, e.g. "⇧⇥", "⌘⇧␣", "↓".
+    var label: String {
+        var s = ""
+        if modifiers.contains(.control) { s += "⌃" }
+        if modifiers.contains(.option) { s += "⌥" }
+        if modifiers.contains(.shift) { s += "⇧" }
+        if modifiers.contains(.command) { s += "⌘" }
+        return s + code.label
+    }
+
     /// Parses "cmd+shift+space", "shift+r", "leftbracket", "a".
     static func parse(_ spec: String) -> KeyPress? {
         let parts = spec.lowercased().split(separator: "+").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -176,6 +135,14 @@ public extension KeyPress {
 public extension KeyCode {
     static let minus = KeyCode(rawValue: 27)
     static let equal = KeyCode(rawValue: 24)
+    static let leftArrow = KeyCode(rawValue: 123)
+    static let rightArrow = KeyCode(rawValue: 124)
+    static let downArrow = KeyCode(rawValue: 125)
+    static let upArrow = KeyCode(rawValue: 126)
+    static let pageUp = KeyCode(rawValue: 116)
+    static let pageDown = KeyCode(rawValue: 121)
+    static let home = KeyCode(rawValue: 115)
+    static let end = KeyCode(rawValue: 119)
 
     static func named(_ name: String) -> KeyCode? {
         if name.count == 1, let c = name.first {
@@ -205,9 +172,35 @@ public extension KeyCode {
         case "rightbracket": return .rightBracket
         case "minus": return .minus
         case "equal", "equals": return .equal
+        case "left", "arrowleft": return .leftArrow
+        case "right", "arrowright": return .rightArrow
+        case "up", "arrowup": return .upArrow
+        case "down", "arrowdown": return .downArrow
+        case "pageup": return .pageUp
+        case "pagedown": return .pageDown
+        case "home": return .home
+        case "end": return .end
         default: return nil
         }
     }
+
+    /// Short display name for legends and in-rectangle labels.
+    var label: String {
+        if let n = KeyCode.labels[self] { return n }
+        return "?"
+    }
+
+    private static let labels: [KeyCode: String] = {
+        var m: [KeyCode: String] = [:]
+        for (c, k) in letters { m[k] = String(c) }
+        for (c, k) in digits { m[k] = String(c) }
+        m[.space] = "␣"; m[.return] = "⏎"; m[.tab] = "⇥"; m[.escape] = "esc"; m[.delete] = "⌫"
+        m[.comma] = ","; m[.period] = "."; m[.slash] = "/"; m[.leftBracket] = "["; m[.rightBracket] = "]"
+        m[.minus] = "-"; m[.equal] = "="
+        m[.leftArrow] = "←"; m[.rightArrow] = "→"; m[.upArrow] = "↑"; m[.downArrow] = "↓"
+        m[.pageUp] = "⇞"; m[.pageDown] = "⇟"; m[.home] = "↖"; m[.end] = "↘"
+        return m
+    }()
 
     private static let letters: [Character: KeyCode] = [
         "a": .a, "b": .b, "c": .c, "d": .d, "e": .e, "f": .f, "g": .g, "h": .h, "i": .i, "j": .j, "k": .k, "l": .l, "m": .m,

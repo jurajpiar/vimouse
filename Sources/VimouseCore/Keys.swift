@@ -202,16 +202,16 @@ public struct KeyMap: Sendable, Equatable {
         rulerShrink: [KeyPress(.leftBracket)]
     )
 
-    /// Label shown inside each quadrant. Derived from the ANSI key name for now;
-    /// a layout-aware version comes with the config loader.
+    /// Label shown inside each quadrant.
     public func label(for quadrant: Quadrant) -> String {
-        guard let press = quadrants.first(where: { $0.value == quadrant })?.key else { return "?" }
-        return KeyMap.ansiNames[press.code] ?? "?"
+        KeyMap.label(of: quadrants.filter { $0.value == quadrant }.map(\.key))
     }
 
-    static let ansiNames: [KeyCode: String] = [
-        .a: "a", .s: "s", .d: "d", .f: "f", .h: "h", .g: "g", .z: "z", .x: "x", .c: "c", .v: "v",
-        .b: "b", .q: "q", .w: "w", .e: "e", .r: "r", .y: "y", .t: "t", .o: "o", .u: "u", .i: "i",
-        .p: "p", .l: "l", .j: "j", .k: "k", .n: "n", .m: "m", .comma: ",", .period: ".", .slash: "/",
-    ]
+    /// One representative key for a binding, for legends: fewest modifiers, then shortest label.
+    public static func label(of keys: some Collection<KeyPress>) -> String {
+        keys.min { a, b in
+            if a.modifiers.rawValue != b.modifiers.rawValue { return a.modifiers.rawValue < b.modifiers.rawValue }
+            return a.label.count < b.label.count || (a.label.count == b.label.count && a.label < b.label)
+        }?.label ?? "?"
+    }
 }

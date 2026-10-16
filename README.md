@@ -40,10 +40,17 @@ the count.
 
 ## Configuration
 
-On first run vimouse writes a commented `~/.config/vimouse/config.toml` with every
-binding and tunable (scroll step, ruler height/step/dimming, snapping default).
-Edit and save; the app reloads it. A parse error keeps the previous settings and
-turns the menu bar item into "vm!"; "Show config error" in the menu says why.
+On first run vimouse writes `~/.config/vimouse/config.toml` with every binding and
+tunable, each with a one-line comment and example values. Edit and save; the app
+reloads within a second. A parse error keeps the previous settings and turns the
+menu bar item into "vm!"; "Show config error" in the menu says why.
+
+On every start the file is brought up to date: settings added in a newer version
+are appended with their defaults and comments, and unknown or superseded settings
+are commented out with a pointer to `CHANGELOG.md`. Your values and comments are
+kept. Arrow keys, page up/down, home and end can be bound like any other key
+(`down = ["j", "down"]`), and the legend and in-rectangle labels show whatever is
+bound.
 
 ## Accessibility permission
 

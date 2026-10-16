@@ -22,8 +22,22 @@ final class ConfigStore {
 
     func start() {
         ensureFile()
+        migrate()
         load()
         watch()
+    }
+
+    /// Append settings added since the file was written; comment out ones that went away.
+    private func migrate() {
+        guard let text = try? String(contentsOf: ConfigStore.file, encoding: .utf8) else { return }
+        let (updated, changed) = ConfigSchema.migrate(text)
+        guard changed else { return }
+        do {
+            try updated.write(to: ConfigStore.file, atomically: true, encoding: .utf8)
+            NSLog("vimouse: config updated with new settings")
+        } catch {
+            NSLog("vimouse: could not update config: \(error)")
+        }
     }
 
     func reload() { load() }

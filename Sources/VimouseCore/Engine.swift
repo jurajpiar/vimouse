@@ -293,37 +293,41 @@ public final class PointerEngine {
 
     // MARK: Discoverability
 
-    /// The keys valid right now, for the status strip.
+    /// The keys valid right now, for the status strip. Labels come from the bindings,
+    /// so a rebind (j -> down arrow) shows as "↓" here and inside the rectangles.
     public var hints: [(key: String, action: String)] {
         guard case .active(let mode, let s) = state else { return [] }
+        let k = keymap
+        func l(_ set: Set<KeyPress>) -> String { KeyMap.label(of: set) }
         var h: [(key: String, action: String)] = []
         switch mode {
         case .pointer:
-            h.append(("iojk", "pick"))
-            if s.depth > 0 { h.append(("⌫", "up")) }
-            h.append(("⏎", "click"))
-            h.append(("␣", "click+stay"))
-            h.append((".", "right"))
-            h.append(("x", "double"))
-            h.append(("v", dragging ? "drop" : "drag"))
-            h.append(("s", "scroll"))
-            h.append(("r", "ruler"))
-            if snapProvider != nil { h.append(("a", snapping ? "snap on" : "snap off")) }
+            let quads = [Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { k.label(for: $0) }.joined()
+            h.append((quads, "pick"))
+            if s.depth > 0 { h.append((l(k.up), "up")) }
+            h.append((l(k.leftClick), "click"))
+            h.append((l(k.clickStay), "click+stay"))
+            h.append((l(k.rightClick), "right"))
+            h.append((l(k.doubleClick), "double"))
+            h.append((l(k.dragToggle), dragging ? "drop" : "drag"))
+            h.append((l(k.scrollToggle), "scroll"))
+            h.append((l(k.rulerToggle), "ruler"))
+            if snapProvider != nil { h.append((l(k.snapToggle), snapping ? "snap on" : "snap off")) }
         case .scroll:
-            h.append(("jk hl", "scroll"))
-            h.append(("d u", "half page"))
-            h.append(("⏎", "click"))
-            h.append(("s", "pointer"))
-            h.append(("r", "ruler"))
+            h.append((l(k.scrollDown) + l(k.scrollUp) + " " + l(k.scrollLeft) + l(k.scrollRight), "scroll"))
+            h.append((l(k.scrollHalfDown) + " " + l(k.scrollHalfUp), "half page"))
+            h.append((l(k.leftClick), "click"))
+            h.append((l(k.scrollToggle), "pointer"))
+            h.append((l(k.rulerToggle), "ruler"))
         case .ruler:
-            h.append(("jk", "move"))
-            h.append(("[ ]", "height"))
-            h.append(("s", "scroll"))
-            h.append(("r", "pointer"))
-            h.append(("R", "remove"))
+            h.append((l(k.rulerDown) + l(k.rulerUp), "move"))
+            h.append((l(k.rulerShrink) + " " + l(k.rulerGrow), "height"))
+            h.append((l(k.scrollToggle), "scroll"))
+            h.append((l(k.rulerToggle), "pointer"))
+            h.append((l(k.rulerRemove), "remove"))
         }
-        if screens.count > 1 { h.append(("⇥ / n⇥", "screen")) }
-        h.append(("esc", pendingCount == nil ? "exit" : "cancel count"))
+        if screens.count > 1 { h.append((l(k.nextScreen) + " / n" + l(k.nextScreen), "screen")) }
+        h.append((l(k.exit), pendingCount == nil ? "exit" : "cancel count"))
         return h
     }
 }
