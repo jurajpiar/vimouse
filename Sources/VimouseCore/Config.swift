@@ -52,6 +52,7 @@ public struct Config: Equatable {
 
     public struct ParseError: Error, CustomStringConvertible {
         public let description: String
+        public init(description: String) { self.description = description }
     }
 
     /// The whole file, with the modes' sections. Parsing it must reproduce the defaults

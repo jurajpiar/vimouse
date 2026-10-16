@@ -43,6 +43,9 @@ public final class PointerEngine {
 
     /// vi-style count prefix typed so far; nil when none. Consumed by the next command.
     public private(set) var pendingCount: Int?
+    /// The mode active before the current one in this activation; where a mode's own
+    /// toggle (or a mode handing back) returns to.
+    public private(set) var previousMode: String?
     /// True when the current activation came from the hold key (quasi-mode).
     public var heldActivation = false
 
@@ -94,6 +97,7 @@ public final class PointerEngine {
         context.services.snap?.prepare(screen: screens[index])
         context.target = pointer ?? screens[index].center
         let id = mode.flatMap { enabled.contains($0) ? $0 : nil } ?? defaultMode
+        previousMode = nil
         context.activeMode = id
         self.mode(id)?.activate(context)
         return [.showOverlay]
@@ -109,9 +113,16 @@ public final class PointerEngine {
     public func enter(mode id: String) -> [Effect] {
         guard let current = context.activeMode, current != id, enabled.contains(id), let next = mode(id) else { return [] }
         mode(current)?.deactivate(context, exiting: false)
+        previousMode = current
         context.activeMode = id
         next.activate(context)
         return [.redraw]
+    }
+
+    /// The mode to fall back to: the previous one if still enabled, else the default.
+    public var returnMode: String {
+        if let p = previousMode, enabled.contains(p) { return p }
+        return defaultMode
     }
 
     /// Leave the active mode, releasing a held drag first. Idle drawings stay.
@@ -166,7 +177,7 @@ public final class PointerEngine {
         for id in enabled {
             guard let m = mode(id), m.toggle.has(key) else { continue }
             if id == currentID {
-                return id == defaultMode ? [] : enter(mode: defaultMode)
+                return returnMode == id ? [] : enter(mode: returnMode)
             }
             return enter(mode: id)
         }
@@ -201,7 +212,7 @@ public final class PointerEngine {
     private func requestedSwitch() -> [Effect] {
         guard let request = context.requestedMode else { return [] }
         context.requestedMode = nil
-        return enter(mode: request ?? defaultMode)
+        return enter(mode: request ?? returnMode)
     }
 
     /// A key went up; the active mode may end a held movement.
@@ -284,7 +295,7 @@ public final class PointerEngine {
         for id in enabled {
             guard let m = mode(id) else { continue }
             var rows = m.help(context).map { ($0.keys, $0.action) }
-            if !m.toggle.isEmpty { rows.append((all(m.toggle), id == defaultMode ? "\(id) mode" : "\(id) mode (again: back to \(defaultMode))")) }
+            if !m.toggle.isEmpty { rows.append((all(m.toggle), "\(id) mode (again: back to the previous mode)")) }
             groups.append((m.name, rows))
         }
         let shared: [(String, String)] = [

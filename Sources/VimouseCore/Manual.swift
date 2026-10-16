@@ -31,7 +31,7 @@ public enum Manual {
         for m in modes {
             line(".TP")
             line(".B \(m.name.capitalized)")
-            let toggle = m.toggle.isEmpty ? "" : " Enter it with \(esc(keys(m.toggle))) (again: back to the default mode)."
+            let toggle = m.toggle.isEmpty ? "" : " Enter it with \(esc(keys(m.toggle))) (again: back to the previous mode)."
             line(esc(m.manual) + toggle)
         }
 

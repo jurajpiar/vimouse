@@ -701,7 +701,7 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.r)), [])            // ruler is disabled: its toggle does nothing
         XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])
         XCTAssertEqual(e.mode, "scroll")
-        XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])     // own toggle: back to the default
+        XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])     // own toggle: back to the previous mode
         XCTAssertEqual(e.mode, "nudge")
         XCTAssertEqual(e.handle(KeyPress(.n)), [])            // the default's own toggle: nothing
         XCTAssertEqual(e.activate(screen: screen, mode: "ruler"), [.showOverlay]) // disabled start mode: default
@@ -739,6 +739,11 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.r, [.shift])), [.redraw, .redraw])
         XCTAssertEqual(e.mode, "pointer")
         XCTAssertNil(e.ruler)
+        // Entered from Nudge, removing the band returns to Nudge, not the default.
+        _ = e.handle(KeyPress(.n)); _ = e.handle(KeyPress(.r))
+        XCTAssertEqual(e.handle(KeyPress(.r, [.shift])), [.redraw, .redraw])
+        XCTAssertEqual(e.mode, "nudge")
+        _ = e.handle(KeyPress(.n))
         // From another mode the band goes but the mode stays.
         _ = e.handle(KeyPress(.r)); _ = e.handle(KeyPress(.s))
         XCTAssertEqual(e.handle(KeyPress(.r, [.shift])), [.redraw])

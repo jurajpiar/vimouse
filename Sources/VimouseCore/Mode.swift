@@ -132,7 +132,7 @@ public final class ModeContext {
     public func colour(of modeID: String) -> String { colours.mode(modeID) }
 
     /// Ask the engine to switch mode once the current key is handled: an id, or nil for
-    /// the default mode.
+    /// the previous mode (the default when there is none).
     public func switchMode(to id: String?) { requestedMode = .some(id) }
     var requestedMode: String?? = nil
 
