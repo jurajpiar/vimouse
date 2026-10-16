@@ -15,8 +15,9 @@ swift run vimouse     # menu bar item "vm" appears
 ```
 
 Press ⌘⇧Space to enter Pointer mode, or set `[hotkey] hold` to a modifier
-chord (`"cmd+shift+ctrl"`) or one key (`"right_cmd"`) to be in Pointer mode only
-while it is held. The status strip at the screen edge lists the
+chord (`"cmd+ctrl+alt"`; avoid Shift, it would hide the shifted bindings) or one
+key (`"right_cmd"`) to be in Pointer mode only while it is held; the hotkey
+pressed meanwhile pins the mode so it survives the release. The status strip at the screen edge lists the
 keys valid at any moment. Defaults:
 
 Pointer: i/o/j/k pick a quadrant, Backspace or u goes up a level, Shift+u or

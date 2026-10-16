@@ -51,7 +51,7 @@ public enum ConfigSchema {
 
         .init(section: "hotkey", key: "activate", defaultValue: "\"cmd+shift+space\"", comment: "Global hotkey that enters Pointer mode, e.g. \"cmd+shift+space\", \"ctrl+alt+m\"."),
         .init(section: "hotkey", key: "activate_mode", defaultValue: "\"pointer\"", comment: "Mode the hotkey starts in: pointer, nudge, scroll or ruler."),
-        .init(section: "hotkey", key: "hold", defaultValue: "\"\"", comment: "Quasi-mode: Pointer mode while this is held, left on release; these modifiers are ignored on the keys you type meanwhile. A chord like \"cmd+shift+ctrl\", one key such as right_cmd, left_alt, right_ctrl, fn, or \"\" for none."),
+        .init(section: "hotkey", key: "hold", defaultValue: "\"\"", comment: "Quasi-mode: the mode is active while this is held and left on release; these modifiers are ignored on the keys you type meanwhile, so avoid shift (shifted bindings such as shift+r would become unreachable). A chord like \"cmd+ctrl+alt\", one key such as right_cmd, left_alt, right_ctrl, fn, or \"\" for none. The activate hotkey pins a held activation."),
         .init(section: "hotkey", key: "hold_mode", defaultValue: "\"pointer\"", comment: "Mode the hold key starts in: pointer, nudge, scroll or ruler."),
 
         .init(section: "global", key: "exit", defaultValue: "\"escape\"", comment: "Leave Pointer mode (releases a drag; keeps a ruler), e.g. \"escape\", \"ctrl+c\"."),

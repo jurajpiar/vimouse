@@ -93,6 +93,17 @@ final class Controller {
             activate()
             return true
         }
+        // The hotkey while active: pins a quasi-mode activation (it then survives the
+        // release of the hold key), or leaves a pinned or hotkey-started one.
+        if rawKey == engine.keymap.activate, isDown, !isRepeat {
+            if engine.heldActivation {
+                engine.heldActivation = false
+                overlay.render(model())
+            } else {
+                apply(engine.deactivate())
+            }
+            return true
+        }
         // While the hold key is down, its own modifier is not part of what the user typed.
         if engine.heldActivation, let bits = engine.keymap.hold?.bits {
             key = KeyPress(key.code, key.modifiers.subtracting(bits))

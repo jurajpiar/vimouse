@@ -419,6 +419,7 @@ public final class PointerEngine {
         h.append((l(k.help), "help"))
         if let hold = k.hold, heldActivation {
             h.append(("release " + hold.label, dragging ? "drop+exit" : "exit"))
+            h.append((k.activate.label, "pin"))
             h.append((l(k.exit), pendingCount != nil ? "cancel count" : (dragging ? "cancel drag" : "exit")))
         } else {
             h.append((l(k.exit), pendingCount != nil ? "cancel count" : (dragging ? "cancel drag" : "exit")))

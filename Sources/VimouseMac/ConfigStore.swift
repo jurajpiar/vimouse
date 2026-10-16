@@ -80,6 +80,9 @@ final class ConfigStore {
             let text = try String(contentsOf: ConfigStore.file, encoding: .utf8)
             config = try Config.parse(text)
             lastError = nil
+            if case .chord(let m)? = config.keymap.hold, m.contains(.shift) {
+                NSLog("vimouse: [hotkey] hold includes shift; shifted bindings (shift+r, shift+u, shift+tab, fine moves) are unreachable while it is held")
+            }
             NSLog("vimouse: config loaded")
         } catch {
             lastError = "\(error)"
