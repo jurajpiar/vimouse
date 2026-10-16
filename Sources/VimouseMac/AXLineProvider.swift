@@ -36,6 +36,8 @@ final class AXLineProvider: LineProvider {
         var markerHost: AXUIElement?
         /// Line number within the web area (Chromium), for stepping by index.
         var webLine: Int?
+        /// A marker at the start of this line, for walking line by line (Chromium, WebKit).
+        var lineStart: AnyObject?
         /// Whether the web area's marker bounds come flipped (Cocoa) or not.
         var flipped = true
     }
@@ -49,6 +51,11 @@ final class AXLineProvider: LineProvider {
         static let forIndex = "AXTextMarkerForIndex"
         static let lineForMarker = "AXLineForTextMarker"
         static let rangeForLine = "AXTextMarkerRangeForLine"
+        static let startOfElement = "AXStartTextMarker"
+        static let nextLineEnd = "AXNextLineEndTextMarkerForTextMarker"
+        static let previousLineStart = "AXPreviousLineStartTextMarkerForTextMarker"
+        static let next = "AXNextTextMarkerForTextMarker"
+        static let previous = "AXPreviousTextMarkerForTextMarker"
     }
     /// The last line handed out, so a move from it needs no fresh hit test.
     private var last: Found?
@@ -87,6 +94,17 @@ final class AXLineProvider: LineProvider {
                     }
                     i += direction
                 }
+            } else if let host = cur.markerHost, let start = cur.lineStart {
+                // Walk the element's lines by marker: line end -> next character -> its line.
+                if let m = sign > 0 ? nextLineStart(host, from: start) : previousLineStart(host, from: start),
+                   let range = markerValue(host, Marker.lineRange, m),
+                   let b = normalisedBounds(host, range, flipped: cur.flipped), b.width > 0,
+                   sign > 0 ? b.midY > cur.rect.midY : b.midY < cur.rect.midY {
+                    last = Found(element: cur.element, line: nil, rect: b, markerHost: host, flipped: cur.flipped, lineStart: m)
+                    log("next by line marker: \(b)")
+                    return b
+                }
+                log("no further line marker in the element")
             } else if let host = cur.markerHost, let n = cur.webLine {
                 // Chromium: lines are numbered across the web area; take the neighbour.
                 var i = n + direction
@@ -194,6 +212,14 @@ final class AXLineProvider: LineProvider {
                 element = parent
             }
         }
+        // Web content: a text node carries its own start marker; walk its lines from there.
+        element = hit
+        for _ in 0..<3 {
+            if Date() > deadline { return nil }
+            if let f = lineFromStartMarker(element, x: x, y: y, deadline: deadline) { return f }
+            guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
+            element = parent
+        }
         if let wa = webArea {
             if let f = lineFromMarkers(wa.element, x: x, y: y) { return f }
             if let f = lineFromWebIndex(wa.element, hit: hit, x: x, y: y, deadline: deadline) { return f }
@@ -271,6 +297,61 @@ final class AXLineProvider: LineProvider {
         guard let b = markerBounds(element, range), b.width > 0 else { log("no bounds for the line range"); return nil }
         guard abs(b.midY - y) <= b.height * 1.5 + 4 else { log("marker line \(b) is not under y \(Int(y))"); return nil }
         return Found(element: element, line: nil, rect: b, markerRange: range, markerHost: element)
+    }
+
+    /// The marker at the start of the line after the one starting at `m`: its end, then one
+    /// character on.
+    private func nextLineStart(_ host: AXUIElement, from m: AnyObject) -> AnyObject? {
+        guard let end = markerValue(host, Marker.nextLineEnd, m) else { return nil }
+        return markerValue(host, Marker.next, end)
+    }
+
+    /// The marker at the start of the line before the one starting at `m`.
+    private func previousLineStart(_ host: AXUIElement, from m: AnyObject) -> AnyObject? {
+        guard let before = markerValue(host, Marker.previous, m) else { return nil }
+        return markerValue(host, Marker.previousLineStart, before) ?? before
+    }
+
+    private func normalisedBounds(_ host: AXUIElement, _ range: AnyObject, flipped: Bool) -> Rect? {
+        var out: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(host, Marker.bounds as CFString, range, &out) == .success,
+              let v = out, CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
+        var r = CGRect.zero
+        // swiftlint:disable:next force_cast
+        guard AXValueGetValue(v as! AXValue, .cgRect, &r), r.height > 0, r.height <= 120 else { return nil }
+        let raw = NSRect(x: r.minX, y: r.minY, width: r.width, height: r.height)
+        return flipped ? Coordinates.cgRect(fromAppKit: raw) : Rect(x: raw.minX, y: raw.minY, width: raw.width, height: raw.height)
+    }
+
+    /// Chromium and WebKit text nodes: from the element's own start marker, walk its lines
+    /// until the one under the point.
+    private func lineFromStartMarker(_ element: AXUIElement, x: Double, y: Double, deadline: Date) -> Found? {
+        guard let frame = frame(of: element), frame.contains(Point(x: x, y: y)) || abs(frame.midY - y) < frame.height else { return nil }
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, Marker.startOfElement as CFString, &value) == .success, var m = value else { return nil }
+        guard let firstRange = markerValue(element, Marker.lineRange, m) else { log("start marker but no line range"); return nil }
+        // Which way the bounds come: the reading that lands inside the element's frame.
+        guard let asCocoa = normalisedBounds(element, firstRange, flipped: true) else { log("start marker but no bounds"); return nil }
+        let asCG = normalisedBounds(element, firstRange, flipped: false)
+        let flipped = frame.intersects(asCocoa) || asCG.map { !frame.intersects($0) } ?? true
+        var range: AnyObject = firstRange
+        var lastMid = -Double.infinity
+        for _ in 0..<80 {
+            guard Date() < deadline else { log("out of time walking lines"); return nil }
+            if let b = normalisedBounds(element, range, flipped: flipped), b.width > 0 {
+                if y >= b.y - 1, y < b.maxY + 1 {
+                    log("line by start marker (\(flipped ? "flipped" : "unflipped")): \(b)")
+                    return Found(element: element, line: nil, rect: b, markerHost: element, flipped: flipped, lineStart: m)
+                }
+                if b.y > y || b.midY <= lastMid { break }
+                lastMid = b.midY
+            }
+            guard let nm = nextLineStart(element, from: m), let nr = markerValue(element, Marker.lineRange, nm) else { break }
+            m = nm
+            range = nr
+        }
+        log("no line under y \(Int(y)) by start marker")
+        return nil
     }
 
     /// Chromium: the hit element's start as a text index, its line number, then the
