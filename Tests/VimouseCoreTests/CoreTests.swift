@@ -674,6 +674,23 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.ruler?.y, 135 + 24)
         _ = e.handle(KeyPress(.a)) // on again: re-seat on the line under the band
         XCTAssertEqual(e.ruler?.y, 158)
+        // Extend takes in the next line below; collapse returns to that line; a move collapses first.
+        _ = e.handle(KeyPress(.k)); _ = e.handle(KeyPress(.k)) // on the 148..168 line again (y 158)
+        XCTAssertEqual(e.ruler?.y, 158)
+        XCTAssertEqual(e.handle(KeyPress(.e)), [.warp(Point(x: 250, y: 182)), .redraw]) // pointer on the line just taken in
+        XCTAssertEqual(e.ruler?.band(on: screen).y, 146)                                  // top unchanged
+        XCTAssertEqual(e.ruler?.band(on: screen).maxY, 194)                               // bottom: line 172..192 plus pad
+        _ = e.handle(KeyPress(.e))
+        XCTAssertEqual(e.ruler?.band(on: screen).maxY, 218)
+        XCTAssertTrue(e.ruler!.isExtended)
+        XCTAssertEqual(e.handle(KeyPress(.c)), [.warp(Point(x: 250, y: 206)), .redraw])
+        XCTAssertEqual(e.ruler?.y, 206); XCTAssertEqual(e.ruler?.height, 24)
+        XCTAssertEqual(e.handle(KeyPress(.c)), [])                                        // nothing to collapse
+        _ = e.handle(KeyPress(.e))
+        _ = e.handle(KeyPress(.j))                                                        // collapses to 230, then moves
+        XCTAssertEqual(e.ruler?.y, 254); XCTAssertEqual(e.ruler?.height, 24)
+        _ = e.handle(KeyPress(.k)); _ = e.handle(KeyPress(.k)); _ = e.handle(KeyPress(.k)); _ = e.handle(KeyPress(.k))
+        XCTAssertEqual(e.ruler?.y, 158)
         // Past the last line: fall back to a height step.
         for _ in 0..<10 { _ = e.handle(KeyPress(.j)) }
         XCTAssertEqual(e.ruler?.y, 302 + 4 * 24) // six line steps, then four height steps

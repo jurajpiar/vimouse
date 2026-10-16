@@ -13,6 +13,16 @@ public struct Ruler: Equatable, Sendable {
     /// the line itself, when known; nil spans the screen.
     public var bounds: Rect?
     public var dimBounds: Rect?
+    /// When the band has been extended over several lines: the last line taken in
+    /// (centre and height), which a collapse returns to. nil for a single line.
+    public var lastLine: (y: Double, height: Double)?
+    public var isExtended: Bool { lastLine != nil }
+
+    public static func == (a: Ruler, b: Ruler) -> Bool {
+        a.screenIndex == b.screenIndex && a.x == b.x && a.y == b.y && a.height == b.height
+            && a.bounds == b.bounds && a.dimBounds == b.dimBounds
+            && a.lastLine?.y == b.lastLine?.y && a.lastLine?.height == b.lastLine?.height
+    }
 
     public init(screenIndex: Int, x: Double = 0, y: Double, height: Double, bounds: Rect? = nil, dimBounds: Rect? = nil) {
         self.screenIndex = screenIndex
@@ -63,6 +73,8 @@ public final class RulerMode: Mode {
         public var grow: Set<KeyPress> = [KeyPress(.rightBracket)]
         public var shrink: Set<KeyPress> = [KeyPress(.leftBracket)]
         public var snapToggle: Set<KeyPress> = [KeyPress(.a)]
+        public var extend: Set<KeyPress> = [KeyPress(.e)]
+        public var collapse: Set<KeyPress> = [KeyPress(.c)]
         public var width: RulerWidth = .window
         public init() {}
     }
@@ -90,6 +102,8 @@ public final class RulerMode: Mode {
             .init(section: id, key: "snap", defaultValue: "true", comment: "Follow lines of text: the band is created on the line under the pointer and down/up move it a line at a time (read via accessibility; falls back to `move` where no text is found)."),
             .init(section: id, key: "pad", defaultValue: "2", comment: "Pixels added above and below a line the band snapped to, e.g. 0, 2, 4."),
             .init(section: id, key: "snap_toggle", defaultValue: "\"a\"", comment: "Toggle following lines of text in Ruler mode, e.g. \"a\"."),
+            .init(section: id, key: "extend", defaultValue: "\"e\"", comment: "Extend the band to take in the next line below (reading in blocks); again for another line, e.g. \"e\"."),
+            .init(section: id, key: "collapse", defaultValue: "\"c\"", comment: "Collapse an extended band back to its last line, so reading continues from there, e.g. \"c\"."),
             .init(section: id, key: "width", defaultValue: "\"window\"", comment: "How wide the band and the dimming are: \"window\" (the window holding the text under the pointer), \"screen\", or \"line\" (the text line itself, dimming its window)."),
             .init(section: id, key: "dim", defaultValue: "0.35", comment: "Darkening outside the band, 0 (none) to 1 (black); 0.2 subtle, 0.35 default, 0.6 strong."),
             .init(section: id, key: "down", defaultValue: "\"j\"", comment: "Move the band down, e.g. \"j\", \"down\"."),
@@ -116,6 +130,8 @@ public final class RulerMode: Mode {
         if let v = try r.keys("grow") { s.grow = v }
         if let v = try r.keys("shrink") { s.shrink = v }
         if let v = try r.keys("snap_toggle") { s.snapToggle = v }
+        if let v = try r.keys("extend") { s.extend = v }
+        if let v = try r.keys("collapse") { s.collapse = v }
         if let v = try r.string("width") {
             guard let w = RulerWidth(rawValue: v.lowercased()) else { throw r.fail("width", "expected \"window\", \"screen\" or \"line\"") }
             s.width = w
@@ -145,7 +161,7 @@ public final class RulerMode: Mode {
     /// Scroll mode all act where the band is.
     private func follow(_ ctx: ModeContext) {
         guard let r = ruler, r.screenIndex == ctx.screenIndex else { return }
-        ctx.target = ctx.clamped(Point(x: ctx.target.x, y: r.y))
+        ctx.target = ctx.clamped(Point(x: ctx.target.x, y: r.lastLine?.y ?? r.y))
     }
 
     /// The band survives only a deliberate switch to another mode; its own toggle and
@@ -179,6 +195,21 @@ public final class RulerMode: Mode {
         }
         guard var r = ruler else { return nil }
         let screen = ctx.screens[r.screenIndex]
+        if s.extend.has(key) {
+            for _ in 0..<Int(n) { extend(&r, ctx) }
+            ruler = r
+            follow(ctx)
+            return [.warp(ctx.target), .redraw]
+        }
+        if s.collapse.has(key) {
+            guard r.isExtended else { return [] }
+            collapse(&r, ctx)
+            ruler = r
+            follow(ctx)
+            return [.warp(ctx.target), .redraw]
+        }
+        // A move or resize of an extended band first collapses it to its last line.
+        if r.isExtended, !s.grow.has(key), !s.shrink.has(key) { collapse(&r, ctx) }
         // Shift held with a move or resize key makes a fine (pixel) adjustment.
         let fine = key.modifiers.contains(.shift)
         let base = KeyPress(key.code, key.modifiers.subtracting(.shift))
@@ -207,10 +238,39 @@ public final class RulerMode: Mode {
         return [.warp(ctx.target), .redraw]
     }
 
+    /// Take in the next line below the band's bottom edge (or `move` pixels when no line
+    /// is found); the band then spans from its top to that line's bottom.
+    private func extend(_ r: inout Ruler, _ ctx: ModeContext) {
+        let top = r.y - r.height / 2
+        let bottomLine = r.lastLine ?? (y: r.y, height: r.height)
+        let probe = Ruler(screenIndex: r.screenIndex, x: r.x, y: bottomLine.y, height: bottomLine.height)
+        let next: (y: Double, height: Double)
+        if let line = snappedLine(for: probe, direction: 1, ctx) {
+            next = (line.y, line.height)
+        } else {
+            let step = settings.move > 0 ? settings.move : bottomLine.height
+            next = (bottomLine.y + step, bottomLine.height)
+        }
+        let bottom = min(ctx.screens[r.screenIndex].maxY, next.y + next.height / 2)
+        r.lastLine = next
+        r.height = bottom - top
+        r.y = top + r.height / 2
+        seat(&r, on: nil, ctx)
+    }
+
+    /// Back to a single line: the last one taken in.
+    private func collapse(_ r: inout Ruler, _ ctx: ModeContext) {
+        guard let l = r.lastLine else { return }
+        r.y = l.y
+        r.height = l.height
+        r.lastLine = nil
+        seat(&r, on: nil, ctx)
+    }
+
     /// Place the band on a found line (or keep its position when nil) and work out how
     /// wide it and its dimming are, per `[ruler] width`.
     private func seat(_ r: inout Ruler, on line: (y: Double, height: Double, rect: Rect)?, _ ctx: ModeContext) {
-        if let line { r.y = line.y; r.height = line.height }
+        if let line { r.y = line.y; r.height = line.height; r.lastLine = nil }
         let window = settings.width == .screen ? nil : ctx.services.lines?.window(at: r.x, y: r.y)
         r.dimBounds = window
         switch settings.width {
@@ -248,7 +308,9 @@ public final class RulerMode: Mode {
             Hint(l(s.down) + l(s.up), "move", "↕"),
             Hint(l(s.shrink) + " " + l(s.grow), "height", "⬍"),
             Hint("⇧", "fine", "1px"),
+            Hint(l(s.extend), "extend", "⤵"),
         ]
+        if ruler?.isExtended == true { h.append(Hint(l(s.collapse), "collapse", "⤒")) }
         if ctx.services.lines != nil { h.append(Hint(l(s.snapToggle), snapping ? "☑ lines" : "☐ lines", snapping ? "☑☰" : "☐☰")) }
         h.append(Hint(l(s.remove), "remove", "☰✕"))
         return h
@@ -260,6 +322,8 @@ public final class RulerMode: Mode {
         return [
             (all(s.down) + " / " + all(s.up), "move band down / up a line of text, or by its height (⇧: 1px)"),
             (all(s.grow) + " / " + all(s.shrink), "taller / shorter by \(Int(s.heightStep))px (⇧: 1px)"),
+            (all(s.extend), "extend the band over the next line below (read in blocks)"),
+            (all(s.collapse), "collapse an extended band to its last line"),
             (all(s.snapToggle), "toggle following lines of text"),
             (all(s.remove), "remove band (any mode)"),
         ]
@@ -277,6 +341,6 @@ public final class RulerMode: Mode {
     public var manual: String {
         let s = Settings()
         func keys(_ set: Set<KeyPress>) -> String { set.map(\.label).sorted().joined(separator: ", ") }
-        return "A reading band that dims everything except the line being read. Entering the mode creates it on the line of text under the pointer (sized to the line when the app exposes its text through accessibility, otherwise \(Int(s.height)) px tall); \(keys(s.down)) / \(keys(s.up)) move it a line at a time (or by its height); \(keys(s.shrink)) / \(keys(s.grow)) resize; Shift held makes one-pixel changes; \(keys(s.snapToggle)) toggles following text. Leaving with the toggle or exiting removes the band; switching to another mode (Scroll, say, to scroll the text under a fixed band) keeps it, and \(keys(s.remove)) removes it from any mode."
+        return "A reading band that dims everything except the line being read. Entering the mode creates it on the line of text under the pointer (sized to the line when the app exposes its text through accessibility, otherwise \(Int(s.height)) px tall); \(keys(s.down)) / \(keys(s.up)) move it a line at a time (or by its height); \(keys(s.shrink)) / \(keys(s.grow)) resize; Shift held makes one-pixel changes; \(keys(s.extend)) extends the band over the next line below, for reading in blocks, and \(keys(s.collapse)) collapses it to the last line taken in; \(keys(s.snapToggle)) toggles following text. Leaving with the toggle or exiting removes the band; switching to another mode (Scroll, say, to scroll the text under a fixed band) keeps it, and \(keys(s.remove)) removes it from any mode."
     }
 }

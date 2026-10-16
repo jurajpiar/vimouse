@@ -80,7 +80,9 @@ Escape removes it; Shift+r removes a kept band from any mode. With `[ruler] snap
 reads the lines of text under the pointer's column through the accessibility API: it
 is created on the line under the pointer, sized to it (plus `[ruler] pad`), and j/k
 move it a line at a time, falling back to height steps where no text is found; a
-toggles this in Ruler mode. The band and the dimming span the window holding the
+toggles this in Ruler mode. e extends the band over the next line below (reading
+in blocks), c collapses it back to the last line taken in; moving an extended band
+collapses it first. The band and the dimming span the window holding the
 text (`[ruler] width = "window"`), the whole display (`"screen"`) or the line
 itself (`"line"`), and the pointer rides on the band.
 
