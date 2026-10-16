@@ -857,10 +857,10 @@ final class PluginTests: XCTestCase {
         XCTAssertFalse(e.isActive)                                           // a click leaves, as a click key would
         _ = e.activate(screen: screen)
         // Two-letter labels: a prefix narrows, Backspace widens, no-click variant just moves.
-        els.frames = (0..<12).map { Rect(x: Double($0) * 50, y: 0, width: 40, height: 20) }
+        els.frames = (0..<9).map { Rect(x: Double($0) * 50, y: 0, width: 40, height: 20) } // 3² labels of two letters
         e.apply(try Config.parse("[hints]\nletters = \"abc\"\nclick = false"))
         _ = e.handle(KeyPress(.f))
-        XCTAssertEqual(hints.targets.count, 12)
+        XCTAssertEqual(hints.targets.count, 9)
         XCTAssertEqual(hints.targets[0].label, "aa")
         _ = e.handle(KeyPress(.b))
         XCTAssertEqual(hints.typed, "b")
