@@ -3,18 +3,30 @@ import AppKit
 import ApplicationServices
 import VimouseCore
 
-/// Finds lines of text under a point through the Accessibility API, so the reading band
-/// can sit on real lines. Text views (AppKit, WebKit, Chromium/Electron) answer the
+/// Finds lines of text through the Accessibility API, so the reading band can sit on
+/// real lines. A text element (AppKit, WebKit, Chromium/Electron) answers the
 /// parameterised attributes RangeForPosition, LineForIndex, RangeForLine and
-/// BoundsForRange; a short single-line element (a label, a menu item) counts as a line
-/// too. Every call is bounded by a small time budget so a slow app cannot stall a key.
+/// BoundsForRange, so once a line is found its neighbours come straight from the
+/// element: two calls, no searching. Only at the edge of an element (the next paragraph
+/// in Chromium, where each paragraph is its own node) is the screen probed, starting
+/// just past the element's frame. A short single-line element (a label, a menu item)
+/// counts as a line too. Everything is bounded by a small time budget.
 final class AXLineProvider: LineProvider {
-    var timeBudget: TimeInterval = 0.08
-    /// Vertical probe spacing and reach when looking for the next line.
-    var probeStep: Double = 4
-    var probeReach: Double = 240
+    var timeBudget: TimeInterval = 0.12
+    /// Vertical probe spacing and reach when looking past an element's edge.
+    var probeStep: Double = 6
+    var probeReach: Double = 300
 
     private let systemWide = AXUIElementCreateSystemWide()
+
+    private struct Found {
+        var element: AXUIElement
+        /// The line's index within the element, when the element exposes lines.
+        var line: Int?
+        var rect: Rect
+    }
+    /// The last line handed out, so a move from it needs no fresh hit test.
+    private var last: Found?
 
     init() {
         AXUIElementSetMessagingTimeout(systemWide, 0.05)
@@ -22,21 +34,37 @@ final class AXLineProvider: LineProvider {
 
     func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
         let deadline = Date().addingTimeInterval(timeBudget)
-        let current = line(at: x, y: y, deadline: deadline)
-        if direction == 0 { return current }
-        // Step away from the current line (or the point) until a different line turns up.
-        let sign = Double(direction)
-        var py = current.map { sign > 0 ? $0.maxY : $0.y } ?? y
-        let limit = sign > 0 ? min(screen.maxY, y + probeReach) : max(screen.y, y - probeReach)
-        while Date() < deadline {
-            py += sign * probeStep
-            if sign > 0 ? py > limit : py < limit { return nil }
-            guard let found = line(at: x, y: py, deadline: deadline) else { continue }
-            if let c = current, found.intersects(c) { continue } // still the same line
-            if sign > 0 ? found.midY <= y : found.midY >= y { continue }
-            return found
+        // The caller moves from the line we last returned; reuse it rather than hit-testing.
+        let current: Found?
+        if let l = last, abs(l.rect.midY - y) < 1, x >= l.rect.x - 2, x <= l.rect.maxX + 2 {
+            current = l
+        } else {
+            current = locate(x: x, y: y, deadline: deadline)
         }
-        return nil
+        if direction == 0 {
+            last = current
+            return current?.rect
+        }
+        let sign = Double(direction)
+        if let cur = current {
+            // Inside the element: the neighbouring line by index, skipping blank lines.
+            if let li = cur.line {
+                var i = li + direction
+                for _ in 0..<4 {
+                    guard Date() < deadline, let r = lineBounds(of: cur.element, line: i) else { break }
+                    if r.width > 0, r.height > 0, sign > 0 ? r.midY > cur.rect.midY : r.midY < cur.rect.midY {
+                        last = Found(element: cur.element, line: i, rect: r)
+                        return r
+                    }
+                    i += direction
+                }
+            }
+            // At the element's edge: look just beyond its frame for the next one.
+            let edge = frame(of: cur.element) ?? cur.rect
+            let start = sign > 0 ? max(edge.maxY, cur.rect.maxY) : min(edge.y, cur.rect.y)
+            return probe(x: x, from: start, sign: sign, avoiding: cur.rect, on: screen, deadline: deadline)
+        }
+        return probe(x: x, from: y, sign: sign, avoiding: nil, on: screen, deadline: deadline)
     }
 
     func window(at x: Double, y: Double) -> Rect? {
@@ -48,28 +76,45 @@ final class AXLineProvider: LineProvider {
         return frame(of: win)
     }
 
-    // MARK: One line
+    // MARK: Searching
 
-    private func line(at x: Double, y: Double, deadline: Date) -> Rect? {
-        var ref: AXUIElement?
-        guard AXUIElementCopyElementAtPosition(systemWide, Float(x), Float(y), &ref) == .success, var element = ref else { return nil }
-        // The hit element may be a run inside the text view; climb a little to find the view.
-        for _ in 0..<4 {
-            if Date() > deadline { return nil }
-            if let r = lineFromTextElement(element, x: x, y: y) { return r }
-            guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
-            element = parent
-        }
-        // No text API: a short element of a text-like role is itself one line.
-        let role: String = attribute(ref!, kAXRoleAttribute) ?? ""
-        if ["AXStaticText", "AXMenuItem", "AXLink", "AXCell", "AXRow"].contains(role),
-           let f = frame(of: ref!), f.height > 0, f.height <= 40, f.contains(Point(x: x, y: y)) {
-            return f
+    private func probe(x: Double, from start: Double, sign: Double, avoiding: Rect?, on screen: Rect, deadline: Date) -> Rect? {
+        var py = start
+        let limit = sign > 0 ? min(screen.maxY, start + probeReach) : max(screen.y, start - probeReach)
+        while Date() < deadline {
+            py += sign * probeStep
+            if sign > 0 ? py > limit : py < limit { return nil }
+            guard let found = locate(x: x, y: py, deadline: deadline) else { continue }
+            if let a = avoiding, found.rect.intersects(a) { continue }
+            if sign > 0 ? found.rect.midY <= start : found.rect.midY >= start { continue }
+            last = found
+            return found.rect
         }
         return nil
     }
 
-    private func lineFromTextElement(_ element: AXUIElement, x: Double, y: Double) -> Rect? {
+    private func locate(x: Double, y: Double, deadline: Date) -> Found? {
+        var ref: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(systemWide, Float(x), Float(y), &ref) == .success, let hit = ref else { return nil }
+        AXUIElementSetMessagingTimeout(hit, 0.05)
+        // The hit element may be a run inside the text view; climb a little to find the view.
+        var element = hit
+        for _ in 0..<4 {
+            if Date() > deadline { return nil }
+            if let f = lineFromTextElement(element, x: x, y: y) { return f }
+            guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
+            element = parent
+        }
+        // No text API: a short element of a text-like role is itself one line.
+        let role: String = attribute(hit, kAXRoleAttribute) ?? ""
+        if ["AXStaticText", "AXMenuItem", "AXLink", "AXCell", "AXRow"].contains(role),
+           let f = frame(of: hit), f.height > 0, f.height <= 40, f.contains(Point(x: x, y: y)) {
+            return Found(element: hit, line: nil, rect: f)
+        }
+        return nil
+    }
+
+    private func lineFromTextElement(_ element: AXUIElement, x: Double, y: Double) -> Found? {
         var namesRef: CFArray?
         guard AXUIElementCopyParameterizedAttributeNames(element, &namesRef) == .success,
               let names = namesRef as? [String],
@@ -81,21 +126,34 @@ final class AXLineProvider: LineProvider {
               let hit: CFRange = parameterised(element, kAXRangeForPositionParameterizedAttribute, pointValue, .cfRange)
         else { return nil }
         var range = CFRange(location: hit.location, length: 1)
+        var lineNo: Int?
         // Whole line when the view can say which line the index is on.
         if names.contains(kAXLineForIndexParameterizedAttribute), names.contains(kAXRangeForLineParameterizedAttribute),
-           let lineNo: Int = parameterisedNumber(element, kAXLineForIndexParameterizedAttribute, hit.location),
-           let lineRange: CFRange = parameterisedRange(element, kAXRangeForLineParameterizedAttribute, lineNo) {
+           let n: Int = parameterisedNumber(element, kAXLineForIndexParameterizedAttribute, hit.location),
+           let lineRange: CFRange = parameterisedRange(element, kAXRangeForLineParameterizedAttribute, n) {
             range = lineRange
+            lineNo = n
         }
-        guard let rangeValue = AXValueCreate(.cfRange, &range),
-              let bounds: CGRect = parameterised(element, kAXBoundsForRangeParameterizedAttribute, rangeValue, .cgRect),
-              bounds.height > 0, bounds.height <= 120, bounds.width > 0
-        else { return nil }
-        let r = Rect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: bounds.height)
+        guard let r = bounds(of: element, range: range), r.width > 0 else { return nil }
         // The view answered with a line; make sure it is the one under the point (some views
         // return the nearest line for a point in the margin, which is fine; a far one is not).
         guard abs(r.midY - y) <= r.height * 1.5 + 4 else { return nil }
-        return r
+        return Found(element: element, line: lineNo, rect: r)
+    }
+
+    /// Bounds of line `n` of an element that exposes lines; nil past the last line.
+    private func lineBounds(of element: AXUIElement, line n: Int) -> Rect? {
+        guard n >= 0, let range: CFRange = parameterisedRange(element, kAXRangeForLineParameterizedAttribute, n) else { return nil }
+        return bounds(of: element, range: range)
+    }
+
+    private func bounds(of element: AXUIElement, range: CFRange) -> Rect? {
+        var r = range
+        guard let rangeValue = AXValueCreate(.cfRange, &r),
+              let b: CGRect = parameterised(element, kAXBoundsForRangeParameterizedAttribute, rangeValue, .cgRect),
+              b.height > 0, b.height <= 120
+        else { return nil }
+        return Rect(x: b.minX, y: b.minY, width: b.width, height: b.height)
     }
 
     // MARK: AX helpers
