@@ -112,6 +112,8 @@ AX snapping, to verify on real apps: native (Finder, System Settings), Safari/Ch
 
 2026-10-16: config file implemented (~/.config/vimouse/config.toml, written with comments on first run, hot reload, TOML-subset parser in Core with tests). Shan: drag/drop (v) will need work; parked, intent recorded alongside the ruler.
 
+2026-10-16: Phase 1 closed (Nudge mode, hold-? map, config file with schema-driven defaults, migration and comments). Drag reworked: a flag orthogonal to mode (over-mode, not a sub-mode); starting a drag restarts the quadrant search; platform posts a short drag ramp so apps start a drag-and-drop session; Escape cancels a drag via a synthetic Escape (marked so our tap ignores it) and releases at the origin; drag badge and origin line in every mode. Ruler: moves by its own height ([ruler] step superseded by move), Shift = 1 px fine moves.
+
 Open: none.
 
 ## Sources

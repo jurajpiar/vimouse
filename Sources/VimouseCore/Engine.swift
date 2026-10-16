@@ -12,6 +12,8 @@ public enum Effect: Equatable, Sendable {
     case click(MouseButton, count: Int, modifiers: Modifiers)
     case mouseDown(MouseButton)
     case mouseUp(MouseButton)
+    /// Abandon a drag: tell the system to cancel it and release the button back at the origin.
+    case cancelDrag(origin: Point)
     /// Pixels. Positive dy reveals content below (like vim's j), positive dx content to the right.
     case scroll(dx: Double, dy: Double)
 }
@@ -59,8 +61,9 @@ public final class PointerEngine {
     /// All displays (CG coordinates) and which one the session is on.
     public private(set) var screens: [Rect] = []
     public private(set) var screenIndex: Int = 0
-    /// Left button currently held by a `v` drag.
+    /// Left button currently held by a `v` drag, and where it was pressed.
     public private(set) var dragging = false
+    public private(set) var dragOrigin: Point?
     /// vi-style count prefix typed so far; nil when none. Consumed by the next command.
     public private(set) var pendingCount: Int?
     /// The reading band, if one is shown. Survives deactivation.
@@ -144,6 +147,7 @@ public final class PointerEngine {
         var fx: [Effect] = []
         if dragging {
             dragging = false
+            dragOrigin = nil
             fx.append(.mouseUp(.left))
         }
         fx.append(ruler == nil ? .hideOverlay : .redraw)
@@ -180,7 +184,15 @@ public final class PointerEngine {
         // Shared across modes.
         if keymap.exit.contains(key) {
             // As in vi, Escape with a count pending only cancels the count.
-            return count == nil ? deactivate() : [.redraw]
+            if count != nil { return [.redraw] }
+            // During a drag, Escape abandons the drag and stays in the mode.
+            if dragging, let origin = dragOrigin {
+                dragging = false
+                dragOrigin = nil
+                target = origin
+                return [.cancelDrag(origin: origin), .redraw]
+            }
+            return deactivate()
         }
         if keymap.scrollToggle.contains(key) {
             state = .active(mode: mode == .scroll ? .pointer : .scroll, session: s)
@@ -208,7 +220,15 @@ public final class PointerEngine {
         }
         if keymap.dragToggle.contains(key) {
             dragging.toggle()
-            return [dragging ? .mouseDown(.left) : .mouseUp(.left), .redraw]
+            if dragging {
+                dragOrigin = target
+                // The task is now "where to drop": restart the quadrant search from the whole
+                // screen, pointer staying where it is.
+                if mode == .pointer { state = .active(mode: .pointer, session: BisectSession(root: screens[screenIndex])) }
+                return [.mouseDown(.left), .redraw]
+            }
+            dragOrigin = nil
+            return [.mouseUp(.left), .redraw]
         }
         if let fx = clickEffects(for: key, count: count) { return fx }
         if keymap.snapToggle.contains(key), mode == .pointer {
@@ -302,6 +322,7 @@ public final class PointerEngine {
         if dragging {
             // A click while dragging ends the drag at the current spot.
             dragging = false
+            dragOrigin = nil
             fx.append(.mouseUp(.left))
         } else {
             fx.append(.click(button, count: count, modifiers: mods))
@@ -367,7 +388,7 @@ public final class PointerEngine {
         }
         if screens.count > 1 { h.append((l(k.nextScreen) + " / n" + l(k.nextScreen), "screen")) }
         h.append((l(k.help), "help"))
-        h.append((l(k.exit), pendingCount == nil ? "exit" : "cancel count"))
+        h.append((l(k.exit), pendingCount != nil ? "cancel count" : (dragging ? "cancel drag" : "exit")))
         return h
     }
 

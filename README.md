@@ -20,8 +20,10 @@ keys valid at any moment. Defaults:
 Pointer: i/o/j/k pick a quadrant, Backspace or u goes up a level. Return or m
 left-clicks and exits, Space clicks and stays, x double-clicks, . right-clicks,
 , middle-clicks. Hold Shift, Cmd or Option with any click key to pass the modifier
-into the click. v presses the left button (drag or select); navigate, then v again
-releases. s enters Scroll mode. a toggles snapping: when on (the default), each
+into the click. v presses the left button (drag or select) and restarts the
+quadrant search from the whole screen; navigate (any mode, any display), then v
+or Return releases. Escape during a drag cancels it and returns the pointer to
+where the button went down. s enters Scroll mode. a toggles snapping: when on (the default), each
 step sends the pointer to the nearest clickable element inside the chosen rectangle
 (read from the frontmost app's accessibility tree) instead of its centre; a pink
 ring marks the snap target. Escape exits (releasing any drag).

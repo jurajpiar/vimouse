@@ -53,6 +53,10 @@ final class InputTap {
             if let port = tap.port { CGEvent.tapEnable(tap: port, enable: true) }
             return Unmanaged.passUnretained(event)
         case .keyDown, .keyUp:
+            // Our own synthetic events (a cancel-drag Escape) pass through untouched.
+            if event.getIntegerValueField(.eventSourceUserData) == Pointer.syntheticMarker {
+                return Unmanaged.passUnretained(event)
+            }
             let code = KeyCode(rawValue: UInt16(event.getIntegerValueField(.keyboardEventKeycode)))
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             let key = KeyPress(code, InputTap.modifiers(from: event.flags))

@@ -82,10 +82,16 @@ final class Controller {
                 Pointer.warp(to: p, dragging: engine.dragging)
             case .click(let button, let count, let modifiers):
                 Pointer.click(button, count: count, modifiers: modifiers, at: Pointer.currentLocation)
+            case .mouseDown(.left):
+                Pointer.startDrag(at: Pointer.currentLocation)
+            case .mouseUp(.left):
+                Pointer.endDrag(at: Pointer.currentLocation)
             case .mouseDown(let button):
                 Pointer.mouseDown(button, at: Pointer.currentLocation)
             case .mouseUp(let button):
                 Pointer.mouseUp(button, at: Pointer.currentLocation)
+            case .cancelDrag(let origin):
+                Pointer.cancelDrag(origin: origin)
             case .scroll(let dx, let dy):
                 Pointer.scroll(dx: dx, dy: dy)
             }
@@ -105,6 +111,7 @@ final class Controller {
                 ancestors: Array(s.ancestors),
                 labels: labels,
                 dragging: engine.dragging,
+                dragOrigin: engine.dragOrigin,
                 pendingCount: engine.pendingCount,
                 target: engine.target,
                 snapping: engine.snapping,

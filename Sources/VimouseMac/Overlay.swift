@@ -9,6 +9,7 @@ struct PointerModel {
     var ancestors: [Rect]
     var labels: [Quadrant: String]
     var dragging: Bool
+    var dragOrigin: Point?
     var pendingCount: Int?
     /// Where the pointer was sent; drawn when it differs from the rectangle centre (a snap).
     var target: Point
@@ -175,6 +176,20 @@ final class OverlayView: NSView {
             break // the band itself is the feedback
         }
 
+        // A drag in progress: line from where the button went down to the pointer.
+        if p.dragging, let o = p.dragOrigin {
+            let a = Coordinates.localRect(Rect(x: o.x, y: o.y, width: 0, height: 0), inWindow: windowFrame).origin
+            let b = Coordinates.localRect(Rect(x: p.target.x, y: p.target.y, width: 0, height: 0), inWindow: windowFrame).origin
+            let line = NSBezierPath()
+            line.move(to: a); line.line(to: b)
+            line.lineWidth = 2
+            line.setLineDash([6, 4], count: 2, phase: 0)
+            NSColor.systemGreen.setStroke()
+            line.stroke()
+            NSColor.systemGreen.setFill()
+            NSBezierPath(ovalIn: NSRect(x: a.x - 5, y: a.y - 5, width: 10, height: 10)).fill()
+        }
+
         drawStatusStrip(p, colour: colour, awayFrom: cur)
         if let help = p.help { drawHelp(help, colour: colour) }
     }
@@ -253,8 +268,9 @@ final class OverlayView: NSView {
         case .scroll: modeName = "SCROLL"
         case .ruler: modeName = "RULER"
         case .nudge: modeName = "NUDGE"
-        case .pointer: modeName = p.dragging ? "DRAG" : "POINTER"
+        case .pointer: modeName = "POINTER"
         }
+        let dragBadge = p.dragging ? "DRAG · " : ""
         let text = NSMutableAttributedString()
         let keyAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.white,
@@ -262,6 +278,11 @@ final class OverlayView: NSView {
         let actionAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.white.withAlphaComponent(0.75),
         ]
+        if p.dragging {
+            text.append(NSAttributedString(string: dragBadge, attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.systemGreen,
+            ]))
+        }
         text.append(NSAttributedString(string: modeName, attributes: keyAttrs))
         if let c = p.pendingCount {
             text.append(NSAttributedString(string: " \(c)", attributes: [

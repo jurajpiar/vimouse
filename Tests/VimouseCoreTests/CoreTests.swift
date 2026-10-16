@@ -307,11 +307,31 @@ final class EngineTests: XCTestCase {
         XCTAssertTrue(e.isActive)
     }
 
-    func testEscapeWhileDraggingReleasesButton() {
+    func testDragRestartsSearchAndEscapeCancels() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.i)); _ = e.handle(KeyPress(.i)) // depth 2, target (125,75)
+        XCTAssertEqual(e.handle(KeyPress(.v)), [.mouseDown(.left), .redraw])
+        XCTAssertEqual(e.session?.depth, 0)             // search restarted from the whole screen
+        XCTAssertEqual(e.target, Point(x: 125, y: 75))   // pointer did not move
+        XCTAssertEqual(e.dragOrigin, Point(x: 125, y: 75))
+        _ = e.handle(KeyPress(.k))                        // drag towards bottom-right
+        _ = e.handle(KeyPress(.s))                        // scrolling while dragging is allowed
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scroll(dx: 0, dy: 60)])
+        XCTAssertTrue(e.dragging)
+        // Escape abandons the drag, returns the pointer to the origin, and stays active.
+        XCTAssertEqual(e.handle(KeyPress(.escape)), [.cancelDrag(origin: Point(x: 125, y: 75)), .redraw])
+        XCTAssertFalse(e.dragging)
+        XCTAssertTrue(e.isActive)
+        XCTAssertEqual(e.target, Point(x: 125, y: 75))
+        XCTAssertEqual(e.handle(KeyPress(.escape)), [.hideOverlay])
+    }
+
+    func testDeactivateWhileDraggingReleasesButton() {
         let e = PointerEngine()
         _ = e.activate(screen: screen)
         _ = e.handle(KeyPress(.v))
-        XCTAssertEqual(e.handle(KeyPress(.escape)), [.mouseUp(.left), .hideOverlay])
+        XCTAssertEqual(e.deactivate(), [.mouseUp(.left), .hideOverlay])
         XCTAssertFalse(e.dragging)
     }
 
