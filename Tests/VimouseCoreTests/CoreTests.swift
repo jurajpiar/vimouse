@@ -57,11 +57,12 @@ final class ConfigTests: XCTestCase {
         let c = try Config.parse("""
         [hotkey]
         activate = "ctrl+alt+m"
-        [keys]
+        [pointer]
         top_left = "q"
         top_right = "w"
         bottom_left = "a"
         bottom_right = "s"
+        [actions]
         left_click = "space"
         [scroll]
         step = 24
@@ -81,8 +82,8 @@ final class ConfigTests: XCTestCase {
     }
 
     func testErrors() {
-        XCTAssertThrowsError(try Config.parse("[keys]\ntop_left = \"q\""))      // incomplete quadrants
-        XCTAssertThrowsError(try Config.parse("[keys]\nexit = \"hyper+q\""))     // unknown modifier
+        XCTAssertThrowsError(try Config.parse("[pointer]\ntop_left = \"q\""))      // incomplete quadrants
+        XCTAssertThrowsError(try Config.parse("[global]\nexit = \"hyper+q\""))     // unknown modifier
         XCTAssertThrowsError(try Config.parse("[scroll]\nstep = \"fast\""))     // wrong type
         XCTAssertThrowsError(try Config.parse("garbage"))                         // not TOML
     }
@@ -90,7 +91,7 @@ final class ConfigTests: XCTestCase {
     func testMigrationAddsMissingAndCommentsUnknown() throws {
         let old = """
         # my notes
-        [keys]
+        [pointer]
         top_left = "q"
         top_right = "w"
         bottom_left = "a"
@@ -102,7 +103,7 @@ final class ConfigTests: XCTestCase {
         let (text, changed) = ConfigSchema.migrate(old)
         XCTAssertTrue(changed)
         XCTAssertTrue(text.contains("# my notes"))
-        XCTAssertTrue(text.contains("# Bindings inside Pointer mode"))      // section description added
+        XCTAssertTrue(text.contains("# Pointer mode: narrowing down"))      // section description added
         XCTAssertTrue(text.contains("# Pick the top-left quadrant, e.g. \"i\", \"up\".\ntop_left = \"q\"")) // comment for an existing key
         XCTAssertTrue(text.contains("top_left = \"q\""))                 // user value kept
         XCTAssertTrue(text.contains("ignored (see CHANGELOG.md in the vimouse repository): mystery = 1"))
@@ -111,6 +112,15 @@ final class ConfigTests: XCTestCase {
         let (t2, _) = ConfigSchema.migrate("[ruler]\nstep = 20\n")
         XCTAssertTrue(t2.contains("# superseded by `move` (0 = the band's own height), ignored (see CHANGELOG.md in the vimouse repository): step = 20"))
         XCTAssertTrue(t2.contains("\nmove = 0"))
+        // A renamed setting carries its value to the new place.
+        let (t3, _) = ConfigSchema.migrate("[keys]\nleft_click = \"space\"\nexit = \"q\"\n")
+        XCTAssertTrue(t3.contains("# moved to [actions] left_click (see CHANGELOG.md in the vimouse repository): left_click = \"space\""))
+        XCTAssertTrue(t3.contains("\nleft_click = \"space\"\n"))
+        XCTAssertTrue(t3.contains("\nexit = \"q\"\n"))
+        let c3 = try Config.parse(t3)
+        XCTAssertEqual(c3.keymap.leftClick, [KeyPress(.space)])
+        XCTAssertEqual(c3.keymap.exit, [KeyPress(.q)])
+        XCTAssertFalse(ConfigSchema.migrate(t3).changed)
         XCTAssertTrue(text.contains("# Darkening outside the band"))      // with its comment
         let c = try Config.parse(text)
         XCTAssertEqual(c.scrollStep, 24)

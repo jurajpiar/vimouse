@@ -59,27 +59,27 @@ public struct Config: Equatable {
         var quadrants: [KeyPress: Quadrant] = [:]
         let qNames: [(String, Quadrant)] = [("top_left", .topLeft), ("top_right", .topRight), ("bottom_left", .bottomLeft), ("bottom_right", .bottomRight)]
         for (name, q) in qNames {
-            if let p = try one("keys", name) { quadrants[p] = q }
+            if let p = try one("pointer", name) { quadrants[p] = q }
         }
         if !quadrants.isEmpty {
-            guard quadrants.count == 4 else { throw ParseError(description: "[keys]: all four quadrant keys must be set and distinct") }
+            guard quadrants.count == 4 else { throw ParseError(description: "[pointer]: all four quadrant keys must be set and distinct") }
             k.quadrants = quadrants
         }
-        if let v = try keys("keys", "up") { k.up = v }
-        if let v = try keys("keys", "top") { k.top = v }
-        if let v = try keys("keys", "left_click") { k.leftClick = v }
-        if let v = try keys("keys", "click_stay") { k.clickStay = v }
-        if let v = try keys("keys", "double_click") { k.doubleClick = v }
-        if let v = try keys("keys", "right_click") { k.rightClick = v }
-        if let v = try keys("keys", "middle_click") { k.middleClick = v }
-        if let v = try keys("keys", "drag") { k.dragToggle = v }
-        if let v = try keys("keys", "exit") { k.exit = v }
-        if let v = try keys("keys", "next_screen") { k.nextScreen = v }
-        if let v = try keys("keys", "previous_screen") { k.previousScreen = v }
-        if let v = try keys("keys", "snap_toggle") { k.snapToggle = v }
-        if let v = try keys("keys", "scroll_toggle") { k.scrollToggle = v }
-        if let v = try keys("keys", "ruler_toggle") { k.rulerToggle = v }
-        if let v = try keys("keys", "ruler_remove") { k.rulerRemove = v }
+        if let v = try keys("pointer", "up") { k.up = v }
+        if let v = try keys("pointer", "top") { k.top = v }
+        if let v = try keys("actions", "left_click") { k.leftClick = v }
+        if let v = try keys("actions", "click_stay") { k.clickStay = v }
+        if let v = try keys("actions", "double_click") { k.doubleClick = v }
+        if let v = try keys("actions", "right_click") { k.rightClick = v }
+        if let v = try keys("actions", "middle_click") { k.middleClick = v }
+        if let v = try keys("actions", "drag") { k.dragToggle = v }
+        if let v = try keys("global", "exit") { k.exit = v }
+        if let v = try keys("global", "next_screen") { k.nextScreen = v }
+        if let v = try keys("global", "previous_screen") { k.previousScreen = v }
+        if let v = try keys("pointer", "snap_toggle") { k.snapToggle = v }
+        if let v = try keys("scroll", "toggle") { k.scrollToggle = v }
+        if let v = try keys("ruler", "toggle") { k.rulerToggle = v }
+        if let v = try keys("ruler", "remove") { k.rulerRemove = v }
 
         if let v = try number("scroll", "step") { c.scrollStep = v }
         if let v = try keys("scroll", "down") { k.scrollDown = v }
@@ -99,7 +99,7 @@ public struct Config: Equatable {
         if let v = try keys("ruler", "grow") { k.rulerGrow = v }
         if let v = try keys("ruler", "shrink") { k.rulerShrink = v }
 
-        if let v = try keys("keys", "help") { k.help = v }
+        if let v = try keys("global", "help") { k.help = v }
         if let v = try number("nudge", "step") { c.nudgeStep = max(1, v) }
         if let v = try keys("nudge", "toggle") { k.nudgeToggle = v }
         if let v = try keys("nudge", "left") { k.nudgeLeft = v }

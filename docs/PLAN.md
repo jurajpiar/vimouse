@@ -104,15 +104,13 @@ Accessibility permission flow and revocation hang (mitigation in section 4). Sec
 
 Phase 1 remaining: Nudge sub-mode, hold-? key map, config file. Phase 3 (ruler) may be pulled forward since it serves the reading goal directly.
 
-2026-10-16: vi-style count prefix (digits scale/repeat the next command; n⇥ picks a screen) and AX snapping ('a' toggles, on by default) implemented.
+2026-10-16: config `[keys]` split into `[pointer]`, `[actions]`, `[global]` and per-mode toggles; migration gained value-carrying renames. Drag ramp turned off by default (it broke text drags in Chromium apps).
 
-AX snapping, to verify on real apps: native (Finder, System Settings), Safari/Chrome (large trees; walk capped at 1500 elements / 150 ms so heavy pages may be partly covered), Electron (VS Code, Slack). Watch for activation lag (the walk runs on ⌘⇧Space; fix is a background walk applied when done) and for the pink ring landing on non-targets (a role to drop from AXSnapper.clickableRoles). Known side effect: setting AXEnhancedUserInterface on Chromium apps can disable their window animations while vimouse runs, as with Homerow and Vimac.
+Parked ideas, recorded on Shan's request:
 
-2026-10-16: Ruler mode v1 implemented (persistent band, dimming, j/k, [ ], R removes). Shan: it works but needs more work; parked for later. Intent to return to: tune defaults (band height, step, dim level, scroll step near line height), consider dimming only the frontmost window, and the planned AX text-line snapping so the band follows real lines. Next: config file (ruler/scroll parameters are the first entries), then Nudge, hold-? map, then Phase 2 robustness (permission revocation, secure input).
+Half-split navigation. Shan's proposal: show the rectangle split one way (top/bottom), up/down picks a half, left/right flips the split to vertical. Counter-proposal: each arrow halves along its own axis (up = top half, left = left half, and so on), both split lines drawn faintly, no orientation state; same cost (1 bit per press, about 15 presses to 10 px) but bits go where needed. Would live inside Pointer mode as a second key set (`[pointer] half_*`). Undecided.
 
-2026-10-16: config file implemented (~/.config/vimouse/config.toml, written with comments on first run, hot reload, TOML-subset parser in Core with tests). Shan: drag/drop (v) will need work; parked, intent recorded alongside the ruler.
-
-2026-10-16: Phase 1 closed (Nudge mode, hold-? map, config file with schema-driven defaults, migration and comments). Drag reworked: a flag orthogonal to mode (over-mode, not a sub-mode); starting a drag restarts the quadrant search; platform posts a short drag ramp so apps start a drag-and-drop session; Escape cancels a drag via a synthetic Escape (marked so our tap ignores it) and releases at the origin; drag badge and origin line in every mode. Ruler: moves by its own height ([ruler] step superseded by move), Shift = 1 px fine moves.
+Mode plugins. Modes behind a `Mode` protocol (keys handled, effects, hints, help, overlay contribution, own config section or `~/.config/vimouse/<mode>.toml`), a registry, `[modes] enabled = [...]`, and the config able to name a plugin. Caveat: runtime-loaded compiled Swift plugins need a stable ABI between app and plugin, which Swift only guarantees within one toolchain; realistic routes are modules compiled into the app and toggled in config, or a scripting layer (Lua) for user-written modes. The refactor towards the protocol is worth doing before Phase 6 (vim-mode foundations) regardless of loading mechanism.
 
 Open: none.
 
