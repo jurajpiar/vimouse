@@ -166,12 +166,13 @@ final class AXLineProvider: LineProvider {
         // Web content (WebKit, Chromium): lines through text markers, answered by the
         // hit element or one of its ancestors (the web area at the latest).
         element = hit
-        for _ in 0..<12 {
+        for _ in 0..<40 {
             if Date() > deadline { return nil }
             if let f = lineFromMarkers(element, x: x, y: y) { return f }
             guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
             element = parent
         }
+        if debug { dump(hit) }
         // No text API: a short element of a text-like role is itself one line.
         let role: String = attribute(hit, kAXRoleAttribute) ?? ""
         if ["AXStaticText", "AXMenuItem", "AXLink", "AXCell", "AXRow"].contains(role),
@@ -210,11 +211,21 @@ final class AXLineProvider: LineProvider {
         return Found(element: element, line: lineNo, rect: r)
     }
 
+    /// Debug: the hit element and its ancestors, with the parameterised attributes each offers.
+    private func dump(_ hit: AXUIElement) {
+        var element = hit
+        for depth in 0..<40 {
+            let role: String = attribute(element, kAXRoleAttribute) ?? "?"
+            var namesRef: CFArray?
+            let names = AXUIElementCopyParameterizedAttributeNames(element, &namesRef) == .success ? (namesRef as? [String] ?? []) : []
+            let f = frame(of: element).map { "\(Int($0.x)),\(Int($0.y)) \(Int($0.width))x\(Int($0.height))" } ?? "no frame"
+            NSLog("vimouse ruler:   [%d] %@ %@ params: %@", depth, role, f, names.joined(separator: " "))
+            guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
+            element = parent
+        }
+    }
+
     private func lineFromMarkers(_ element: AXUIElement, x: Double, y: Double) -> Found? {
-        var namesRef: CFArray?
-        guard AXUIElementCopyParameterizedAttributeNames(element, &namesRef) == .success,
-              let names = namesRef as? [String], names.contains(Marker.forPosition), names.contains(Marker.lineRange)
-        else { return nil }
         var point = CGPoint(x: x, y: y)
         guard let pointValue = AXValueCreate(.cgPoint, &point),
               let marker = markerValue(element, Marker.forPosition, pointValue),
