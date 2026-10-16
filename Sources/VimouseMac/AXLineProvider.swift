@@ -30,6 +30,21 @@ final class AXLineProvider: LineProvider {
         /// The element answers RangeForPosition / BoundsForRange (a text node), as opposed
         /// to a plain single-line element matched by role.
         var textAPI = true
+        /// Text-marker based lines (WebKit, Chromium): the line's marker range and the
+        /// element that answers marker queries.
+        var markerRange: AnyObject?
+        var markerHost: AXUIElement?
+    }
+
+    /// Text-marker parameterised attributes (WebKit and Chromium web content).
+    private enum Marker {
+        static let forPosition = "AXTextMarkerForPosition"
+        static let lineRange = "AXLineTextMarkerRangeForTextMarker"
+        static let bounds = "AXBoundsForTextMarkerRange"
+        static let next = "AXNextTextMarkerForTextMarker"
+        static let previous = "AXPreviousTextMarkerForTextMarker"
+        static let rangeStart = "AXStartTextMarkerForTextMarkerRange"
+        static let rangeEnd = "AXEndTextMarkerForTextMarkerRange"
     }
     /// The last line handed out, so a move from it needs no fresh hit test.
     private var last: Found?
@@ -65,6 +80,23 @@ final class AXLineProvider: LineProvider {
                         return r
                     }
                     i += direction
+                }
+            } else if let host = cur.markerHost, let range = cur.markerRange {
+                // Web content: walk the text markers to the neighbouring line.
+                var r: AnyObject = range
+                for _ in 0..<6 {
+                    guard Date() < deadline,
+                          let edgeMarker = markerValue(host, sign > 0 ? Marker.rangeEnd : Marker.rangeStart, r),
+                          let step = markerValue(host, sign > 0 ? Marker.next : Marker.previous, edgeMarker),
+                          let nextRange = markerValue(host, Marker.lineRange, step)
+                    else { break }
+                    r = nextRange
+                    if let b = markerBounds(host, nextRange), b.width > 0, b.height > 0,
+                       sign > 0 ? b.midY > cur.rect.midY : b.midY < cur.rect.midY {
+                        last = Found(element: cur.element, line: nil, rect: b, markerRange: nextRange, markerHost: host)
+                        log("next by marker: \(b)")
+                        return b
+                    }
                 }
             } else if cur.textAPI {
                 // Lines not indexed (Chromium text nodes): ask the same element for the
@@ -131,6 +163,15 @@ final class AXLineProvider: LineProvider {
             guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
             element = parent
         }
+        // Web content (WebKit, Chromium): lines through text markers, answered by the
+        // hit element or one of its ancestors (the web area at the latest).
+        element = hit
+        for _ in 0..<12 {
+            if Date() > deadline { return nil }
+            if let f = lineFromMarkers(element, x: x, y: y) { return f }
+            guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
+            element = parent
+        }
         // No text API: a short element of a text-like role is itself one line.
         let role: String = attribute(hit, kAXRoleAttribute) ?? ""
         if ["AXStaticText", "AXMenuItem", "AXLink", "AXCell", "AXRow"].contains(role),
@@ -167,6 +208,38 @@ final class AXLineProvider: LineProvider {
         // Without line indexing the bounds are one character's; take the element's width.
         if lineNo == nil, let f = frame(of: element) { r.x = f.x; r.width = f.width }
         return Found(element: element, line: lineNo, rect: r)
+    }
+
+    private func lineFromMarkers(_ element: AXUIElement, x: Double, y: Double) -> Found? {
+        var namesRef: CFArray?
+        guard AXUIElementCopyParameterizedAttributeNames(element, &namesRef) == .success,
+              let names = namesRef as? [String], names.contains(Marker.forPosition), names.contains(Marker.lineRange)
+        else { return nil }
+        var point = CGPoint(x: x, y: y)
+        guard let pointValue = AXValueCreate(.cgPoint, &point),
+              let marker = markerValue(element, Marker.forPosition, pointValue),
+              let range = markerValue(element, Marker.lineRange, marker),
+              let b = markerBounds(element, range), b.width > 0
+        else { return nil }
+        guard abs(b.midY - y) <= b.height * 1.5 + 4 else { return nil }
+        return Found(element: element, line: nil, rect: b, markerRange: range, markerHost: element)
+    }
+
+    /// A parameterised attribute whose value is an opaque text marker or marker range.
+    private func markerValue(_ element: AXUIElement, _ name: String, _ param: AnyObject) -> AnyObject? {
+        var out: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element, name as CFString, param, &out) == .success else { return nil }
+        return out
+    }
+
+    private func markerBounds(_ element: AXUIElement, _ range: AnyObject) -> Rect? {
+        var out: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element, Marker.bounds as CFString, range, &out) == .success,
+              let v = out, CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
+        var r = CGRect.zero
+        // swiftlint:disable:next force_cast
+        guard AXValueGetValue(v as! AXValue, .cgRect, &r), r.height > 0, r.height <= 120 else { return nil }
+        return Rect(x: r.minX, y: r.minY, width: r.width, height: r.height)
     }
 
     /// Bounds of line `n` of an element that exposes lines; nil past the last line.
