@@ -14,6 +14,8 @@ struct PointerModel {
     var target: Point
     var snapping: Bool
     var hints: [(key: String, action: String)]
+    /// Non-nil while the help key is held.
+    var help: [(title: String, rows: [(keys: String, action: String)])]?
 }
 
 struct RulerModel {
@@ -91,6 +93,7 @@ final class OverlayView: NSView {
         switch p.mode {
         case .scroll: return .systemOrange
         case .ruler: return .systemPurple
+        case .nudge: return .systemTeal
         case .pointer: return p.dragging ? .systemGreen : .systemBlue
         }
     }
@@ -159,11 +162,21 @@ final class OverlayView: NSView {
             ring.lineWidth = 3
             colour.setStroke()
             ring.stroke()
+        case .nudge:
+            // Crosshair at the pointer.
+            let t = toLocal(Rect(x: p.target.x - 12, y: p.target.y - 12, width: 24, height: 24))
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: t.minX, y: t.midY)); path.line(to: NSPoint(x: t.maxX, y: t.midY))
+            path.move(to: NSPoint(x: t.midX, y: t.minY)); path.line(to: NSPoint(x: t.midX, y: t.maxY))
+            path.lineWidth = 2
+            colour.setStroke()
+            path.stroke()
         case .ruler:
             break // the band itself is the feedback
         }
 
         drawStatusStrip(p, colour: colour, awayFrom: cur)
+        if let help = p.help { drawHelp(help, colour: colour) }
     }
 
     private func drawRuler(_ ruler: RulerModel, screen: Rect, toLocal: (Rect) -> NSRect, adjusting: Bool) {
@@ -200,6 +213,38 @@ final class OverlayView: NSView {
         s.draw(at: NSPoint(x: rect.midX - sz.width / 2, y: rect.midY - sz.height / 2))
     }
 
+    /// Full key map in the middle of the screen while the help key is held.
+    private func drawHelp(_ help: [(title: String, rows: [(keys: String, action: String)])], colour: NSColor) {
+        let title: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .bold), .foregroundColor: NSColor.white]
+        let keys: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.white]
+        let action: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.white.withAlphaComponent(0.8)]
+        let keyColumn: CGFloat = 170
+        let lineH: CGFloat = 18
+        var lines: [(NSAttributedString, NSAttributedString?)] = []
+        for (i, g) in help.enumerated() {
+            if i > 0 { lines.append((NSAttributedString(string: ""), nil)) }
+            lines.append((NSAttributedString(string: g.title, attributes: title), nil))
+            for r in g.rows {
+                lines.append((NSAttributedString(string: r.keys, attributes: keys), NSAttributedString(string: r.action, attributes: action)))
+            }
+        }
+        let width: CGFloat = 640
+        let height = CGFloat(lines.count) * lineH + 24
+        let box = NSRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2, width: width, height: height)
+        NSColor.black.withAlphaComponent(0.85).setFill()
+        NSBezierPath(roundedRect: box, xRadius: 10, yRadius: 10).fill()
+        colour.setStroke()
+        let border = NSBezierPath(roundedRect: box, xRadius: 10, yRadius: 10)
+        border.lineWidth = 2
+        border.stroke()
+        var y = box.maxY - 12 - lineH
+        for (left, right) in lines {
+            left.draw(at: NSPoint(x: box.minX + 16, y: y))
+            right?.draw(at: NSPoint(x: box.minX + 16 + keyColumn, y: y))
+            y -= lineH
+        }
+    }
+
     /// One line: mode name, then "key action" pairs. Placed at the bottom edge unless
     /// the current rectangle is in the lower half, then at the top, so it never covers the target.
     private func drawStatusStrip(_ p: PointerModel, colour: NSColor, awayFrom target: NSRect) {
@@ -207,6 +252,7 @@ final class OverlayView: NSView {
         switch p.mode {
         case .scroll: modeName = "SCROLL"
         case .ruler: modeName = "RULER"
+        case .nudge: modeName = "NUDGE"
         case .pointer: modeName = p.dragging ? "DRAG" : "POINTER"
         }
         let text = NSMutableAttributedString()

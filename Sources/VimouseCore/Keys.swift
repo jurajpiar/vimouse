@@ -105,6 +105,12 @@ public struct KeyMap: Sendable, Equatable {
     public var rulerUp: Set<KeyPress>
     public var rulerGrow: Set<KeyPress>
     public var rulerShrink: Set<KeyPress>
+    public var nudgeToggle: Set<KeyPress>
+    public var nudgeLeft: Set<KeyPress>
+    public var nudgeRight: Set<KeyPress>
+    public var nudgeUp: Set<KeyPress>
+    public var nudgeDown: Set<KeyPress>
+    public var help: Set<KeyPress>
 
     public init(
         activate: KeyPress,
@@ -133,7 +139,13 @@ public struct KeyMap: Sendable, Equatable {
         rulerDown: Set<KeyPress> = [],
         rulerUp: Set<KeyPress> = [],
         rulerGrow: Set<KeyPress> = [],
-        rulerShrink: Set<KeyPress> = []
+        rulerShrink: Set<KeyPress> = [],
+        nudgeToggle: Set<KeyPress> = [],
+        nudgeLeft: Set<KeyPress> = [],
+        nudgeRight: Set<KeyPress> = [],
+        nudgeUp: Set<KeyPress> = [],
+        nudgeDown: Set<KeyPress> = [],
+        help: Set<KeyPress> = []
     ) {
         self.activate = activate
         self.quadrants = quadrants
@@ -162,6 +174,12 @@ public struct KeyMap: Sendable, Equatable {
         self.rulerUp = rulerUp
         self.rulerGrow = rulerGrow
         self.rulerShrink = rulerShrink
+        self.nudgeToggle = nudgeToggle
+        self.nudgeLeft = nudgeLeft
+        self.nudgeRight = nudgeRight
+        self.nudgeUp = nudgeUp
+        self.nudgeDown = nudgeDown
+        self.help = help
     }
 
     public static let `default` = KeyMap(
@@ -199,7 +217,13 @@ public struct KeyMap: Sendable, Equatable {
         rulerDown: [KeyPress(.j)],
         rulerUp: [KeyPress(.k)],
         rulerGrow: [KeyPress(.rightBracket)],
-        rulerShrink: [KeyPress(.leftBracket)]
+        rulerShrink: [KeyPress(.leftBracket)],
+        nudgeToggle: [KeyPress(.n)],
+        nudgeLeft: [KeyPress(.h), KeyPress(.leftArrow)],
+        nudgeRight: [KeyPress(.l), KeyPress(.rightArrow)],
+        nudgeUp: [KeyPress(.k), KeyPress(.upArrow)],
+        nudgeDown: [KeyPress(.j), KeyPress(.downArrow)],
+        help: [KeyPress(.slash, [.shift])]
     )
 
     /// Label shown inside each quadrant.

@@ -33,6 +33,7 @@ public enum ConfigSchema {
         "keys": "Bindings inside Pointer mode: picking quadrants, clicking, dragging, switching modes and displays.",
         "scroll": "Scroll mode: scrolling the content under the pointer with the keyboard.",
         "ruler": "Ruler mode: the reading band that dims everything except the line being read.",
+        "nudge": "Nudge mode: moving the pointer by a few pixels at a time for the final adjustment.",
         "snap": "Snapping the pointer to clickable UI elements read from the accessibility tree.",
     ]
 
@@ -56,6 +57,7 @@ public enum ConfigSchema {
         .init(section: "keys", key: "snap_toggle", defaultValue: "\"a\"", comment: "Toggle snapping to UI elements for this session, e.g. \"a\"."),
         .init(section: "keys", key: "scroll_toggle", defaultValue: "\"s\"", comment: "Enter or leave Scroll mode, e.g. \"s\"."),
         .init(section: "keys", key: "ruler_toggle", defaultValue: "\"r\"", comment: "Create the reading band / enter or leave Ruler mode, e.g. \"r\"."),
+        .init(section: "keys", key: "help", defaultValue: "\"shift+slash\"", comment: "Hold to show every binding of the current mode; release to hide, e.g. \"shift+slash\" (the ? key)."),
         .init(section: "keys", key: "ruler_remove", defaultValue: "\"shift+r\"", comment: "Remove the reading band, e.g. \"shift+r\"."),
 
         .init(section: "scroll", key: "step", defaultValue: "60", comment: "Pixels scrolled per press; a count multiplies (45j). Try 20 for line-by-line reading, 60 to 120 for browsing."),
@@ -75,6 +77,13 @@ public enum ConfigSchema {
         .init(section: "ruler", key: "up", defaultValue: "\"k\"", comment: "Move the band up, e.g. \"k\", \"up\"."),
         .init(section: "ruler", key: "grow", defaultValue: "\"rightbracket\"", comment: "Make the band taller, e.g. \"rightbracket\", \"equal\"."),
         .init(section: "ruler", key: "shrink", defaultValue: "\"leftbracket\"", comment: "Make the band shorter, e.g. \"leftbracket\", \"minus\"."),
+
+        .init(section: "nudge", key: "step", defaultValue: "5", comment: "Pixels the pointer moves per press; Shift held moves one pixel; a count multiplies, e.g. 5, 10."),
+        .init(section: "nudge", key: "toggle", defaultValue: "\"n\"", comment: "Enter or leave Nudge mode from Pointer mode, e.g. \"n\"."),
+        .init(section: "nudge", key: "left", defaultValue: "[\"h\", \"left\"]", comment: "Move the pointer left, e.g. [\"h\", \"left\"]."),
+        .init(section: "nudge", key: "right", defaultValue: "[\"l\", \"right\"]", comment: "Move the pointer right, e.g. [\"l\", \"right\"]."),
+        .init(section: "nudge", key: "up", defaultValue: "[\"k\", \"up\"]", comment: "Move the pointer up, e.g. [\"k\", \"up\"]."),
+        .init(section: "nudge", key: "down", defaultValue: "[\"j\", \"down\"]", comment: "Move the pointer down, e.g. [\"j\", \"down\"]."),
 
         .init(section: "snap", key: "enabled", defaultValue: "true", comment: "Snap the pointer to the nearest clickable element in the chosen rectangle: true or false."),
     ]

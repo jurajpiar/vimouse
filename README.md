@@ -26,7 +26,12 @@ step sends the pointer to the nearest clickable element inside the chosen rectan
 (read from the frontmost app's accessibility tree) instead of its centre; a pink
 ring marks the snap target. Escape exits (releasing any drag).
 
+Nudge: n from Pointer mode, then h/j/k/l or the arrows move the pointer 5 px
+(Shift: 1 px, counts multiply), n back to the quadrants.
+
 Scroll: j/k/h/l scroll at the pointer, d/u half a page, s back to Pointer.
+
+Hold ? in any mode for the full key map; release to hide.
 
 Ruler (reading band): r creates a band at the pointer's height, dimming the rest
 of the screen, and enters Ruler mode: j/k move it by its own height (or a fixed number of pixels

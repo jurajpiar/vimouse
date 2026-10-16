@@ -17,7 +17,7 @@ public enum Effect: Equatable, Sendable {
 }
 
 public enum Mode: Equatable, Sendable {
-    case pointer, scroll, ruler
+    case pointer, scroll, ruler, nudge
 }
 
 /// A horizontal reading band. Persists after Pointer mode exits until removed.
@@ -72,6 +72,8 @@ public final class PointerEngine {
     public var rulerMove: Double = 0
     public var rulerHeightStep: Double = 4
     public var rulerFine: Double = 1
+    /// Pointer movement per press in Nudge mode (Shift: one pixel).
+    public var nudgeStep: Double = 5
     public var rulerDefaultHeight: Double = 32
 
     /// Snap the pointer to UI elements (needs a `snapProvider`). Toggled in Pointer mode.
@@ -94,6 +96,7 @@ public final class PointerEngine {
         rulerMove = c.rulerMove
         rulerHeightStep = c.rulerHeightStep
         rulerFine = c.rulerFine
+        nudgeStep = c.nudgeStep
         if !isActive { snapping = c.snapEnabled }
     }
 
@@ -199,6 +202,10 @@ public final class PointerEngine {
             if mode == .ruler { state = .active(mode: .pointer, session: s) }
             return [.redraw]
         }
+        if keymap.nudgeToggle.contains(key), mode == .pointer || mode == .nudge {
+            state = .active(mode: mode == .nudge ? .pointer : .nudge, session: s)
+            return [.redraw]
+        }
         if keymap.dragToggle.contains(key) {
             dragging.toggle()
             return [dragging ? .mouseDown(.left) : .mouseUp(.left), .redraw]
@@ -239,6 +246,22 @@ public final class PointerEngine {
             if keymap.scrollRight.contains(key) { return [.scroll(dx: scrollStep * n, dy: 0)] }
             if keymap.scrollHalfDown.contains(key) { return [.scroll(dx: 0, dy: half * n)] }
             if keymap.scrollHalfUp.contains(key) { return [.scroll(dx: 0, dy: -half * n)] }
+        case .nudge:
+            let fine = key.modifiers.contains(.shift)
+            let base = KeyPress(key.code, key.modifiers.subtracting(.shift))
+            func hit(_ set: Set<KeyPress>) -> Bool { set.contains(key) || (fine && set.contains(base)) }
+            let d = (fine ? 1 : nudgeStep) * n
+            var p = target
+            if hit(keymap.nudgeLeft) { p.x -= d }
+            else if hit(keymap.nudgeRight) { p.x += d }
+            else if hit(keymap.nudgeUp) { p.y -= d }
+            else if hit(keymap.nudgeDown) { p.y += d }
+            else { break }
+            let screen = screens[screenIndex]
+            p.x = min(max(p.x, screen.x), screen.maxX - 1)
+            p.y = min(max(p.y, screen.y), screen.maxY - 1)
+            target = p
+            return [.warp(p), .redraw]
         case .ruler:
             guard var r = ruler else { break }
             let screen = screens[r.screenIndex]
@@ -317,9 +340,17 @@ public final class PointerEngine {
             h.append((l(k.rightClick), "right"))
             h.append((l(k.doubleClick), "double"))
             h.append((l(k.dragToggle), dragging ? "drop" : "drag"))
+            h.append((l(k.nudgeToggle), "nudge"))
             h.append((l(k.scrollToggle), "scroll"))
             h.append((l(k.rulerToggle), "ruler"))
             if snapProvider != nil { h.append((l(k.snapToggle), snapping ? "snap on" : "snap off")) }
+        case .nudge:
+            h.append((l(k.nudgeLeft) + l(k.nudgeDown) + l(k.nudgeUp) + l(k.nudgeRight), "move \(Int(nudgeStep))px"))
+            h.append(("⇧", "1px"))
+            h.append((l(k.leftClick), "click"))
+            h.append((l(k.clickStay), "click+stay"))
+            h.append((l(k.dragToggle), dragging ? "drop" : "drag"))
+            h.append((l(k.nudgeToggle), "quadrants"))
         case .scroll:
             h.append((l(k.scrollDown) + l(k.scrollUp) + " " + l(k.scrollLeft) + l(k.scrollRight), "scroll"))
             h.append((l(k.scrollHalfDown) + " " + l(k.scrollHalfUp), "half page"))
@@ -335,7 +366,68 @@ public final class PointerEngine {
             h.append((l(k.rulerRemove), "remove"))
         }
         if screens.count > 1 { h.append((l(k.nextScreen) + " / n" + l(k.nextScreen), "screen")) }
+        h.append((l(k.help), "help"))
         h.append((l(k.exit), pendingCount == nil ? "exit" : "cancel count"))
         return h
+    }
+
+    /// Every binding, grouped, for the hold-? help panel. The current mode's group comes first.
+    public var help: [(title: String, rows: [(keys: String, action: String)])] {
+        let k = keymap
+        func all(_ set: Set<KeyPress>) -> String {
+            set.map(\.label).sorted().joined(separator: " ")
+        }
+        let pointer: [(String, String)] = [
+            ([Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { k.label(for: $0) }.joined(separator: " "), "pick top-left, top-right, bottom-left, bottom-right quadrant"),
+            (all(k.up), "up one level (count: several)"),
+            (all(k.leftClick), "left click and exit (count: double/triple)"),
+            (all(k.clickStay), "left click and stay"),
+            (all(k.doubleClick), "double click and exit"),
+            (all(k.rightClick), "right click and exit"),
+            (all(k.middleClick), "middle click and exit"),
+            ("⇧ ⌘ ⌥ + click key", "modifier click"),
+            (all(k.dragToggle), "press / release left button (drag, select)"),
+            (all(k.snapToggle), "toggle snapping to UI elements"),
+            (all(k.nudgeToggle), "nudge mode"),
+            (all(k.scrollToggle), "scroll mode"),
+            (all(k.rulerToggle), "ruler mode"),
+        ]
+        let nudge: [(String, String)] = [
+            (all(k.nudgeLeft) + " / " + all(k.nudgeRight), "move left / right \(Int(nudgeStep))px (⇧: 1px, count multiplies)"),
+            (all(k.nudgeUp) + " / " + all(k.nudgeDown), "move up / down"),
+            (all(k.nudgeToggle), "back to quadrants"),
+        ]
+        let scroll: [(String, String)] = [
+            (all(k.scrollDown) + " / " + all(k.scrollUp), "scroll down / up \(Int(scrollStep))px (count multiplies)"),
+            (all(k.scrollLeft) + " / " + all(k.scrollRight), "scroll left / right"),
+            (all(k.scrollHalfDown) + " / " + all(k.scrollHalfUp), "half a screen down / up"),
+            (all(k.scrollToggle), "back to pointer"),
+        ]
+        let rulerRows: [(String, String)] = [
+            (all(k.rulerDown) + " / " + all(k.rulerUp), "move band down / up by its height (⇧: 1px)"),
+            (all(k.rulerGrow) + " / " + all(k.rulerShrink), "taller / shorter by \(Int(rulerHeightStep))px (⇧: 1px)"),
+            (all(k.rulerToggle), "back to pointer (band stays)"),
+            (all(k.rulerRemove), "remove band"),
+        ]
+        let shared: [(String, String)] = [
+            ("0-9", "count prefix for the next command"),
+            (all(k.nextScreen) + " / " + all(k.previousScreen), "next / previous display (count: that display)"),
+            (all(k.help), "hold for this help"),
+            (all(k.exit), "exit (cancels a pending count first)"),
+        ]
+        var groups: [(String, [(String, String)])] = [
+            ("POINTER", pointer), ("NUDGE", nudge), ("SCROLL", scroll), ("RULER", rulerRows), ("ANY MODE", shared),
+        ]
+        let name: String? = {
+            switch mode {
+            case .pointer?: return "POINTER"
+            case .nudge?: return "NUDGE"
+            case .scroll?: return "SCROLL"
+            case .ruler?: return "RULER"
+            case nil: return nil
+            }
+        }()
+        if let name, let i = groups.firstIndex(where: { $0.0 == name }) { groups.insert(groups.remove(at: i), at: 0) }
+        return groups.map { (title: $0.0, rows: $0.1.map { (keys: $0.0, action: $0.1) }) }
     }
 }

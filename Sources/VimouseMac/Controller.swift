@@ -9,6 +9,8 @@ final class Controller {
     private let tap = InputTap()
     private let overlay = Overlay()
     private var rulerDim: Double = Config().rulerDim
+    /// True while the help key is held.
+    private var helpShown = false
 
     init() {
         engine = PointerEngine(keymap: .default, snapping: true, snapProvider: snapper)
@@ -46,14 +48,24 @@ final class Controller {
             return true
         }
         // Active: swallow everything so the focused app sees nothing.
+        // The help key works on hold: shown on key down, hidden on key up.
+        // On key up the modifier may already be released, so match the key code alone.
+        let isHelp = engine.keymap.help.contains(key) || (!isDown && engine.keymap.help.contains { $0.code == key.code })
+        if isHelp {
+            if isRepeat { return true }
+            helpShown = isDown
+            overlay.render(model())
+            return true
+        }
         guard isDown else { return true }
-        // Key repeat is useful for scrolling and moving the ruler, not for picking quadrants.
+        // Key repeat is useful for scrolling, nudging and moving the ruler, not for picking quadrants.
         if isRepeat, engine.mode == .pointer { return true }
         apply(engine.handle(key))
         return true
     }
 
     private func activate() {
+        helpShown = false
         let mouse = NSEvent.mouseLocation
         let screens = NSScreen.screens
         guard !screens.isEmpty else { return }
@@ -96,7 +108,8 @@ final class Controller {
                 pendingCount: engine.pendingCount,
                 target: engine.target,
                 snapping: engine.snapping,
-                hints: engine.hints
+                hints: engine.hints,
+                help: helpShown ? engine.help : nil
             )
         }
         let ruler = engine.ruler.map { RulerModel(screenIndex: $0.screenIndex, band: $0.band(on: engine.screens[$0.screenIndex]), dim: rulerDim) }

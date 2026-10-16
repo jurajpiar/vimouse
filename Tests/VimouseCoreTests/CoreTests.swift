@@ -341,6 +341,27 @@ final class EngineTests: XCTestCase {
         XCTAssertTrue(e.hints.contains { $0.action == "half page" })
     }
 
+    func testNudgeMode() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.i)) // target (250,150)
+        XCTAssertEqual(e.handle(KeyPress(.n)), [.redraw])
+        XCTAssertEqual(e.mode, .nudge)
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 255, y: 150)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.warp(Point(x: 255, y: 155)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.h, [.shift])), [.warp(Point(x: 254, y: 155)), .redraw])
+        _ = e.handle(KeyPress(.four))
+        XCTAssertEqual(e.handle(KeyPress(.k)), [.warp(Point(x: 254, y: 135)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.i)), []) // quadrant keys inactive here
+        _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine))
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 999, y: 135)), .redraw]) // clamped to the screen
+        XCTAssertEqual(e.handle(KeyPress(.n)), [.redraw])
+        XCTAssertEqual(e.mode, .pointer)
+        XCTAssertEqual(e.session?.depth, 1) // the descent is untouched
+        XCTAssertTrue(e.help.first?.title == "POINTER")
+        XCTAssertTrue(e.help.flatMap(\.rows).contains { $0.keys.contains("←") })
+    }
+
     func testRulerLifecycle() {
         let e = PointerEngine()
         _ = e.activate(screen: screen)

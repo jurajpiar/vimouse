@@ -13,6 +13,7 @@ public struct Config: Equatable {
     public var rulerFine: Double = 1
     public var rulerDim: Double = 0.35
     public var snapEnabled: Bool = true
+    public var nudgeStep: Double = 5
 
     public init() {}
 
@@ -94,6 +95,14 @@ public struct Config: Equatable {
         if let v = try keys("ruler", "up") { k.rulerUp = v }
         if let v = try keys("ruler", "grow") { k.rulerGrow = v }
         if let v = try keys("ruler", "shrink") { k.rulerShrink = v }
+
+        if let v = try keys("keys", "help") { k.help = v }
+        if let v = try number("nudge", "step") { c.nudgeStep = max(1, v) }
+        if let v = try keys("nudge", "toggle") { k.nudgeToggle = v }
+        if let v = try keys("nudge", "left") { k.nudgeLeft = v }
+        if let v = try keys("nudge", "right") { k.nudgeRight = v }
+        if let v = try keys("nudge", "up") { k.nudgeUp = v }
+        if let v = try keys("nudge", "down") { k.nudgeDown = v }
 
         if let v = t["snap"]?["enabled"] {
             guard let b = v.bool else { throw ParseError(description: "[snap] enabled: expected true or false") }
