@@ -62,7 +62,9 @@ after Escape; Shift+r removes it from any mode. With `[ruler] snap = true` (the 
 reads the lines of text under the pointer's column through the accessibility API: it
 is created on the line under the pointer, sized to it (plus `[ruler] pad`), and j/k
 move it a line at a time, falling back to height steps where no text is found; a
-toggles this in Ruler mode.
+toggles this in Ruler mode. The band and the dimming span the window holding the
+text (`[ruler] width = "window"`), the whole display (`"screen"`) or the line
+itself (`"line"`), and the pointer rides on the band.
 
 Counts work as in vi: digits before a command repeat or scale it. 45j scrolls 45
 steps, 3⌫ goes up three levels, 3⏎ triple-clicks, and with several displays 2⇥

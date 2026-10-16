@@ -9,17 +9,39 @@ public struct Ruler: Equatable, Sendable {
     /// Vertical centre of the band, CG coordinates.
     public var y: Double
     public var height: Double
+    /// Horizontal extent of the band and of the dimming: the window holding the text, or
+    /// the line itself, when known; nil spans the screen.
+    public var bounds: Rect?
+    public var dimBounds: Rect?
 
-    public init(screenIndex: Int, x: Double = 0, y: Double, height: Double) {
+    public init(screenIndex: Int, x: Double = 0, y: Double, height: Double, bounds: Rect? = nil, dimBounds: Rect? = nil) {
         self.screenIndex = screenIndex
         self.x = x
         self.y = y
         self.height = height
+        self.bounds = bounds
+        self.dimBounds = dimBounds
     }
 
     public func band(on screen: Rect) -> Rect {
-        Rect(x: screen.x, y: y - height / 2, width: screen.width, height: height)
+        let b = bounds.map { $0.intersection(screen) } ?? screen
+        return Rect(x: b.x, y: y - height / 2, width: b.width, height: height)
     }
+
+    /// The area darkened around the band.
+    public func dimArea(on screen: Rect) -> Rect {
+        dimBounds.map { $0.intersection(screen) } ?? screen
+    }
+}
+
+/// How wide the band is.
+public enum RulerWidth: String, Equatable {
+    /// The window holding the text under the pointer (the screen when none is found).
+    case window
+    /// The whole display.
+    case screen
+    /// The line of text itself (its window when no line is found).
+    case line
 }
 
 public final class RulerMode: Mode {
@@ -41,6 +63,7 @@ public final class RulerMode: Mode {
         public var grow: Set<KeyPress> = [KeyPress(.rightBracket)]
         public var shrink: Set<KeyPress> = [KeyPress(.leftBracket)]
         public var snapToggle: Set<KeyPress> = [KeyPress(.a)]
+        public var width: RulerWidth = .window
         public init() {}
     }
 
@@ -67,6 +90,7 @@ public final class RulerMode: Mode {
             .init(section: id, key: "snap", defaultValue: "true", comment: "Follow lines of text: the band is created on the line under the pointer and down/up move it a line at a time (read via accessibility; falls back to `move` where no text is found)."),
             .init(section: id, key: "pad", defaultValue: "2", comment: "Pixels added above and below a line the band snapped to, e.g. 0, 2, 4."),
             .init(section: id, key: "snap_toggle", defaultValue: "\"a\"", comment: "Toggle following lines of text in Ruler mode, e.g. \"a\"."),
+            .init(section: id, key: "width", defaultValue: "\"window\"", comment: "How wide the band and the dimming are: \"window\" (the window holding the text under the pointer), \"screen\", or \"line\" (the text line itself, dimming its window)."),
             .init(section: id, key: "dim", defaultValue: "0.35", comment: "Darkening outside the band, 0 (none) to 1 (black); 0.2 subtle, 0.35 default, 0.6 strong."),
             .init(section: id, key: "down", defaultValue: "\"j\"", comment: "Move the band down, e.g. \"j\", \"down\"."),
             .init(section: id, key: "up", defaultValue: "\"k\"", comment: "Move the band up, e.g. \"k\", \"up\"."),
@@ -92,6 +116,10 @@ public final class RulerMode: Mode {
         if let v = try r.keys("grow") { s.grow = v }
         if let v = try r.keys("shrink") { s.shrink = v }
         if let v = try r.keys("snap_toggle") { s.snapToggle = v }
+        if let v = try r.string("width") {
+            guard let w = RulerWidth(rawValue: v.lowercased()) else { throw r.fail("width", "expected \"window\", \"screen\" or \"line\"") }
+            s.width = w
+        }
         return s
     }
 
@@ -107,7 +135,7 @@ public final class RulerMode: Mode {
     public func activate(_ ctx: ModeContext) {
         if ruler == nil {
             var r = Ruler(screenIndex: ctx.screenIndex, x: ctx.target.x, y: ctx.target.y, height: settings.height)
-            if let line = snappedLine(for: r, direction: 0, ctx) { r.y = line.y; r.height = line.height }
+            seat(&r, on: snappedLine(for: r, direction: 0, ctx), ctx)
             ruler = r
         }
         follow(ctx)
@@ -135,7 +163,7 @@ public final class RulerMode: Mode {
         if s.snapToggle.has(key) {
             snapping.toggle()
             if snapping, var r = ruler, let line = snappedLine(for: r, direction: 0, ctx) {
-                r.y = line.y; r.height = line.height
+                seat(&r, on: line, ctx)
                 ruler = r
             }
             follow(ctx)
@@ -152,9 +180,10 @@ public final class RulerMode: Mode {
         // otherwise it steps by the band height (or `move` pixels).
         func step(_ direction: Double) {
             if !fine, let line = snappedLine(for: r, direction: Int(direction), count: Int(n), ctx) {
-                r.y = line.y; r.height = line.height
+                seat(&r, on: line, ctx)
             } else {
                 r.y += direction * move * n
+                seat(&r, on: nil, ctx)
             }
         }
         func hit(_ set: Set<KeyPress>) -> Bool { set.has(key) || (fine && set.has(base)) }
@@ -170,9 +199,24 @@ public final class RulerMode: Mode {
         return [.warp(ctx.target), .redraw]
     }
 
+    /// Place the band on a found line (or keep its position when nil) and work out how
+    /// wide it and its dimming are, per `[ruler] width`.
+    private func seat(_ r: inout Ruler, on line: (y: Double, height: Double, rect: Rect)?, _ ctx: ModeContext) {
+        if let line { r.y = line.y; r.height = line.height }
+        let window = settings.width == .screen ? nil : ctx.services.lines?.window(at: r.x, y: r.y)
+        r.dimBounds = window
+        switch settings.width {
+        case .screen: r.bounds = nil
+        case .window: r.bounds = window
+        case .line:
+            if let line { r.bounds = Rect(x: line.rect.x - settings.pad, y: line.rect.y, width: line.rect.width + 2 * settings.pad, height: line.rect.height) }
+            else { r.bounds = window }
+        }
+    }
+
     /// Centre and height for the band on the text line `count` lines from the current one
     /// (0: the line under it), padded; nil when snapping is off or no text is there.
-    private func snappedLine(for r: Ruler, direction: Int, count: Int = 1, _ ctx: ModeContext) -> (y: Double, height: Double)? {
+    private func snappedLine(for r: Ruler, direction: Int, count: Int = 1, _ ctx: ModeContext) -> (y: Double, height: Double, rect: Rect)? {
         guard snapping, let provider = ctx.services.lines else { return nil }
         let screen = ctx.screens[r.screenIndex]
         var y = r.y
@@ -184,7 +228,7 @@ public final class RulerMode: Mode {
             if direction == 0 { break }
         }
         guard let line = found else { return nil }
-        return (line.midY, line.height + 2 * settings.pad)
+        return (line.midY, line.height + 2 * settings.pad, line)
     }
 
     public func hints(_ ctx: ModeContext) -> [(key: String, action: String)] {
@@ -215,7 +259,7 @@ public final class RulerMode: Mode {
         guard let r = ruler, ctx.screens.indices.contains(r.screenIndex) else { return [] }
         let band = r.band(on: ctx.screens[r.screenIndex])
         return [
-            .dim(screen: r.screenIndex, except: band, alpha: settings.dim),
+            .dim(screen: r.screenIndex, area: r.dimArea(on: ctx.screens[r.screenIndex]), except: band, alpha: settings.dim),
             .outline(band, colour: ctx.colour(of: id), alpha: active ? 0.9 : 0.5, width: active ? 2 : 1),
         ]
     }

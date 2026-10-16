@@ -108,6 +108,12 @@ public protocol LineProvider: AnyObject {
     /// The line containing (x, y) when `direction` is 0, the first line below it when 1,
     /// the first line above it when -1. nil when no text is found there.
     func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect?
+    /// The frame of the window under (x, y), if any.
+    func window(at x: Double, y: Double) -> Rect?
+}
+
+public extension LineProvider {
+    func window(at x: Double, y: Double) -> Rect? { nil }
 }
 
 /// What the engine shares with modes: the session's geometry, the pointer target, the
@@ -206,8 +212,8 @@ public enum Drawable: Equatable, Sendable {
     case crosshair(Point, size: Double, colour: String, alpha: Double, width: Double)
     /// Text centred in a rectangle, sized to it.
     case label(String, in: Rect, colour: String, alpha: Double)
-    /// Darken a display except one rectangle.
-    case dim(screen: Int, except: Rect, alpha: Double)
+    /// Darken an area of a display except one rectangle.
+    case dim(screen: Int, area: Rect, except: Rect, alpha: Double)
 }
 
 /// Everything the overlay draws, assembled by the engine.

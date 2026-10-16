@@ -595,8 +595,10 @@ final class EngineTests: XCTestCase {
         XCTAssertTrue(e.help.flatMap(\.rows).contains { $0.keys.contains("←") })
     }
 
-    /// Lines 20 px tall every 24 px from y = 100 to 300, only in the column x < 500.
+    /// Lines 20 px tall every 24 px from y = 100 to 300, only in the column x < 500,
+    /// inside a window (0,80)-(500,400).
     final class FakeLines: LineProvider {
+        func window(at x: Double, y: Double) -> Rect? { x < 500 ? Rect(x: 0, y: 80, width: 500, height: 320) : nil }
         func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
             guard x < 500 else { return nil }
             let lines = stride(from: 100.0, through: 300, by: 24).map { Rect(x: 0, y: $0, width: 400, height: 20) }
@@ -617,6 +619,12 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.r)), [.warp(Point(x: 250, y: 158)), .redraw]) // seated on the line, pointer with it
         XCTAssertEqual(e.ruler?.y, 158)
         XCTAssertEqual(e.ruler?.height, 24) // 20 + 2 px padding each side
+        XCTAssertEqual(e.ruler?.band(on: screen), Rect(x: 0, y: 146, width: 500, height: 24)) // as wide as the window
+        XCTAssertEqual(e.ruler?.dimArea(on: screen), Rect(x: 0, y: 80, width: 500, height: 320))
+        e.rulerMode.settings.width = .line
+        _ = e.handle(KeyPress(.j)); _ = e.handle(KeyPress(.k))
+        XCTAssertEqual(e.ruler?.band(on: screen).width, 402) // the line plus padding, clipped at the screen edge
+        e.rulerMode.settings.width = .window
         _ = e.handle(KeyPress(.j))
         XCTAssertEqual(e.ruler?.y, 182)
         _ = e.handle(KeyPress(.two)); _ = e.handle(KeyPress(.k))
@@ -638,7 +646,8 @@ final class EngineTests: XCTestCase {
         _ = e2.activate(screen: screen)
         _ = e2.handle(KeyPress(.o)) // (750,150)
         _ = e2.handle(KeyPress(.r))
-        XCTAssertEqual(e2.ruler, Ruler(screenIndex: 0, x: 750, y: 150, height: 32))
+        XCTAssertEqual(e2.ruler, Ruler(screenIndex: 0, x: 750, y: 150, height: 32)) // no window either: the whole screen
+        XCTAssertEqual(e2.ruler?.band(on: screen).width, 1000)
     }
 
     func testRulerLifecycle() {
@@ -737,7 +746,7 @@ final class PluginTests: XCTestCase {
         _ = e.handle(KeyPress(.escape))
         let idle = e.scene()!
         XCTAssertNil(idle.modeName)
-        XCTAssertTrue(idle.drawables.contains { if case .dim(0, _, 0.35) = $0 { return true } else { return false } })
+        XCTAssertTrue(idle.drawables.contains { if case .dim(0, _, _, 0.35) = $0 { return true } else { return false } })
         XCTAssertTrue(idle.hints.isEmpty)
     }
 

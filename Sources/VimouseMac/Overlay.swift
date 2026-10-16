@@ -108,12 +108,12 @@ final class OverlayView: NSView {
             case .label(let text, let r, let c, let a):
                 guard r.intersects(screen) else { continue }
                 drawLabel(text, centredIn: toLocal(r), colour: NSColor(hex: c).withAlphaComponent(a))
-            case .dim(let index, let except, let a):
+            case .dim(let index, let area, let except, let a):
                 guard index == screenIndex else { continue }
-                let above = Rect(x: screen.x, y: screen.y, width: screen.width, height: max(0, except.y - screen.y))
-                let below = Rect(x: screen.x, y: except.maxY, width: screen.width, height: max(0, screen.maxY - except.maxY))
-                let left = Rect(x: screen.x, y: except.y, width: max(0, except.x - screen.x), height: except.height)
-                let right = Rect(x: except.maxX, y: except.y, width: max(0, screen.maxX - except.maxX), height: except.height)
+                let above = Rect(x: area.x, y: area.y, width: area.width, height: max(0, except.y - area.y))
+                let below = Rect(x: area.x, y: except.maxY, width: area.width, height: max(0, area.maxY - except.maxY))
+                let left = Rect(x: area.x, y: except.y, width: max(0, except.x - area.x), height: except.height)
+                let right = Rect(x: except.maxX, y: except.y, width: max(0, area.maxX - except.maxX), height: except.height)
                 NSColor.black.withAlphaComponent(CGFloat(a)).setFill()
                 for r in [above, below, left, right] where r.width > 0 && r.height > 0 { toLocal(r).fill() }
             }

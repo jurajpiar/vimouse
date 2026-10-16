@@ -39,6 +39,15 @@ final class AXLineProvider: LineProvider {
         return nil
     }
 
+    func window(at x: Double, y: Double) -> Rect? {
+        var ref: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(systemWide, Float(x), Float(y), &ref) == .success, let element = ref else { return nil }
+        var w: AXUIElement? = attribute(element, kAXWindowAttribute)
+        if w == nil, (attribute(element, kAXRoleAttribute) as String?) == kAXWindowRole { w = element }
+        guard let win = w else { return nil }
+        return frame(of: win)
+    }
+
     // MARK: One line
 
     private func line(at x: Double, y: Double, deadline: Date) -> Rect? {
