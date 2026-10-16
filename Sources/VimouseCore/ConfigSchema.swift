@@ -221,6 +221,34 @@ public struct ConfigSchema {
             }
             return false
         }
+        /// An earlier wording of the same comment: most words in common. A user's own note
+        /// ("# clamped", "# my notes") shares few words with a schema comment.
+        func isEarlierWording(_ old: String, of new: String) -> Bool {
+            func words(_ s: String) -> Set<String> {
+                Set(s.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).filter { $0.count > 2 })
+            }
+            let a = words(old), b = words(new)
+            guard !a.isEmpty, !b.isEmpty else { return false }
+            return Double(a.intersection(b).count) / Double(a.union(b).count) >= 0.5
+        }
+        /// Index of a comment line directly above `i` that is an earlier wording of `comment`.
+        func staleComment(above i: Int, for comment: String) -> Int? {
+            var j = i - 1
+            while j >= 0 {
+                let l = lines[j].trimmingCharacters(in: .whitespaces)
+                guard l.hasPrefix("#") else { return nil }
+                if isEarlierWording(String(l.dropFirst()), of: comment) { return j }
+                j -= 1
+            }
+            return nil
+        }
+        /// The key line without its inline comment, and that comment's text, if any.
+        func splitInline(_ raw: String) -> (body: String, comment: String?) {
+            let body = TOML.stripComment(raw)
+            guard body.count < raw.count else { return (raw, nil) }
+            let c = String(raw.dropFirst(body.count).dropFirst()).trimmingCharacters(in: .whitespaces)
+            return (String(body.reversed().drop { $0 == " " }.reversed()), c)
+        }
         for (i, raw) in lines.enumerated() {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("[") && line.hasSuffix("]") {
@@ -228,7 +256,11 @@ public struct ConfigSchema {
                 current = name
                 sections[name] = SectionInfo(start: i, end: i, keys: [], keyLines: 0)
                 if let c = sectionComments[name], !hasComment("# \(c)", above: i) {
-                    commentsToInsert.append((before: i, text: ["# \(c)"]))
+                    if let j = staleComment(above: i, for: c) {
+                        lines[j] = "# \(c)"
+                    } else {
+                        commentsToInsert.append((before: i, text: ["# \(c)"]))
+                    }
                 }
                 continue
             }
@@ -242,11 +274,19 @@ public struct ConfigSchema {
                 sections[sec]!.keyLines += 1
                 let documented = hasComment("# \(entry.comment)", above: i) || line.hasSuffix("# \(entry.comment)")
                 if !documented {
+                    // An earlier wording of this comment, inline or above, makes way for the new one.
+                    let (body, inline) = splitInline(raw)
+                    var keyLine = raw
+                    if let inline, isEarlierWording(inline, of: entry.comment) { keyLine = body }
+                    if let j = staleComment(above: i, for: entry.comment) { removals.insert(j) }
                     if entry.comment.count <= ConfigSchema.inlineCommentLimit {
-                        lines[i] = "\(raw)   # \(entry.comment)"
+                        lines[i] = "\(keyLine)   # \(entry.comment)"
                     } else {
+                        lines[i] = keyLine
                         // Blank line first unless the key already follows a blank line or the header.
-                        let prev = i > 0 ? lines[i - 1].trimmingCharacters(in: .whitespaces) : ""
+                        var p = i - 1
+                        while p >= 0, removals.contains(p) { p -= 1 }
+                        let prev = p >= 0 ? lines[p].trimmingCharacters(in: .whitespaces) : ""
                         let separated = prev.isEmpty || prev.hasPrefix("[") || prev.hasPrefix("#")
                         commentsToInsert.append((before: i, text: (separated ? [] : [""]) + ["# \(entry.comment)"]))
                     }

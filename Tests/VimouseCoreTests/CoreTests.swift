@@ -170,6 +170,13 @@ final class ConfigTests: XCTestCase {
         XCTAssertFalse(schema.migrate(text).changed)
         XCTAssertFalse(schema.migrate(Config.defaultTOML).changed)
         XCTAssertTrue(schema.migrate("").changed)
+        // A reworded comment replaces its earlier wording, inline or above; a user's note stays.
+        let reworded = "[global]\nexit = \"escape\"   # Leave Pointer mode (releases a drag; keeps a ruler), e.g. \"escape\".\n# my own note\n# Toggle snapping to UI elements, e.g. \"a\".\nhelp = \"shift+slash\"\n"
+        let (t6, _) = schema.migrate(reworded)
+        XCTAssertEqual(t6.components(separatedBy: "Leave").count, 2, t6)       // one exit comment, not two
+        XCTAssertFalse(t6.contains("Leave Pointer mode"))
+        XCTAssertTrue(t6.contains("# my own note\n"))
+        XCTAssertTrue(t6.contains("Toggle snapping"))                           // unrelated comment above help: kept
         // The old [snap] section and [drag] restart_search move into [pointer].
         let (t5, _) = schema.migrate("[snap]\nenabled = false\n[drag]\nrestart_search = false\n")
         XCTAssertFalse(t5.contains("[snap]"))
