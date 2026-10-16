@@ -15,6 +15,11 @@ let modes: [Mode] = [PointerMode(), HalfMode(), HintsMode(), NudgeMode(), Scroll
 // Cursor markers selectable with [cursor] style; add a CursorStyle here for a new one.
 let cursors: [CursorStyle] = [RingCursor(), CrosshairCursor(), DotCursor()]
 
+// Headless line-provider check: vimouse --probe "App Name" ...
+if let i = CommandLine.arguments.firstIndex(of: "--probe") {
+    exit(Probe.run(apps: Array(CommandLine.arguments[(i + 1)...])))
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate(modes: modes, cursors: cursors)
 app.delegate = delegate
