@@ -104,7 +104,9 @@ final class Controller {
         // release of the hold key), or leaves a pinned or hotkey-started one.
         if engine.keymap.activate.matches(event: rawKey), isDown, !isRepeat {
             if engine.heldActivation {
+                // Pin, and take the hotkey's own start mode.
                 engine.heldActivation = false
+                apply(engine.enter(mode: activateMode))
                 overlay.render(model())
             } else {
                 apply(engine.deactivate())

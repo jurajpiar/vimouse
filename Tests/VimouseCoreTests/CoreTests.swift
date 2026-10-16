@@ -218,6 +218,16 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(e.ruler?.y, 20)
     }
 
+    func testEnterMode() {
+        let e = PointerEngine()
+        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100), pointer: Point(x: 10, y: 30), mode: .nudge)
+        XCTAssertEqual(e.enter(mode: .nudge), [])
+        XCTAssertEqual(e.enter(mode: .pointer), [.redraw])
+        XCTAssertEqual(e.mode, .pointer)
+        XCTAssertEqual(e.enter(mode: .ruler), [.redraw])
+        XCTAssertEqual(e.ruler?.y, 30)
+    }
+
     func testConfigUpdateSwitch() throws {
         XCTAssertTrue(Config().autoUpdate)
         XCTAssertFalse(try Config.parse("[config]\nupdate = false").autoUpdate)

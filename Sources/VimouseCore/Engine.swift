@@ -157,6 +157,17 @@ public final class PointerEngine {
         activate(screens: [screen], index: 0, pointer: pointer, mode: mode)
     }
 
+    /// Switch the active mode (for example when a held activation is pinned by the
+    /// hotkey, which carries its own start mode). Ruler mode creates a band if none exists.
+    public func enter(mode: Mode) -> [Effect] {
+        guard case .active(let current, let s) = state, current != mode else { return [] }
+        if mode == .ruler, ruler == nil {
+            ruler = Ruler(screenIndex: screenIndex, y: target.y, height: rulerDefaultHeight)
+        }
+        state = .active(mode: mode, session: s)
+        return [.redraw]
+    }
+
     /// Leave the active mode, releasing a held drag first. A ruler stays on screen.
     public func deactivate() -> [Effect] {
         state = .idle
