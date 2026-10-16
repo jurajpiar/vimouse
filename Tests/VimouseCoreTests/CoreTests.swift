@@ -327,6 +327,19 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.escape)), [.hideOverlay])
     }
 
+    func testTopKeyAndDragWithoutRestart() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.i)); _ = e.handle(KeyPress(.i))
+        XCTAssertEqual(e.handle(KeyPress(.u, [.shift])), [.warp(Point(x: 500, y: 300)), .redraw])
+        XCTAssertEqual(e.session?.depth, 0)
+        XCTAssertEqual(e.handle(KeyPress(.delete, [.shift])), []) // already at the top
+        e.dragRestartsSearch = false
+        _ = e.handle(KeyPress(.i)); _ = e.handle(KeyPress(.i))
+        _ = e.handle(KeyPress(.v))
+        XCTAssertEqual(e.session?.depth, 2) // descent kept for extending a selection
+    }
+
     func testDeactivateWhileDraggingReleasesButton() {
         let e = PointerEngine()
         _ = e.activate(screen: screen)

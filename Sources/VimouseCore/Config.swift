@@ -14,6 +14,7 @@ public struct Config: Equatable {
     public var rulerDim: Double = 0.35
     public var snapEnabled: Bool = true
     public var nudgeStep: Double = 5
+    public var dragRestartsSearch: Bool = true
 
     public init() {}
 
@@ -64,6 +65,7 @@ public struct Config: Equatable {
             k.quadrants = quadrants
         }
         if let v = try keys("keys", "up") { k.up = v }
+        if let v = try keys("keys", "top") { k.top = v }
         if let v = try keys("keys", "left_click") { k.leftClick = v }
         if let v = try keys("keys", "click_stay") { k.clickStay = v }
         if let v = try keys("keys", "double_click") { k.doubleClick = v }
@@ -104,6 +106,10 @@ public struct Config: Equatable {
         if let v = try keys("nudge", "up") { k.nudgeUp = v }
         if let v = try keys("nudge", "down") { k.nudgeDown = v }
 
+        if let v = t["drag"]?["restart_search"] {
+            guard let b = v.bool else { throw ParseError(description: "[drag] restart_search: expected true or false") }
+            c.dragRestartsSearch = b
+        }
         if let v = t["snap"]?["enabled"] {
             guard let b = v.bool else { throw ParseError(description: "[snap] enabled: expected true or false") }
             c.snapEnabled = b

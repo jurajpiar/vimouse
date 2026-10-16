@@ -77,6 +77,8 @@ public final class PointerEngine {
     public var rulerFine: Double = 1
     /// Pointer movement per press in Nudge mode (Shift: one pixel).
     public var nudgeStep: Double = 5
+    /// Whether starting a drag restarts the quadrant search from the whole screen.
+    public var dragRestartsSearch = true
     public var rulerDefaultHeight: Double = 32
 
     /// Snap the pointer to UI elements (needs a `snapProvider`). Toggled in Pointer mode.
@@ -100,6 +102,7 @@ public final class PointerEngine {
         rulerHeightStep = c.rulerHeightStep
         rulerFine = c.rulerFine
         nudgeStep = c.nudgeStep
+        dragRestartsSearch = c.dragRestartsSearch
         if !isActive { snapping = c.snapEnabled }
     }
 
@@ -224,7 +227,7 @@ public final class PointerEngine {
                 dragOrigin = target
                 // The task is now "where to drop": restart the quadrant search from the whole
                 // screen, pointer staying where it is.
-                if mode == .pointer { state = .active(mode: .pointer, session: BisectSession(root: screens[screenIndex])) }
+                if mode == .pointer, dragRestartsSearch { state = .active(mode: .pointer, session: BisectSession(root: screens[screenIndex])) }
                 return [.mouseDown(.left), .redraw]
             }
             dragOrigin = nil
@@ -249,6 +252,12 @@ public final class PointerEngine {
         case .pointer:
             if let q = keymap.quadrants[key] {
                 for _ in 0..<(count ?? 1) { s.select(q) }
+                state = .active(mode: .pointer, session: s)
+                return [.warp(aim(s.current)), .redraw]
+            }
+            if keymap.top.contains(key) {
+                guard s.depth > 0 else { return count == nil ? [] : [.redraw] }
+                s.reset()
                 state = .active(mode: .pointer, session: s)
                 return [.warp(aim(s.current)), .redraw]
             }
@@ -355,7 +364,7 @@ public final class PointerEngine {
         case .pointer:
             let quads = [Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { k.label(for: $0) }.joined()
             h.append((quads, "pick"))
-            if s.depth > 0 { h.append((l(k.up), "up")) }
+            if s.depth > 0 { h.append((l(k.up), "up")); h.append((l(k.top), "top")) }
             h.append((l(k.leftClick), "click"))
             h.append((l(k.clickStay), "click+stay"))
             h.append((l(k.rightClick), "right"))
@@ -401,6 +410,7 @@ public final class PointerEngine {
         let pointer: [(String, String)] = [
             ([Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { k.label(for: $0) }.joined(separator: " "), "pick top-left, top-right, bottom-left, bottom-right quadrant"),
             (all(k.up), "up one level (count: several)"),
+            (all(k.top), "back to the whole screen"),
             (all(k.leftClick), "left click and exit (count: double/triple)"),
             (all(k.clickStay), "left click and stay"),
             (all(k.doubleClick), "double click and exit"),

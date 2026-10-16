@@ -80,6 +80,8 @@ public struct KeyMap: Sendable, Equatable {
     public var activate: KeyPress
     public var quadrants: [KeyPress: Quadrant]
     public var up: Set<KeyPress>
+    /// Back to the whole screen (root of the descent).
+    public var top: Set<KeyPress>
     public var leftClick: Set<KeyPress>
     public var rightClick: Set<KeyPress>
     public var middleClick: Set<KeyPress>
@@ -116,6 +118,7 @@ public struct KeyMap: Sendable, Equatable {
         activate: KeyPress,
         quadrants: [KeyPress: Quadrant],
         up: Set<KeyPress>,
+        top: Set<KeyPress> = [],
         leftClick: Set<KeyPress>,
         rightClick: Set<KeyPress>,
         middleClick: Set<KeyPress>,
@@ -150,6 +153,7 @@ public struct KeyMap: Sendable, Equatable {
         self.activate = activate
         self.quadrants = quadrants
         self.up = up
+        self.top = top
         self.leftClick = leftClick
         self.rightClick = rightClick
         self.middleClick = middleClick
@@ -191,6 +195,7 @@ public struct KeyMap: Sendable, Equatable {
             KeyPress(.k): .bottomRight,
         ],
         up: [KeyPress(.delete), KeyPress(.u)],
+        top: [KeyPress(.u, [.shift]), KeyPress(.delete, [.shift])],
         leftClick: [KeyPress(.return), KeyPress(.m)],
         rightClick: [KeyPress(.period)],
         middleClick: [KeyPress(.comma)],

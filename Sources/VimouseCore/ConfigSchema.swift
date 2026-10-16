@@ -34,6 +34,7 @@ public enum ConfigSchema {
         "scroll": "Scroll mode: scrolling the content under the pointer with the keyboard.",
         "ruler": "Ruler mode: the reading band that dims everything except the line being read.",
         "nudge": "Nudge mode: moving the pointer by a few pixels at a time for the final adjustment.",
+        "drag": "Dragging: holding the left button while navigating, for text selection and drag-and-drop.",
         "snap": "Snapping the pointer to clickable UI elements read from the accessibility tree.",
     ]
 
@@ -45,6 +46,7 @@ public enum ConfigSchema {
         .init(section: "keys", key: "bottom_left", defaultValue: "\"j\"", comment: "Pick the bottom-left quadrant, e.g. \"j\", \"left\"."),
         .init(section: "keys", key: "bottom_right", defaultValue: "\"k\"", comment: "Pick the bottom-right quadrant, e.g. \"k\", \"down\"."),
         .init(section: "keys", key: "up", defaultValue: "[\"backspace\", \"u\"]", comment: "Go up one level in the quadrant descent; a count repeats, e.g. [\"backspace\", \"u\"]."),
+        .init(section: "keys", key: "top", defaultValue: "[\"shift+u\", \"shift+backspace\"]", comment: "Restart the quadrant search from the whole screen, e.g. [\"shift+u\", \"shift+backspace\"]."),
         .init(section: "keys", key: "left_click", defaultValue: "[\"return\", \"m\"]", comment: "Left-click and exit; a count sets the click count (3 = triple), modifiers held pass through."),
         .init(section: "keys", key: "click_stay", defaultValue: "\"space\"", comment: "Left-click and stay in Pointer mode, e.g. \"space\"."),
         .init(section: "keys", key: "double_click", defaultValue: "\"x\"", comment: "Double-click and exit, e.g. \"x\"."),
@@ -84,6 +86,8 @@ public enum ConfigSchema {
         .init(section: "nudge", key: "right", defaultValue: "[\"l\", \"right\"]", comment: "Move the pointer right, e.g. [\"l\", \"right\"]."),
         .init(section: "nudge", key: "up", defaultValue: "[\"k\", \"up\"]", comment: "Move the pointer up, e.g. [\"k\", \"up\"]."),
         .init(section: "nudge", key: "down", defaultValue: "[\"j\", \"down\"]", comment: "Move the pointer down, e.g. [\"j\", \"down\"]."),
+
+        .init(section: "drag", key: "restart_search", defaultValue: "true", comment: "When a drag starts, restart the quadrant search from the whole screen (good for moving items far; set false to keep extending a selection from where you are): true or false."),
 
         .init(section: "snap", key: "enabled", defaultValue: "true", comment: "Snap the pointer to the nearest clickable element in the chosen rectangle: true or false."),
     ]
@@ -126,8 +130,16 @@ public enum ConfigSchema {
         var sections: [String: SectionInfo] = [:]
         var current: String? = nil
         var commentsToInsert: [(before: Int, text: String)] = []
-        func hasCommentAbove(_ i: Int) -> Bool {
-            i > 0 && lines[i - 1].trimmingCharacters(in: .whitespaces).hasPrefix("#")
+        /// True when `comment` already sits in the block of comment lines directly above line i.
+        func hasComment(_ comment: String, above i: Int) -> Bool {
+            var j = i - 1
+            while j >= 0 {
+                let l = lines[j].trimmingCharacters(in: .whitespaces)
+                guard l.hasPrefix("#") else { return false }
+                if l == comment { return true }
+                j -= 1
+            }
+            return false
         }
         for (i, raw) in lines.enumerated() {
             let line = raw.trimmingCharacters(in: .whitespaces)
@@ -135,7 +147,7 @@ public enum ConfigSchema {
                 let name = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
                 current = name
                 sections[name] = SectionInfo(start: i, end: i, keys: [])
-                if let c = sectionComments[name], !hasCommentAbove(i) {
+                if let c = sectionComments[name], !hasComment("# \(c)", above: i) {
                     commentsToInsert.append((before: i, text: "# \(c)"))
                 }
                 continue
@@ -146,7 +158,7 @@ public enum ConfigSchema {
             let key = line[..<eq].trimmingCharacters(in: .whitespaces)
             sections[sec]!.keys.insert(key)
             if let entry = entries.first(where: { $0.section == sec && $0.key == key }) {
-                if !hasCommentAbove(i) { commentsToInsert.append((before: i, text: "# \(entry.comment)")) }
+                if !hasComment("# \(entry.comment)", above: i) { commentsToInsert.append((before: i, text: "# \(entry.comment)")) }
             } else {
                 let note = superseded["\(sec).\(key)"] ?? "unknown setting"
                 lines[i] = "# \(note), ignored (see \(changelog)): \(raw)"
@@ -165,7 +177,7 @@ public enum ConfigSchema {
             if let info = sections[section] {
                 insertions.append((after: info.end, text: block))
             } else {
-                appendix += ["", "[\(section)]"] + block
+                appendix += ["", "# \(sectionComments[section] ?? section)", "[\(section)]"] + block
             }
             changed = true
         }

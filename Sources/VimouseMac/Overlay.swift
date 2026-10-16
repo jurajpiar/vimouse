@@ -180,14 +180,17 @@ final class OverlayView: NSView {
         if p.dragging, let o = p.dragOrigin {
             let a = Coordinates.localRect(Rect(x: o.x, y: o.y, width: 0, height: 0), inWindow: windowFrame).origin
             let b = Coordinates.localRect(Rect(x: p.target.x, y: p.target.y, width: 0, height: 0), inWindow: windowFrame).origin
-            let line = NSBezierPath()
-            line.move(to: a); line.line(to: b)
-            line.lineWidth = 2
-            line.setLineDash([6, 4], count: 2, phase: 0)
-            NSColor.systemGreen.setStroke()
-            line.stroke()
-            NSColor.systemGreen.setFill()
-            NSBezierPath(ovalIn: NSRect(x: a.x - 5, y: a.y - 5, width: 10, height: 10)).fill()
+            // The line only while bisecting; in Nudge or Scroll it would sit on the text being selected.
+            if p.mode == .pointer {
+                let line = NSBezierPath()
+                line.move(to: a); line.line(to: b)
+                line.lineWidth = 1
+                line.setLineDash([4, 4], count: 2, phase: 0)
+                NSColor.systemGreen.withAlphaComponent(0.4).setStroke()
+                line.stroke()
+            }
+            NSColor.systemGreen.withAlphaComponent(0.8).setFill()
+            NSBezierPath(ovalIn: NSRect(x: a.x - 4, y: a.y - 4, width: 8, height: 8)).fill()
         }
 
         drawStatusStrip(p, colour: colour, awayFrom: cur)
