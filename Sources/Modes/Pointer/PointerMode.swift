@@ -144,7 +144,7 @@ public final class PointerMode: Mode {
             h.append(Hint(KeyMap.label(of: settings.up), "up", "↰"))
             h.append(Hint(KeyMap.label(of: settings.top), "top", "⇈"))
         }
-        if ctx.services.snap != nil { h.append(Hint(KeyMap.label(of: settings.snapToggle), snapping ? "snap on" : "snap off", snapping ? "⌖ on" : "⌖ off")) }
+        if ctx.services.snap != nil { h.append(Hint(KeyMap.label(of: settings.snapToggle), snapping ? "☑ snap" : "☐ snap", snapping ? "☑⌖" : "☐⌖")) }
         return h
     }
 

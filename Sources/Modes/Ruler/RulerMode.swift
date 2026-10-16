@@ -249,7 +249,7 @@ public final class RulerMode: Mode {
             Hint(l(s.shrink) + " " + l(s.grow), "height", "⬍"),
             Hint("⇧", "fine", "1px"),
         ]
-        if ctx.services.lines != nil { h.append(Hint(l(s.snapToggle), snapping ? "lines on" : "lines off", snapping ? "☰ on" : "☰ off")) }
+        if ctx.services.lines != nil { h.append(Hint(l(s.snapToggle), snapping ? "☑ lines" : "☐ lines", snapping ? "☑☰" : "☐☰")) }
         h.append(Hint(l(s.remove), "remove", "☰✕"))
         return h
     }
