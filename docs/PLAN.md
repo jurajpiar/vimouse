@@ -98,6 +98,8 @@ Accessibility permission flow and revocation hang (mitigation in section 4). Sec
 
 2026-10-16: licence GPL-3.0-or-later. Phase 0 scaffold committed (Package.swift, VimouseCore + tests, VimouseMac spike).
 
+2026-10-16: Phase 0 verified on Shan's Mac: event tap, overlay over full-screen apps, cursor warp and click all work; display switching added (Tab/Shift+Tab, digits 1-9, bisect resets on switch). Phase 0 closed.
+
 Open: 2x2 vs 3x3 default (decide after spike measurements).
 
 ## Sources
