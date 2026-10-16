@@ -8,12 +8,24 @@ enum Pointer {
     /// Stamped on every event we post, so our own event tap lets them through untouched.
     static let syntheticMarker: Int64 = 0x56_49_4D_4F // "VIMO"
 
+    /// Buttons we have pressed and not yet released, so a shutdown can let go of them.
+    private static var held: Set<MouseButton> = []
+
+    /// Release anything still held (shutdown safety). Safe to call twice.
+    static func releaseHeldButtons() {
+        for b in held {
+            post(b, down: false, clickState: 1, modifiers: [], at: currentLocation)
+        }
+        held = []
+    }
+
     /// Press the left button. With `ramp`, also post a few small drag events and return
     /// to the origin, for apps that start a drag-and-drop session only after movement
     /// following the press. Off by default: Chromium-based apps treat the ramp as a new
     /// selection instead of a drag of the selected text.
     static func startDrag(at p: Point, ramp: Bool) {
         post(.left, down: true, clickState: 1, modifiers: [], at: p)
+        held.insert(.left)
         guard ramp else { return }
         for i in 1...4 {
             usleep(12_000)
@@ -28,6 +40,7 @@ enum Pointer {
         postDragged(to: CGPoint(x: p.x, y: p.y))
         usleep(30_000)
         post(.left, down: false, clickState: 1, modifiers: [], at: p)
+        held.remove(.left)
     }
 
     /// Abandon a drag: the Escape key cancels a drag-and-drop session system-wide, then
@@ -44,6 +57,7 @@ enum Pointer {
         postDragged(to: o)
         usleep(20_000)
         post(.left, down: false, clickState: 1, modifiers: [], at: origin)
+        held.remove(.left)
     }
 
     private static func postDragged(to q: CGPoint) {
@@ -72,10 +86,12 @@ enum Pointer {
 
     static func mouseDown(_ button: MouseButton, at p: Point) {
         post(button, down: true, clickState: 1, modifiers: [], at: p)
+        held.insert(button)
     }
 
     static func mouseUp(_ button: MouseButton, at p: Point) {
         post(button, down: false, clickState: 1, modifiers: [], at: p)
+        held.remove(button)
     }
 
     /// Positive dy reveals content below; positive dx content to the right.

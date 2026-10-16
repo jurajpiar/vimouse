@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         _ = Permissions.ensureAccessibility() // shows the system prompt when not yet granted
         controller.start()
+        Shutdown.install { [weak self] in self?.controller.stop() }
     }
 
     private func setUpStatusItem() {

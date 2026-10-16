@@ -86,12 +86,18 @@ final class Controller {
         startHealthMonitor()
     }
 
+    /// Everything down, in the order that matters: no more input, movement stopped,
+    /// buttons released (deactivate posts the mouse-up for a held drag), overlay gone.
     func stop() {
         healthTimer?.invalidate()
-        scroller.stop()
-        apply(engine.deactivate())
+        healthTimer = nil
         tap.stop()
         tapRunning = false
+        scroller.brake()
+        scroller.stop()
+        nudger.stop()
+        apply(engine.deactivate())
+        overlay.render(nil)
     }
 
     /// Every second: secure input state; every third tick: can we still filter events?
