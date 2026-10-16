@@ -122,7 +122,11 @@ final class Controller {
         let screens = NSScreen.screens
         guard !screens.isEmpty else { return }
         let index = screens.firstIndex { NSMouseInRect(mouse, $0.frame, false) } ?? 0
-        apply(engine.activate(screens: screens.map { Coordinates.cgRect(fromAppKit: $0.frame) }, index: index))
+        apply(engine.activate(
+            screens: screens.map { Coordinates.cgRect(fromAppKit: $0.frame) },
+            index: index,
+            pointer: Coordinates.cgPoint(fromAppKit: mouse)
+        ))
     }
 
     private func apply(_ effects: [Effect]) {

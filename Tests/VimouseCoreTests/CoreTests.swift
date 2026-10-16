@@ -282,10 +282,13 @@ final class SnapTests: XCTestCase {
 final class EngineTests: XCTestCase {
     let screen = Rect(x: 0, y: 0, width: 1000, height: 600)
 
-    func testActivateWarpsToCentre() {
+    func testActivateLeavesPointerWhereItIs() {
         let e = PointerEngine()
-        XCTAssertEqual(e.activate(screen: screen), [.showOverlay, .warp(Point(x: 500, y: 300))])
+        XCTAssertEqual(e.activate(screen: screen, pointer: Point(x: 40, y: 50)), [.showOverlay])
         XCTAssertTrue(e.isActive)
+        XCTAssertEqual(e.target, Point(x: 40, y: 50))
+        // Without a known position the centre is assumed.
+        XCTAssertEqual(PointerEngine().activate(screen: screen), [.showOverlay])
     }
 
     func testQuadrantThenClick() {

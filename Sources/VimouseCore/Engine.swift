@@ -133,8 +133,9 @@ public final class PointerEngine {
 
     // MARK: Activation
 
-    /// Enter Pointer mode over `screens[index]` (CG coordinates).
-    public func activate(screens: [Rect], index: Int) -> [Effect] {
+    /// Enter Pointer mode over `screens[index]` (CG coordinates). The pointer stays
+    /// where it is (`pointer`); the first quadrant pick moves it.
+    public func activate(screens: [Rect], index: Int, pointer: Point? = nil) -> [Effect] {
         precondition(!screens.isEmpty && screens.indices.contains(index))
         self.screens = screens
         screenIndex = index
@@ -142,12 +143,13 @@ public final class PointerEngine {
         state = .active(mode: .pointer, session: s)
         pendingCount = nil
         snapProvider?.prepare(screen: screens[index])
-        return [.showOverlay, .warp(aim(s.current))]
+        target = pointer ?? s.current.center
+        return [.showOverlay]
     }
 
     /// Convenience for a single screen.
-    public func activate(screen: Rect) -> [Effect] {
-        activate(screens: [screen], index: 0)
+    public func activate(screen: Rect, pointer: Point? = nil) -> [Effect] {
+        activate(screens: [screen], index: 0, pointer: pointer)
     }
 
     /// Leave the active mode, releasing a held drag first. A ruler stays on screen.
