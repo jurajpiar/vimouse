@@ -585,7 +585,7 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.ruler?.y, 158)
         // Past the last line: fall back to a height step.
         for _ in 0..<10 { _ = e.handle(KeyPress(.j)) }
-        XCTAssertEqual(e.ruler?.y, 310 + 24)
+        XCTAssertEqual(e.ruler?.y, 302 + 4 * 24) // six line steps, then four height steps
         // No text under the column: plain steps from the start.
         let e2 = PointerEngine()
         e2.lineProvider = fake
