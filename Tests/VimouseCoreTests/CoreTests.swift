@@ -204,8 +204,8 @@ final class ConfigTests: XCTestCase {
         let e = PointerEngine(keymap: c.keymap)
         _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
         _ = e.handle(KeyPress(.s))
-        XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.scroll(dx: 0, dy: 60)])
-        XCTAssertEqual(e.handle(KeyPress(.upArrow)), [.scroll(dx: 0, dy: -60)])
+        XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.scrollStart(dx: 0, dy: 1, multiplier: 1)])
+        XCTAssertEqual(e.handle(KeyPress(.upArrow)), [.scrollStart(dx: 0, dy: -1, multiplier: 1)])
         XCTAssertEqual(e.hints.first?.key, "↓k hl")
         XCTAssertEqual(KeyPress(.tab, [.shift]).label, "⇧⇥")
         XCTAssertEqual(KeyPress(.space, [.command, .shift]).label, "⇧⌘␣")
@@ -335,9 +335,9 @@ final class EngineTests: XCTestCase {
         _ = e.handle(KeyPress(.four))
         XCTAssertEqual(e.handle(KeyPress(.five)), [.redraw])
         XCTAssertEqual(e.pendingCount, 45)
-        XCTAssertEqual(e.handle(KeyPress(.j)), [.scroll(dx: 0, dy: 45 * 60)])
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scrollStart(dx: 0, dy: 1, multiplier: 45)])
         XCTAssertNil(e.pendingCount)
-        XCTAssertEqual(e.handle(KeyPress(.j)), [.scroll(dx: 0, dy: 60)]) // count consumed
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scrollStart(dx: 0, dy: 1, multiplier: 1)]) // count consumed
         // Escape with a pending count cancels the count, not the mode.
         _ = e.handle(KeyPress(.three))
         XCTAssertEqual(e.handle(KeyPress(.escape)), [.redraw])
@@ -385,7 +385,7 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.dragOrigin, Point(x: 125, y: 75))
         _ = e.handle(KeyPress(.k))                        // drag towards bottom-right
         _ = e.handle(KeyPress(.s))                        // scrolling while dragging is allowed
-        XCTAssertEqual(e.handle(KeyPress(.j)), [.scroll(dx: 0, dy: 60)])
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scrollStart(dx: 0, dy: 1, multiplier: 1)])
         XCTAssertTrue(e.dragging)
         // Escape abandons the drag, returns the pointer to the origin, and stays active.
         XCTAssertEqual(e.handle(KeyPress(.escape)), [.cancelDrag(origin: Point(x: 125, y: 75)), .redraw])
@@ -421,9 +421,11 @@ final class EngineTests: XCTestCase {
         _ = e.activate(screen: screen)
         XCTAssertEqual(e.handle(KeyPress(.s)), [.redraw])
         XCTAssertEqual(e.mode, .scroll)
-        XCTAssertEqual(e.handle(KeyPress(.j)), [.scroll(dx: 0, dy: 60)])
-        XCTAssertEqual(e.handle(KeyPress(.k)), [.scroll(dx: 0, dy: -60)])
-        XCTAssertEqual(e.handle(KeyPress(.l)), [.scroll(dx: 60, dy: 0)])
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scrollStart(dx: 0, dy: 1, multiplier: 1)])
+        XCTAssertEqual(e.handleRelease(KeyPress(.j)), [.scrollStop])
+        XCTAssertEqual(e.handleRelease(KeyPress(.i)), [])
+        XCTAssertEqual(e.handle(KeyPress(.k)), [.scrollStart(dx: 0, dy: -1, multiplier: 1)])
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.scrollStart(dx: 1, dy: 0, multiplier: 1)])
         XCTAssertEqual(e.handle(KeyPress(.d)), [.scroll(dx: 0, dy: 300)])
         XCTAssertEqual(e.handle(KeyPress(.u)), [.scroll(dx: 0, dy: -300)])
         XCTAssertEqual(e.handle(KeyPress(.i)), []) // quadrant keys inactive in scroll mode

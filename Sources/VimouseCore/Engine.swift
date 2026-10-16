@@ -16,6 +16,11 @@ public enum Effect: Equatable, Sendable {
     case cancelDrag(origin: Point)
     /// Pixels. Positive dy reveals content below (like vim's j), positive dx content to the right.
     case scroll(dx: Double, dy: Double)
+    /// A scroll key went down: direction (unit components) and multiplier (count prefix).
+    /// The platform taps, accelerates while held and coasts after release.
+    case scrollStart(dx: Double, dy: Double, multiplier: Double)
+    /// The scroll key went up.
+    case scrollStop
 }
 
 public enum Mode: Equatable, Sendable {
@@ -271,10 +276,10 @@ public final class PointerEngine {
             }
         case .scroll:
             let half = screens[screenIndex].height / 2
-            if keymap.scrollDown.contains(key) { return [.scroll(dx: 0, dy: scrollStep * n)] }
-            if keymap.scrollUp.contains(key) { return [.scroll(dx: 0, dy: -scrollStep * n)] }
-            if keymap.scrollLeft.contains(key) { return [.scroll(dx: -scrollStep * n, dy: 0)] }
-            if keymap.scrollRight.contains(key) { return [.scroll(dx: scrollStep * n, dy: 0)] }
+            if keymap.scrollDown.contains(key) { return [.scrollStart(dx: 0, dy: 1, multiplier: n)] }
+            if keymap.scrollUp.contains(key) { return [.scrollStart(dx: 0, dy: -1, multiplier: n)] }
+            if keymap.scrollLeft.contains(key) { return [.scrollStart(dx: -1, dy: 0, multiplier: n)] }
+            if keymap.scrollRight.contains(key) { return [.scrollStart(dx: 1, dy: 0, multiplier: n)] }
             if keymap.scrollHalfDown.contains(key) { return [.scroll(dx: 0, dy: half * n)] }
             if keymap.scrollHalfUp.contains(key) { return [.scroll(dx: 0, dy: -half * n)] }
         case .nudge:
@@ -312,6 +317,14 @@ public final class PointerEngine {
             return [.redraw]
         }
         return count == nil ? [] : [.redraw]
+    }
+
+    /// A key went up. Only scroll keys care (the held scroll ends); everything else is ignored.
+    public func handleRelease(_ key: KeyPress) -> [Effect] {
+        guard case .active(.scroll, _) = state else { return [] }
+        let bare = KeyPress(key.code)
+        let scrollKeys = keymap.scrollDown.union(keymap.scrollUp).union(keymap.scrollLeft).union(keymap.scrollRight)
+        return scrollKeys.contains(bare) || scrollKeys.contains(key) ? [.scrollStop] : []
     }
 
     /// Click keys match on key code only; held modifiers are passed into the click.

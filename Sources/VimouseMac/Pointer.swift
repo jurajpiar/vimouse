@@ -93,6 +93,25 @@ enum Pointer {
         e.post(tap: .cghidEventTap)
     }
 
+    /// Trackpad-style scroll event: continuous (pixel) with scroll / momentum phase fields.
+    /// Phase values follow CGScrollPhase (1 began, 2 changed, 4 ended) and
+    /// CGMomentumScrollPhase (1 begin, 2 continue, 3 end); 0 means "not set".
+    static func scrollContinuous(dx: Double, dy: Double, phase: Int64, momentum: Int64) {
+        guard let e = CGEvent(
+            scrollWheelEvent2Source: nil,
+            units: .pixel,
+            wheelCount: 2,
+            wheel1: Int32(-dy),
+            wheel2: Int32(-dx),
+            wheel3: 0
+        ) else { return }
+        e.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        e.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+        e.setIntegerValueField(.scrollWheelEventMomentumPhase, value: momentum)
+        e.setIntegerValueField(.eventSourceUserData, value: syntheticMarker)
+        e.post(tap: .cghidEventTap)
+    }
+
     static var currentLocation: Point {
         let loc = CGEvent(source: nil)?.location ?? .zero
         return Point(x: loc.x, y: loc.y)

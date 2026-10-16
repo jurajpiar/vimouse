@@ -34,7 +34,8 @@ ring marks the snap target. Escape exits (releasing any drag).
 Nudge: n from Pointer mode, then h/j/k/l or the arrows move the pointer 5 px
 (Shift: 1 px, counts multiply), n back to the quadrants.
 
-Scroll: j/k/h/l scroll at the pointer, d/u half a page, s back to Pointer.
+Scroll: j/k/h/l scroll at the pointer (a tap is one step, a hold accelerates,
+release coasts like a trackpad flick), d/u half a page, s back to Pointer.
 
 Hold ? in any mode for the full key map; release to hide.
 

@@ -24,6 +24,11 @@ public struct Config: Equatable {
     /// Whether the app may rewrite config.toml on start (migration).
     public var autoUpdate: Bool = true
     public var scrollStep: Double = 60
+    /// Full speed while a scroll key is held, px/s; seconds to reach it; coast after release; trackpad-style events.
+    public var scrollSpeed: Double = 1500
+    public var scrollAcceleration: Double = 0.5
+    public var scrollMomentum: Bool = true
+    public var scrollSmooth: Bool = true
     public var rulerHeight: Double = 32
     /// 0 means move by the band's own height.
     public var rulerMove: Double = 0
@@ -117,6 +122,14 @@ public struct Config: Equatable {
         if let v = try keys("ruler", "remove") { k.rulerRemove = v }
 
         if let v = try number("scroll", "step") { c.scrollStep = v }
+        if let v = try number("scroll", "speed") { c.scrollSpeed = max(50, v) }
+        if let v = try number("scroll", "acceleration") { c.scrollAcceleration = max(0.05, v) }
+        for (name, set) in [("momentum", { (c: inout Config, b: Bool) in c.scrollMomentum = b }), ("smooth", { (c: inout Config, b: Bool) in c.scrollSmooth = b })] {
+            if let v = t["scroll"]?[name] {
+                guard let b = v.bool else { throw ParseError(description: "[scroll] \(name): expected true or false") }
+                set(&c, b)
+            }
+        }
         if let v = try keys("scroll", "down") { k.scrollDown = v }
         if let v = try keys("scroll", "up") { k.scrollUp = v }
         if let v = try keys("scroll", "left") { k.scrollLeft = v }

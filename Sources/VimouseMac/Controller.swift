@@ -8,6 +8,7 @@ final class Controller {
     private let engine: PointerEngine
     private let tap = InputTap()
     private let overlay = Overlay()
+    private let scroller = ScrollDriver()
     private var rulerDim: Double = Config().rulerDim
     private var colours = Colours()
     private var dragRamp = false
@@ -22,6 +23,11 @@ final class Controller {
     func apply(_ config: Config) {
         engine.apply(config)
         rulerDim = config.rulerDim
+        scroller.step = config.scrollStep
+        scroller.speed = config.scrollSpeed
+        scroller.acceleration = config.scrollAcceleration
+        scroller.momentum = config.scrollMomentum
+        scroller.smooth = config.scrollSmooth
         colours = config.colours
         dragRamp = config.dragRamp
         overlay.render(model())
@@ -37,6 +43,7 @@ final class Controller {
     }
 
     func stop() {
+        scroller.stop()
         apply(engine.deactivate())
         tap.stop()
     }
@@ -94,9 +101,15 @@ final class Controller {
             overlay.render(model())
             return true
         }
-        guard isDown else { return true }
-        // Key repeat is useful for scrolling, nudging and moving the ruler, not for picking quadrants.
-        if isRepeat, engine.mode == .pointer { return true }
+        guard isDown else {
+            // A held scroll key must end its gesture whatever mode we are in by now.
+            if scroller.isHeld { scroller.stop() }
+            apply(engine.handleRelease(key))
+            return true
+        }
+        // Key repeat is useful for nudging and moving the ruler, not for picking quadrants;
+        // a held scroll key is driven by the scroller, not by repeats.
+        if isRepeat, engine.mode == .pointer || (engine.mode == .scroll && scroller.smooth) { return true }
         apply(engine.handle(key))
         return true
     }
@@ -131,8 +144,13 @@ final class Controller {
                 Pointer.cancelDrag(origin: origin)
             case .scroll(let dx, let dy):
                 Pointer.scroll(dx: dx, dy: dy)
+            case .scrollStart(let dx, let dy, let multiplier):
+                scroller.start(dx: dx, dy: dy, multiplier: multiplier)
+            case .scrollStop:
+                scroller.stop()
             }
         }
+        if !engine.isActive, scroller.isHeld { scroller.stop() }
     }
 
     /// nil when there is nothing to draw.
