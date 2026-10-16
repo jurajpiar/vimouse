@@ -143,6 +143,7 @@ final class Controller {
             case .cancelDrag(let origin):
                 Pointer.cancelDrag(origin: origin)
             case .scroll(let dx, let dy):
+                scroller.brake()
                 Pointer.scroll(dx: dx, dy: dy)
             case .scrollStart(let dx, let dy, let multiplier):
                 scroller.start(dx: dx, dy: dy, multiplier: multiplier)
