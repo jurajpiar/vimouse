@@ -83,17 +83,17 @@ public enum Manual {
         } else {
             line("Settings that moved (values are carried over automatically):")
             for (old, new) in ConfigSchema.renamed.sorted(by: { $0.key < $1.key }) {
-                let o = old.split(separator: "."), n = new.split(separator: ".")
+                let o = ConfigSchema.split(old), n = ConfigSchema.split(new)
                 line(".TP")
-                line(".B [\(o[0])] \(o[1])")
-                line("now [\(n[0])] \(n[1])")
+                line(".B [\(o.section)] \(o.key)")
+                line("now [\(n.section)] \(n.key)")
             }
             line(".PP")
             line("Settings that no longer exist (left in the Retired settings block):")
             for (old, note) in ConfigSchema.superseded.sorted(by: { $0.key < $1.key }) {
-                let o = old.split(separator: ".")
+                let o = ConfigSchema.split(old)
                 line(".TP")
-                line(".B [\(o[0])] \(o[1])")
+                line(".B [\(o.section)] \(o.key)")
                 line(esc(note))
             }
         }

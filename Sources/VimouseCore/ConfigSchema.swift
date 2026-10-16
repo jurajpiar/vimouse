@@ -41,7 +41,8 @@ public enum ConfigSchema {
         "ruler": "Ruler mode: the reading band that dims everything except the line being read.",
         "nudge": "Nudge mode: moving the pointer by a few pixels at a time for the final adjustment.",
         "drag": "Dragging: holding the left button while navigating, for text selection and drag-and-drop.",
-        "colours": "Overlay colours, as \"#RRGGBB\".",
+        "colours.modes": "Overlay colour of each mode (its rectangles, ring and status strip), as \"#RRGGBB\".",
+        "colours.markers": "Overlay colours of markers that appear in any mode, as \"#RRGGBB\".",
         "snap": "Snapping the pointer to clickable UI elements read from the accessibility tree.",
     ]
 
@@ -101,12 +102,13 @@ public enum ConfigSchema {
         .init(section: "drag", key: "restart_search", defaultValue: "true", comment: "When a drag starts, restart the quadrant search from the whole screen (good for moving items far; set false to keep extending a selection from where you are): true or false."),
         .init(section: "drag", key: "ramp", defaultValue: "false", comment: "After pressing the button, wiggle the pointer a few pixels so apps that need movement before starting a drag-and-drop session do so. Breaks text drags in Chromium-based apps, so off unless an app needs it: true or false."),
 
-        .init(section: "colours", key: "pointer", defaultValue: "\"#0A84FF\"", comment: "Pointer mode (quadrants, strip)."),
-        .init(section: "colours", key: "drag", defaultValue: "\"#30D158\"", comment: "Drag badge, origin dot and line."),
-        .init(section: "colours", key: "nudge", defaultValue: "\"#40C8E0\"", comment: "Nudge mode."),
-        .init(section: "colours", key: "scroll", defaultValue: "\"#FF9F0A\"", comment: "Scroll mode."),
-        .init(section: "colours", key: "ruler", defaultValue: "\"#BF5AF2\"", comment: "Ruler mode and the band edges."),
-        .init(section: "colours", key: "snap", defaultValue: "\"#FF375F\"", comment: "Ring marking the snap target."),
+        .init(section: "colours.modes", key: "pointer", defaultValue: "\"#0A84FF\"", comment: "Pointer mode."),
+        .init(section: "colours.modes", key: "nudge", defaultValue: "\"#40C8E0\"", comment: "Nudge mode."),
+        .init(section: "colours.modes", key: "scroll", defaultValue: "\"#FF9F0A\"", comment: "Scroll mode."),
+        .init(section: "colours.modes", key: "ruler", defaultValue: "\"#BF5AF2\"", comment: "Ruler mode and the band edges."),
+
+        .init(section: "colours.markers", key: "drag", defaultValue: "\"#30D158\"", comment: "Drag badge, origin dot and line."),
+        .init(section: "colours.markers", key: "snap", defaultValue: "\"#FF375F\"", comment: "Ring marking the snap target."),
 
         .init(section: "snap", key: "enabled", defaultValue: "true", comment: "Snap the pointer to the nearest clickable element in the chosen rectangle: true or false."),
     ]
@@ -127,7 +129,16 @@ public enum ConfigSchema {
         "keys.exit": "global.exit", "keys.next_screen": "global.next_screen",
         "keys.previous_screen": "global.previous_screen", "keys.help": "global.help",
         "keys.scroll_toggle": "scroll.toggle", "keys.ruler_toggle": "ruler.toggle", "keys.ruler_remove": "ruler.remove",
+        "colours.pointer": "colours.modes.pointer", "colours.nudge": "colours.modes.nudge",
+        "colours.scroll": "colours.modes.scroll", "colours.ruler": "colours.modes.ruler",
+        "colours.drag": "colours.markers.drag", "colours.snap": "colours.markers.snap",
     ]
+
+    /// Splits "section.sub.key" into its section ("section.sub") and key ("key").
+    public static func split(_ path: String) -> (section: String, key: String) {
+        guard let dot = path.lastIndex(of: ".") else { return ("", path) }
+        return (String(path[..<dot]), String(path[path.index(after: dot)...]))
+    }
 
     public static var sections: [String] {
         var seen: [String] = []

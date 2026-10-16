@@ -151,10 +151,18 @@ final class ConfigTests: XCTestCase {
     }
 
     func testColours() throws {
-        let c = try Config.parse("[colours]\nscroll = \"#ff0000\"")
+        let c = try Config.parse("[colours.modes]\nscroll = \"#ff0000\"\n[colours.markers]\nsnap = \"#000000\"")
         XCTAssertEqual(c.colours.scroll, "#FF0000")
+        XCTAssertEqual(c.colours.snap, "#000000")
         XCTAssertEqual(c.colours.pointer, Colours().pointer)
-        XCTAssertThrowsError(try Config.parse("[colours]\nruler = \"red\""))
+        XCTAssertThrowsError(try Config.parse("[colours.modes]\nruler = \"red\""))
+        // The flat [colours] of the first draft migrates into the sub-sections.
+        let (t, _) = ConfigSchema.migrate("[colours]\npointer = \"#123456\"\ndrag = \"#654321\"\n")
+        XCTAssertFalse(t.contains("[colours]\n"))
+        let m = try Config.parse(t)
+        XCTAssertEqual(m.colours.pointer, "#123456")
+        XCTAssertEqual(m.colours.drag, "#654321")
+        XCTAssertFalse(ConfigSchema.migrate(t).changed)
     }
 
     func testConfigUpdateSwitch() throws {

@@ -138,17 +138,17 @@ public struct Config: Equatable {
             guard let b = v.bool else { throw ParseError(description: "[drag] ramp: expected true or false") }
             c.dragRamp = b
         }
-        func colour(_ name: String, _ set: (inout Colours, String) -> Void) throws {
-            guard let v = t["colours"]?[name] else { return }
-            guard let hex = v.string, Colours.isValid(hex) else { throw ParseError(description: "[colours] \(name): expected \"#RRGGBB\"") }
+        func colour(_ section: String, _ name: String, _ set: (inout Colours, String) -> Void) throws {
+            guard let v = t[section]?[name] else { return }
+            guard let hex = v.string, Colours.isValid(hex) else { throw ParseError(description: "[\(section)] \(name): expected \"#RRGGBB\"") }
             set(&c.colours, hex.uppercased())
         }
-        try colour("pointer") { $0.pointer = $1 }
-        try colour("drag") { $0.drag = $1 }
-        try colour("nudge") { $0.nudge = $1 }
-        try colour("scroll") { $0.scroll = $1 }
-        try colour("ruler") { $0.ruler = $1 }
-        try colour("snap") { $0.snap = $1 }
+        try colour("colours.modes", "pointer") { $0.pointer = $1 }
+        try colour("colours.modes", "nudge") { $0.nudge = $1 }
+        try colour("colours.modes", "scroll") { $0.scroll = $1 }
+        try colour("colours.modes", "ruler") { $0.ruler = $1 }
+        try colour("colours.markers", "drag") { $0.drag = $1 }
+        try colour("colours.markers", "snap") { $0.snap = $1 }
 
         if let v = t["snap"]?["enabled"] {
             guard let b = v.bool else { throw ParseError(description: "[snap] enabled: expected true or false") }
