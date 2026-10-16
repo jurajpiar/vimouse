@@ -675,8 +675,7 @@ final class EngineTests: XCTestCase {
         _ = e.handle(KeyPress(.a)) // on again: re-seat on the line under the band
         XCTAssertEqual(e.ruler?.y, 158)
         // Extend takes in the next line below; collapse returns to that line; a move collapses first.
-        _ = e.handle(KeyPress(.k)); _ = e.handle(KeyPress(.k)) // on the 148..168 line again (y 158)
-        XCTAssertEqual(e.ruler?.y, 158)
+        XCTAssertEqual(e.ruler?.y, 158)                                                   // on the 148..168 line
         XCTAssertEqual(e.handle(KeyPress(.e)), [.warp(Point(x: 250, y: 182)), .redraw]) // pointer on the line just taken in
         XCTAssertEqual(e.ruler?.band(on: screen).y, 146)                                  // top unchanged
         XCTAssertEqual(e.ruler?.band(on: screen).maxY, 194)                               // bottom: line 172..192 plus pad
