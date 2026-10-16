@@ -9,6 +9,7 @@ final class Controller {
     private let tap = InputTap()
     private let overlay = Overlay()
     private var rulerDim: Double = Config().rulerDim
+    private var dragRamp = false
     /// True while the help key is held.
     private var helpShown = false
 
@@ -20,6 +21,7 @@ final class Controller {
     func apply(_ config: Config) {
         engine.apply(config)
         rulerDim = config.rulerDim
+        dragRamp = config.dragRamp
         overlay.render(model())
     }
 
@@ -83,7 +85,7 @@ final class Controller {
             case .click(let button, let count, let modifiers):
                 Pointer.click(button, count: count, modifiers: modifiers, at: Pointer.currentLocation)
             case .mouseDown(.left):
-                Pointer.startDrag(at: Pointer.currentLocation)
+                Pointer.startDrag(at: Pointer.currentLocation, ramp: dragRamp)
             case .mouseUp(.left):
                 Pointer.endDrag(at: Pointer.currentLocation)
             case .mouseDown(let button):

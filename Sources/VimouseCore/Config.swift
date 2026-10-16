@@ -15,6 +15,7 @@ public struct Config: Equatable {
     public var snapEnabled: Bool = true
     public var nudgeStep: Double = 5
     public var dragRestartsSearch: Bool = true
+    public var dragRamp: Bool = false
 
     public init() {}
 
@@ -109,6 +110,10 @@ public struct Config: Equatable {
         if let v = t["drag"]?["restart_search"] {
             guard let b = v.bool else { throw ParseError(description: "[drag] restart_search: expected true or false") }
             c.dragRestartsSearch = b
+        }
+        if let v = t["drag"]?["ramp"] {
+            guard let b = v.bool else { throw ParseError(description: "[drag] ramp: expected true or false") }
+            c.dragRamp = b
         }
         if let v = t["snap"]?["enabled"] {
             guard let b = v.bool else { throw ParseError(description: "[snap] enabled: expected true or false") }

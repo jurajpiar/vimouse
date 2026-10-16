@@ -8,17 +8,19 @@ enum Pointer {
     /// Stamped on every event we post, so our own event tap lets them through untouched.
     static let syntheticMarker: Int64 = 0x56_49_4D_4F // "VIMO"
 
-    /// Press the left button and ramp a few drag events so apps start a drag-and-drop
-    /// session (they require movement past a threshold after the press, not one jump).
-    static func startDrag(at p: Point) {
+    /// Press the left button. With `ramp`, also post a few small drag events and return
+    /// to the origin, for apps that start a drag-and-drop session only after movement
+    /// following the press. Off by default: Chromium-based apps treat the ramp as a new
+    /// selection instead of a drag of the selected text.
+    static func startDrag(at p: Point, ramp: Bool) {
         post(.left, down: true, clickState: 1, modifiers: [], at: p)
+        guard ramp else { return }
         for i in 1...4 {
             usleep(12_000)
-            let q = CGPoint(x: p.x + Double(i) * 2, y: p.y + Double(i) * 2)
-            postDragged(to: q)
+            postDragged(to: CGPoint(x: p.x + Double(i) * 2, y: p.y + Double(i) * 2))
         }
         usleep(12_000)
-        postDragged(to: CGPoint(x: p.x, y: p.y)) // back to where the user put it
+        postDragged(to: CGPoint(x: p.x, y: p.y))
     }
 
     /// Release at `p`, after a last drag event there so the drop target is up to date.

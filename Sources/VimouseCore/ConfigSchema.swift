@@ -89,6 +89,8 @@ public enum ConfigSchema {
 
         .init(section: "drag", key: "restart_search", defaultValue: "true", comment: "When a drag starts, restart the quadrant search from the whole screen (good for moving items far; set false to keep extending a selection from where you are): true or false."),
 
+        .init(section: "drag", key: "ramp", defaultValue: "false", comment: "After pressing the button, wiggle the pointer a few pixels so apps that need movement before starting a drag-and-drop session do so. Breaks text drags in Chromium-based apps, so off unless an app needs it: true or false."),
+
         .init(section: "snap", key: "enabled", defaultValue: "true", comment: "Snap the pointer to the nearest clickable element in the chosen rectangle: true or false."),
     ]
 
