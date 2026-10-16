@@ -30,7 +30,8 @@ Scroll: j/k/h/l scroll at the pointer, d/u half a page, s back to Pointer.
 
 Ruler (reading band): r creates a band at the pointer's height, dimming the rest
 of the screen, and enters Ruler mode: j/k move it by its own height (or a fixed number of pixels
-via `[ruler] move`), [ ] change its height, s goes to
+via `[ruler] move`), [ ] change its height, Shift with any of those moves or
+resizes by one pixel, s goes to
 Scroll mode (scroll the text under a fixed band), r back to Pointer. The band stays
 after Escape; Shift+r removes it.
 

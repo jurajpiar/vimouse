@@ -68,6 +68,7 @@ public enum ConfigSchema {
 
         .init(section: "ruler", key: "height", defaultValue: "32", comment: "Band height in pixels when created; 20 to 40 covers one or two text lines."),
         .init(section: "ruler", key: "move", defaultValue: "0", comment: "How far the band moves per press: 0 = its own height (one line when sized to a line), otherwise pixels, e.g. 20. A count multiplies."),
+        .init(section: "ruler", key: "fine", defaultValue: "1", comment: "Pixels the band moves or resizes per press while Shift is held (micro-adjustment), e.g. 1, 2."),
         .init(section: "ruler", key: "height_step", defaultValue: "4", comment: "Pixels added or removed from the band height per press, e.g. 2, 4, 8."),
         .init(section: "ruler", key: "dim", defaultValue: "0.35", comment: "Darkening outside the band, 0 (none) to 1 (black); 0.2 subtle, 0.35 default, 0.6 strong."),
         .init(section: "ruler", key: "down", defaultValue: "\"j\"", comment: "Move the band down, e.g. \"j\", \"down\"."),

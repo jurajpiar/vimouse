@@ -71,6 +71,7 @@ public final class PointerEngine {
     /// Ruler movement per j/k press (0 = the band's own height), its height change per [ ] press, and its initial height.
     public var rulerMove: Double = 0
     public var rulerHeightStep: Double = 4
+    public var rulerFine: Double = 1
     public var rulerDefaultHeight: Double = 32
 
     /// Snap the pointer to UI elements (needs a `snapProvider`). Toggled in Pointer mode.
@@ -92,6 +93,7 @@ public final class PointerEngine {
         rulerDefaultHeight = c.rulerHeight
         rulerMove = c.rulerMove
         rulerHeightStep = c.rulerHeightStep
+        rulerFine = c.rulerFine
         if !isActive { snapping = c.snapEnabled }
     }
 
@@ -240,11 +242,15 @@ public final class PointerEngine {
         case .ruler:
             guard var r = ruler else { break }
             let screen = screens[r.screenIndex]
-            let step = rulerMove > 0 ? rulerMove : r.height
-            if keymap.rulerDown.contains(key) { r.y += step * n }
-            else if keymap.rulerUp.contains(key) { r.y -= step * n }
-            else if keymap.rulerGrow.contains(key) { r.height += rulerHeightStep * n }
-            else if keymap.rulerShrink.contains(key) { r.height -= rulerHeightStep * n }
+            // Shift held with a move or resize key makes a fine (pixel) adjustment.
+            let fine = key.modifiers.contains(.shift)
+            let base = KeyPress(key.code, key.modifiers.subtracting(.shift))
+            let move = fine ? rulerFine : (rulerMove > 0 ? rulerMove : r.height)
+            let resize = fine ? rulerFine : rulerHeightStep
+            if keymap.rulerDown.contains(key) || (fine && keymap.rulerDown.contains(base)) { r.y += move * n }
+            else if keymap.rulerUp.contains(key) || (fine && keymap.rulerUp.contains(base)) { r.y -= move * n }
+            else if keymap.rulerGrow.contains(key) || (fine && keymap.rulerGrow.contains(base)) { r.height += resize * n }
+            else if keymap.rulerShrink.contains(key) || (fine && keymap.rulerShrink.contains(base)) { r.height -= resize * n }
             else { break }
             r.height = max(8, r.height)
             r.y = min(max(r.y, screen.y), screen.maxY)
@@ -323,6 +329,7 @@ public final class PointerEngine {
         case .ruler:
             h.append((l(k.rulerDown) + l(k.rulerUp), "move"))
             h.append((l(k.rulerShrink) + " " + l(k.rulerGrow), "height"))
+            h.append(("⇧", "fine"))
             h.append((l(k.scrollToggle), "scroll"))
             h.append((l(k.rulerToggle), "pointer"))
             h.append((l(k.rulerRemove), "remove"))

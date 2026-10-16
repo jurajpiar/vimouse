@@ -9,6 +9,8 @@ public struct Config: Equatable {
     /// 0 means move by the band's own height.
     public var rulerMove: Double = 0
     public var rulerHeightStep: Double = 4
+    /// Pixels per press with Shift held, for move and resize.
+    public var rulerFine: Double = 1
     public var rulerDim: Double = 0.35
     public var snapEnabled: Bool = true
 
@@ -86,6 +88,7 @@ public struct Config: Equatable {
         if let v = try number("ruler", "height") { c.rulerHeight = v }
         if let v = try number("ruler", "move") { c.rulerMove = max(0, v) }
         if let v = try number("ruler", "height_step") { c.rulerHeightStep = v }
+        if let v = try number("ruler", "fine") { c.rulerFine = max(0.5, v) }
         if let v = try number("ruler", "dim") { c.rulerDim = min(max(v, 0), 1) }
         if let v = try keys("ruler", "down") { k.rulerDown = v }
         if let v = try keys("ruler", "up") { k.rulerUp = v }

@@ -359,6 +359,11 @@ final class EngineTests: XCTestCase {
         e.rulerMove = 10
         _ = e.handle(KeyPress(.k))
         XCTAssertEqual(e.ruler?.y, 274 - 10)     // explicit pixel step
+        _ = e.handle(KeyPress(.j, [.shift]))
+        XCTAssertEqual(e.ruler?.y, 265)          // Shift: one pixel
+        _ = e.handle(KeyPress(.three))
+        _ = e.handle(KeyPress(.leftBracket, [.shift]))
+        XCTAssertEqual(e.ruler?.height, 33)      // Shift with a count: three pixels
         // Clamped to the screen.
         _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine))
         _ = e.handle(KeyPress(.j))
