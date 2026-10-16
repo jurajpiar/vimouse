@@ -56,9 +56,10 @@ reloads within a second. A parse error keeps the previous settings and turns the
 menu bar item into "vm!"; "Show config error" in the menu says why.
 
 On every start the file is brought up to date: settings added in a newer version
-are appended with their defaults and comments, and unknown or superseded settings
-are commented out with a pointer to `CHANGELOG.md`. Your values and comments are
-kept. Arrow keys, page up/down, home and end can be bound like any other key
+are appended with their defaults and comments, renamed settings move with their
+values, and unknown or superseded settings are gathered into a short "Retired
+settings" block at the end (see `CHANGELOG.md` for what replaced them). Your
+values and comments are kept. Arrow keys, page up/down, home and end can be bound like any other key
 (`down = ["j", "down"]`), and the legend and in-rectangle labels show whatever is
 bound.
 

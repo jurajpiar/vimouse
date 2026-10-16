@@ -106,21 +106,31 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(text.contains("# Pointer mode: narrowing down"))      // section description added
         XCTAssertTrue(text.contains("# Pick the top-left quadrant, e.g. \"i\", \"up\".\ntop_left = \"q\"")) // comment for an existing key
         XCTAssertTrue(text.contains("top_left = \"q\""))                 // user value kept
-        XCTAssertTrue(text.contains("ignored (see CHANGELOG.md in the vimouse repository): mystery = 1"))
+        XCTAssertFalse(text.contains("mystery = 1\n[scroll]"))              // unknown key removed from its place
+        XCTAssertTrue(text.hasSuffix("# Retired settings (see CHANGELOG.md in the vimouse repository):\n# [pointer] mystery = 1\n"))
         XCTAssertTrue(text.contains("left_click = [\"return\", \"m\"]"))   // missing key appended with default
         XCTAssertTrue(text.contains("[ruler]"))                            // missing section appended
         let (t2, _) = ConfigSchema.migrate("[ruler]\nstep = 20\n")
-        XCTAssertTrue(t2.contains("# superseded by `move` (0 = the band's own height), ignored (see CHANGELOG.md in the vimouse repository): step = 20"))
+        XCTAssertTrue(t2.hasSuffix("# Retired settings (see CHANGELOG.md in the vimouse repository):\n# [ruler] step = 20\n"))
+        XCTAssertFalse(t2.contains("\nstep = 20"))
         XCTAssertTrue(t2.contains("\nmove = 0"))
         // A renamed setting carries its value to the new place.
         let (t3, _) = ConfigSchema.migrate("[keys]\nleft_click = \"space\"\nexit = \"q\"\n")
-        XCTAssertTrue(t3.contains("# moved to [actions] left_click (see CHANGELOG.md in the vimouse repository): left_click = \"space\""))
+        XCTAssertFalse(t3.contains("[keys]"))                              // empty old section dropped
+        XCTAssertFalse(t3.contains("moved to"))                            // renames are silent
         XCTAssertTrue(t3.contains("\nleft_click = \"space\"\n"))
         XCTAssertTrue(t3.contains("\nexit = \"q\"\n"))
         let c3 = try Config.parse(t3)
         XCTAssertEqual(c3.keymap.leftClick, [KeyPress(.space)])
         XCTAssertEqual(c3.keymap.exit, [KeyPress(.q)])
         XCTAssertFalse(ConfigSchema.migrate(t3).changed)
+        // Notes left inline by earlier versions are gathered into the retired block.
+        let legacy = "[scroll]\nstep = 24\n# moved to [actions] drag (see x): drag = \"v\"\n# unknown setting, ignored (see x): foo = 1\n"
+        let (t4, c4) = ConfigSchema.migrate(legacy)
+        XCTAssertTrue(c4)
+        XCTAssertFalse(t4.contains("moved to"))
+        XCTAssertTrue(t4.hasSuffix("# Retired settings (see CHANGELOG.md in the vimouse repository):\n# foo = 1\n"))
+        XCTAssertFalse(ConfigSchema.migrate(t4).changed)
         XCTAssertTrue(text.contains("# Darkening outside the band"))      // with its comment
         let c = try Config.parse(text)
         XCTAssertEqual(c.scrollStep, 24)

@@ -23,8 +23,8 @@ public enum ConfigSchema {
     # Modifiers cmd, shift, ctrl, alt are joined with "+", e.g. "cmd+shift+space".
     # A list binds several keys to one action, e.g. ["j", "down"].
     #
-    # On start, settings missing from this file are appended with their defaults, and
-    # unknown or superseded settings are commented out (see \(changelog)).
+    # On start, settings missing from this file are appended with their defaults;
+    # unknown or superseded ones are moved to a "Retired settings" block at the end.
     """
 
     /// One line above each section header.
@@ -133,23 +133,56 @@ public enum ConfigSchema {
         return out
     }
 
-    /// Adds missing settings with their defaults (and comments) and comments out
-    /// unknown or superseded ones. Returns the new text and whether anything changed.
-    /// Line based, so the user's own comments and ordering are preserved.
+    static let retiredHeader = "# Retired settings (see \(changelog)):"
+
+    /// Brings a file up to date: adds missing settings with their defaults and comments
+    /// (and descriptions for known sections and keys that lack them), moves renamed
+    /// settings silently with their values, and gathers superseded or unknown settings
+    /// into one block at the end. Line based, so the user's own comments and ordering
+    /// are preserved. Returns the new text and whether anything changed.
     public static func migrate(_ text: String) -> (text: String, changed: Bool) {
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return (template(), true) }
         var lines = text.components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }
         var changed = false
 
-        // Pass 1: find sections, their line ranges, and the keys they contain. Known
-        // sections and keys without a comment on the line above get theirs.
-        struct SectionInfo { var start: Int; var end: Int; var keys: Set<String> }
+        // Pass 0: notes written by earlier versions inline ("# moved to ...: x = 1",
+        // "# ..., ignored (see ...): x = 1") and an existing retired block.
+        var retired: [String] = []
+        var cleaned: [String] = []
+        var inRetired = false
+        for raw in lines {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line == retiredHeader { inRetired = true; continue }
+            if inRetired {
+                if line.hasPrefix("#"), line.count > 1 {
+                    retired.append(String(line.dropFirst()).trimmingCharacters(in: .whitespaces))
+                    continue
+                }
+                inRetired = false
+                if line.isEmpty { continue }
+            }
+            if line.hasPrefix("# moved to ["), line.contains("): ") {
+                continue // the value already lives at its new place
+            }
+            if line.hasPrefix("#"), line.contains("ignored (see "), let r = line.range(of: "): ") {
+                retired.append(String(line[r.upperBound...]))
+                changed = true
+                continue
+            }
+            cleaned.append(raw)
+        }
+        lines = cleaned
+
+        // Pass 1: sections, their line ranges and keys. Known sections and keys without
+        // their description directly above get it. Renamed keys are removed and their
+        // values carried; superseded and unknown keys are retired.
+        struct SectionInfo { var start: Int; var end: Int; var keys: Set<String>; var keyLines: Int }
         var sections: [String: SectionInfo] = [:]
         var current: String? = nil
         var commentsToInsert: [(before: Int, text: String)] = []
+        var removals = Set<Int>()
         var carried: [String: String] = [:]
-        /// True when `comment` already sits in the block of comment lines directly above line i.
         func hasComment(_ comment: String, above i: Int) -> Bool {
             var j = i - 1
             while j >= 0 {
@@ -165,7 +198,7 @@ public enum ConfigSchema {
             if line.hasPrefix("[") && line.hasSuffix("]") {
                 let name = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
                 current = name
-                sections[name] = SectionInfo(start: i, end: i, keys: [])
+                sections[name] = SectionInfo(start: i, end: i, keys: [], keyLines: 0)
                 if let c = sectionComments[name], !hasComment("# \(c)", above: i) {
                     commentsToInsert.append((before: i, text: "# \(c)"))
                 }
@@ -175,25 +208,24 @@ public enum ConfigSchema {
             if !line.isEmpty { sections[sec]!.end = i }
             guard !line.isEmpty, !line.hasPrefix("#"), let eq = line.firstIndex(of: "=") else { continue }
             let key = line[..<eq].trimmingCharacters(in: .whitespaces)
-            sections[sec]!.keys.insert(key)
+            let value = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
             if let entry = entries.first(where: { $0.section == sec && $0.key == key }) {
+                sections[sec]!.keys.insert(key)
+                sections[sec]!.keyLines += 1
                 if !hasComment("# \(entry.comment)", above: i) { commentsToInsert.append((before: i, text: "# \(entry.comment)")) }
             } else if let target = renamed["\(sec).\(key)"] {
-                // Moved: keep the user's value for the new location, comment the old line.
-                let value = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
                 carried[target] = value
-                let parts = target.split(separator: ".").map(String.init)
-                lines[i] = "# moved to [\(parts[0])] \(parts[1]) (see \(changelog)): \(raw)"
+                removals.insert(i)
                 changed = true
             } else {
-                let note = superseded["\(sec).\(key)"] ?? "unknown setting"
-                lines[i] = "# \(note), ignored (see \(changelog)): \(raw)"
+                retired.append("[\(sec)] \(key) = \(value)")
+                removals.insert(i)
                 changed = true
             }
         }
 
-        // Pass 2: append missing keys per known section, and missing sections. Insert
-        // from the bottom up so earlier indices stay valid.
+        // Pass 2: blocks of missing keys per known section (carried values first), and
+        // missing sections.
         var insertions: [(after: Int, text: [String])] = []
         var appendix: [String] = []
         for section in self.sections {
@@ -207,10 +239,27 @@ public enum ConfigSchema {
             }
             changed = true
         }
+
+        // Unknown sections left without any key (for example a former [keys]) go away,
+        // header and all, together with the comments directly above them.
+        for (name, info) in sections where sectionComments[name] == nil && !entries.contains(where: { $0.section == name }) {
+            let remaining = (info.start...info.end).filter { i in
+                let l = lines[i].trimmingCharacters(in: .whitespaces)
+                return !l.isEmpty && !l.hasPrefix("#") && !l.hasPrefix("[") && !removals.contains(i)
+            }
+            guard remaining.isEmpty else { continue }
+            for i in info.start...info.end { removals.insert(i) }
+            var j = info.start - 1
+            while j >= 0, lines[j].trimmingCharacters(in: .whitespaces).hasPrefix("#") { removals.insert(j); j -= 1 }
+            changed = true
+        }
+
         // Apply every insert bottom up so earlier indices stay valid. A comment goes at
         // `before`; a block of new keys goes at `after + 1`. At the same position the
         // comment (which belongs to the line after it) is inserted first, so the block,
-        // which belongs to the section before, ends up above it.
+        // which belongs to the section before, ends up above it. Removals are marked
+        // first so their indices are not shifted.
+        for i in removals { lines[i] = "\u{0}" }
         var inserts: [(at: Int, isComment: Bool, text: [String])] =
             commentsToInsert.map { (at: $0.before, isComment: true, text: [$0.text]) }
             + insertions.map { (at: $0.after + 1, isComment: false, text: $0.text) }
@@ -219,7 +268,19 @@ public enum ConfigSchema {
             lines.insert(contentsOf: ins.text, at: ins.at)
             changed = true
         }
+        lines.removeAll { $0 == "\u{0}" }
         lines += appendix
-        return (lines.joined(separator: "\n") + "\n", changed)
+
+        // Retired block, deduplicated, at the very end.
+        var seen = Set<String>()
+        let retiredUnique = retired.filter { seen.insert($0).inserted }
+        while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true { lines.removeLast() }
+        if !retiredUnique.isEmpty {
+            lines += ["", retiredHeader] + retiredUnique.map { "# \($0)" }
+        }
+        // "Changed" means the text differs; the flags above only steer the passes.
+        _ = changed
+        let result = lines.joined(separator: "\n") + "\n"
+        return (result, result != text)
     }
 }
