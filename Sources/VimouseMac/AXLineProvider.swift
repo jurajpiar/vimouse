@@ -251,7 +251,7 @@ final class AXLineProvider: LineProvider {
             guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
             element = parent
         }
-        if let wa = webArea {
+        if let wa = webArea, !hollowMarkers.contains(pid) {
             if let f = lineFromMarkers(wa.element, x: x, y: y) { return f }
             if let f = lineFromWebIndex(wa.element, hit: hit, x: x, y: y, deadline: deadline) { return f }
             log("web area answered no line at (\(Int(x)),\(Int(y)))")
