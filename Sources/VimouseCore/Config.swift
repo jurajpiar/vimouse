@@ -199,8 +199,12 @@ public extension Modifiers {
 }
 
 public extension KeyPress {
-    /// Display form: modifier symbols then the key, e.g. "⇧⇥", "⌘⇧␣", "↓".
+    /// Display form: modifier symbols then the key, e.g. "⇧⇥", "⌘⇧␣", "↓". Shift alone
+    /// with a letter shows the capital: "R" rather than "⇧r".
     var label: String {
+        if modifiers == .shift, code.label.count == 1, let c = code.label.first, c.isLetter {
+            return code.label.uppercased()
+        }
         var s = ""
         func sym(_ m: Modifiers, _ symbol: String) {
             let (l, r) = Modifiers.sides(of: m)

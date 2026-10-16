@@ -301,6 +301,8 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.upArrow)), [.scrollStart(dx: 0, dy: -1, multiplier: 1)])
         XCTAssertEqual(e.hints.first?.key, "↓k hl")
         XCTAssertEqual(KeyPress(.tab, [.shift]).label, "⇧⇥")
+        XCTAssertEqual(KeyPress(.r, [.shift]).label, "R")          // a shifted letter is its capital
+        XCTAssertEqual(KeyPress(.r, [.shift, .command]).label, "⇧⌘r") // with other modifiers, spelled out
         XCTAssertEqual(KeyPress(.space, [.command, .shift]).label, "⇧⌘␣")
     }
 
