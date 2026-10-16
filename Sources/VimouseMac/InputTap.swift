@@ -11,7 +11,8 @@ final class InputTap {
     }
 
     /// `isModifier` is true for a modifier key going down or up (a flagsChanged event).
-    typealias Handler = (_ key: KeyPress, _ isKeyDown: Bool, _ isRepeat: Bool, _ isModifier: Bool) -> Bool
+    /// `bothSides` lists modifiers whose left and right keys are both down.
+    typealias Handler = (_ key: KeyPress, _ isKeyDown: Bool, _ isRepeat: Bool, _ isModifier: Bool, _ bothSides: Modifiers) -> Bool
     var handler: Handler?
 
     private var port: CFMachPort?
@@ -62,7 +63,7 @@ final class InputTap {
             let code = KeyCode(rawValue: UInt16(event.getIntegerValueField(.keyboardEventKeycode)))
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             let key = KeyPress(code, InputTap.modifiers(from: event.flags))
-            let swallow = tap.handler?(key, type == .keyDown, isRepeat, false) ?? false
+            let swallow = tap.handler?(key, type == .keyDown, isRepeat, false, InputTap.bothSides(event.flags)) ?? false
             return swallow ? nil : Unmanaged.passUnretained(event)
         case .flagsChanged:
             let code = KeyCode(rawValue: UInt16(event.getIntegerValueField(.keyboardEventKeycode)))
@@ -76,7 +77,7 @@ final class InputTap {
                 return Unmanaged.passUnretained(event)
             }
             let key = KeyPress(code, InputTap.modifiers(from: event.flags))
-            let swallow = tap.handler?(key, isDown, false, true) ?? false
+            let swallow = tap.handler?(key, isDown, false, true, InputTap.bothSides(event.flags)) ?? false
             return swallow ? nil : Unmanaged.passUnretained(event)
         default:
             return Unmanaged.passUnretained(event)
@@ -91,6 +92,17 @@ final class InputTap {
         case .command: return .maskCommand
         default: return []
         }
+    }
+
+    /// Device-level flag bits (NX_DEVICE*KEYMASK) tell left from right. Both down -> listed.
+    private static func bothSides(_ flags: CGEventFlags) -> Modifiers {
+        let raw = flags.rawValue
+        var m: Modifiers = []
+        if raw & 0x02 != 0, raw & 0x04 != 0 { m.insert(.shift) }       // L/R shift
+        if raw & 0x08 != 0, raw & 0x10 != 0 { m.insert(.command) }     // L/R command
+        if raw & 0x20 != 0, raw & 0x40 != 0 { m.insert(.option) }      // L/R option
+        if raw & 0x01 != 0, raw & 0x2000 != 0 { m.insert(.control) }   // L/R control
+        return m
     }
 
     private static func modifiers(from flags: CGEventFlags) -> Modifiers {

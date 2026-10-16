@@ -40,10 +40,10 @@ final class Controller {
     }
 
     func start() throws {
-        tap.handler = { [weak self] key, isDown, isRepeat, isModifier in
+        tap.handler = { [weak self] key, isDown, isRepeat, isModifier, bothSides in
             guard let self else { return false }
             if isModifier { return self.handleModifier(key, isDown: isDown) }
-            return self.handleKey(key, isDown: isDown, isRepeat: isRepeat)
+            return self.handleKey(key, isDown: isDown, isRepeat: isRepeat, bothSides: bothSides)
         }
         try tap.start()
     }
@@ -85,7 +85,7 @@ final class Controller {
     }
 
     // Runs on the event-tap callback (main run loop). Must be fast.
-    private func handleKey(_ rawKey: KeyPress, isDown: Bool, isRepeat: Bool) -> Bool {
+    private func handleKey(_ rawKey: KeyPress, isDown: Bool, isRepeat: Bool, bothSides: Modifiers) -> Bool {
         var key = rawKey
         if !engine.isActive {
             guard key == engine.keymap.activate, isDown, !isRepeat else { return false }
@@ -104,9 +104,11 @@ final class Controller {
             }
             return true
         }
-        // While the hold key is down, its own modifier is not part of what the user typed.
+        // While the hold key is down, its own modifiers are not part of what the user
+        // typed, unless the other side of that modifier is down too: a hyper key on the
+        // left plus right Shift still means Shift.
         if engine.heldActivation, let bits = engine.keymap.hold?.bits {
-            key = KeyPress(key.code, key.modifiers.subtracting(bits))
+            key = KeyPress(key.code, key.modifiers.subtracting(bits.subtracting(bothSides)))
         }
         // Active: swallow everything so the focused app sees nothing.
         // The help key works on hold: shown on key down, hidden on key up.
