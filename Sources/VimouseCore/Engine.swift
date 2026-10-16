@@ -183,6 +183,8 @@ public final class PointerEngine {
             }
             return deactivate()
         }
+        // A mode that takes typed letters sees the key before any shared binding.
+        if current.capturesKeys, let fx = current.handle(key, count: count, context) { return fx + requestedSwitch() }
         // Mode toggles: another mode's key enters it; the active mode's own returns to the default.
         for id in enabled {
             guard let m = mode(id), m.toggle.has(key) else { continue }

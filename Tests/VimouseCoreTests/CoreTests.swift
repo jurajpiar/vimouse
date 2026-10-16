@@ -2,12 +2,13 @@ import XCTest
 @testable import VimouseCore
 import PointerMode
 import HalfMode
+import HintsMode
 import NudgeMode
 import ScrollMode
 import RulerMode
 
 /// The modes the app ships, fresh for each test.
-func standardModes() -> [Mode] { [PointerMode(), HalfMode(), NudgeMode(), ScrollMode(), RulerMode()] }
+func standardModes() -> [Mode] { [PointerMode(), HalfMode(), HintsMode(), NudgeMode(), ScrollMode(), RulerMode()] }
 
 let standardCursors: [CursorStyle] = [RingCursor(), CrosshairCursor(), DotCursor()]
 
@@ -822,6 +823,43 @@ final class PluginTests: XCTestCase {
         })
         XCTAssertThrowsError(try Config.parse("[cursor]\nstyle = \"arrow\""))
         XCTAssertThrowsError(try Config.parse("[cursor]\ncolour = \"red\""))
+    }
+
+    final class FakeElements: ElementProvider {
+        var frames: [Rect] = []
+        func elements(on screen: Rect) -> [Rect] { frames }
+    }
+
+    func testHintsMode() throws {
+        XCTAssertEqual(HintsMode.labels(count: 3, letters: "ab"), ["aa", "ab", "ba"])
+        XCTAssertEqual(HintsMode.labels(count: 2, letters: "ab"), ["a", "b"])
+        XCTAssertEqual(HintsMode.labels(count: 30, letters: "asdfghjkl").count, 30)
+        let e = PointerEngine()
+        let els = FakeElements()
+        els.frames = [Rect(x: 10, y: 10, width: 40, height: 20), Rect(x: 100, y: 100, width: 40, height: 20), Rect(x: 300, y: 300, width: 40, height: 20)]
+        e.context.services.elements = els
+        _ = e.activate(screen: screen)
+        XCTAssertEqual(e.handle(KeyPress(.f)), [.redraw])
+        XCTAssertEqual(e.mode, "hints")
+        let hints = e.mode("hints") as! HintsMode
+        XCTAssertEqual(hints.targets.map(\.label), ["a", "s", "d"])
+        XCTAssertEqual(e.handle(KeyPress(.m)), [.redraw])                    // m is a click key elsewhere; here an unused letter: ignored
+        XCTAssertEqual(e.mode, "hints")
+        XCTAssertEqual(e.handle(KeyPress(.s)), [.warp(Point(x: 120, y: 110)), .click(.left, count: 1, modifiers: []), .redraw, .redraw])
+        XCTAssertEqual(e.mode, "pointer")                                    // handed back after the click
+        // Two-letter labels: a prefix narrows, Backspace widens, no-click variant just moves.
+        els.frames = (0..<12).map { Rect(x: Double($0) * 50, y: 0, width: 40, height: 20) }
+        e.apply(try Config.parse("[hints]\nletters = \"abc\"\nclick = false"))
+        _ = e.handle(KeyPress(.f))
+        XCTAssertEqual(hints.targets.count, 12)
+        XCTAssertEqual(hints.targets[0].label, "aa")
+        _ = e.handle(KeyPress(.b))
+        XCTAssertEqual(hints.typed, "b")
+        _ = e.handle(KeyPress(.delete))
+        XCTAssertEqual(hints.typed, "")
+        _ = e.handle(KeyPress(.c)); XCTAssertEqual(e.handle(KeyPress(.a)), [.warp(Point(x: 320, y: 10)), .redraw, .redraw]) // "ca" = index 6
+        XCTAssertEqual(e.mode, "pointer")
+        XCTAssertEqual(e.target, Point(x: 320, y: 10))
     }
 
     func testEveryModeSchemaStaysInItsSection() {

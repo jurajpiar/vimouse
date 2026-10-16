@@ -7,7 +7,7 @@ import VimouseCore
 /// Accessibility (AX) tree. The tree is walked once per activation (cached), pruned
 /// to what is on screen, and capped in size and time so a slow app cannot stall
 /// the key handler. AX positions are in CG coordinates, the same as VimouseCore.
-final class AXSnapper: SnapProvider {
+final class AXSnapper: SnapProvider, ElementProvider {
     /// Element roles that are worth snapping to. Anything with an AXPress action also counts.
     private static let clickableRoles: Set<String> = [
         "AXButton", "AXLink", "AXCheckBox", "AXRadioButton", "AXMenuItem", "AXMenuBarItem",
@@ -20,9 +20,22 @@ final class AXSnapper: SnapProvider {
     var timeBudget: TimeInterval = 0.15
 
     private var centres: [Point] = []
+    private var frames: [Rect] = []
+    private var preparedScreen: Rect?
+    private var preparedAt = Date.distantPast
+
+    /// Frames of the clickable elements on `screen`; the tree is walked again when the
+    /// cache is older than a moment (the frontmost app may have changed).
+    func elements(on screen: Rect) -> [Rect] {
+        if preparedScreen != screen || Date().timeIntervalSince(preparedAt) > 1 { prepare(screen: screen) }
+        return frames
+    }
 
     func prepare(screen: Rect) {
         centres = []
+        frames = []
+        preparedScreen = screen
+        preparedAt = Date()
         guard let app = NSWorkspace.shared.frontmostApplication else { return }
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(appElement, 0.1)
@@ -62,7 +75,10 @@ final class AXSnapper: SnapProvider {
         let role: String = attribute(element, kAXRoleAttribute) ?? ""
         if isClickable(element, role: role) {
             let visible = frame.intersection(clip)
-            if visible.width > 2, visible.height > 2 { centres.append(visible.center) }
+            if visible.width > 2, visible.height > 2 {
+                centres.append(visible.center)
+                frames.append(visible)
+            }
         }
         // Scroll areas clip their children; everything else inherits the clip.
         let childClip = role == "AXScrollArea" ? clip.intersection(frame) : clip

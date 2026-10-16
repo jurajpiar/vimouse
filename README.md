@@ -44,6 +44,10 @@ h/j/k/l or the arrows keep the left/bottom/top/right half of the current rectang
 Backspace or u go up a level, Shift+u back to the whole screen, b back to Pointer
 (whose descent is kept).
 
+Hints: f labels every clickable element the frontmost app exposes through
+accessibility with a letter or two; type the label to click it (or only move there
+with `[hints] click = false`). Backspace deletes a letter, f or Escape leaves.
+
 Nudge: n from Pointer mode, then h/j/k/l or the arrows move the pointer (a tap is
 one step, a hold accelerates, release stops, a horizontal and a vertical key held
 together move diagonally; Shift: one pixel per repeat; counts multiply), n back to

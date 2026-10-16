@@ -30,6 +30,7 @@ final class Controller {
         engine = PointerEngine(modes: modes, cursors: cursors)
         engine.context.services.snap = snapper
         engine.context.services.lines = lines
+        engine.context.services.elements = snapper
         activateMode = engine.defaultMode
         holdMode = engine.defaultMode
     }

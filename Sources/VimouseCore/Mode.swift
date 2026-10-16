@@ -29,6 +29,10 @@ public protocol Mode: AnyObject {
     var toggle: Set<KeyPress> { get }
     /// Whether the platform should pass key repeats (a held key) to `handle`.
     var acceptsKeyRepeat: Bool { get }
+    /// The mode sees every key before the shared bindings (clicks, drag, mode toggles),
+    /// except exit and the count digits; for modes that take typed letters. Return nil
+    /// from `handle` to let the shared binding run.
+    var capturesKeys: Bool { get }
     /// Whether the dashed line from the drag origin to the pointer is drawn while dragging
     /// (off where it would sit on the text being selected).
     var showsDragLine: Bool { get }
@@ -98,6 +102,7 @@ public struct Hint: Equatable, Sendable {
 
 public extension Mode {
     var enabledByDefault: Bool { true }
+    var capturesKeys: Bool { false }
     var symbol: String { String(name.prefix(1)) }
     var acceptsKeyRepeat: Bool { true }
     var showsDragLine: Bool { false }
@@ -116,7 +121,14 @@ public extension Mode {
 public final class Services {
     public weak var snap: SnapProvider?
     public weak var lines: LineProvider?
+    public weak var elements: ElementProvider?
     public init() {}
+}
+
+/// Supplies the frames of clickable UI elements on a display (from the accessibility
+/// tree), for hint labels.
+public protocol ElementProvider: AnyObject {
+    func elements(on screen: Rect) -> [Rect]
 }
 
 /// Supplies a better pointer target inside a rectangle (for example the centre of
