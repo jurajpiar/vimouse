@@ -198,8 +198,9 @@ final class AXLineProvider: LineProvider {
             if let f = lineFromMarkers(wa.element, x: x, y: y) { return f }
             if let f = lineFromWebIndex(wa.element, hit: hit, x: x, y: y, deadline: deadline) { return f }
             log("web area answered no line at (\(Int(x)),\(Int(y)))")
+            if debug, dumped == false { dumped = true; dump(hit, levels: 4) }
         } else if debug {
-            dump(hit)
+            dump(hit, levels: 40)
         }
         // No text API: a short element of a text-like role is itself one line.
         let role: String = attribute(hit, kAXRoleAttribute) ?? ""
@@ -240,14 +241,18 @@ final class AXLineProvider: LineProvider {
     }
 
     /// Debug: the hit element and its ancestors, with the parameterised attributes each offers.
-    private func dump(_ hit: AXUIElement) {
+    private var dumped = false
+    private func dump(_ hit: AXUIElement, levels: Int) {
         var element = hit
-        for depth in 0..<40 {
+        for depth in 0..<levels {
             let role: String = attribute(element, kAXRoleAttribute) ?? "?"
             var namesRef: CFArray?
             let names = AXUIElementCopyParameterizedAttributeNames(element, &namesRef) == .success ? (namesRef as? [String] ?? []) : []
             let f = frame(of: element).map { "\(Int($0.x)),\(Int($0.y)) \(Int($0.width))x\(Int($0.height))" } ?? "no frame"
-            NSLog("vimouse ruler:   [%d] %@ %@ params: %@", depth, role, f, names.joined(separator: " "))
+            var attrsRef: CFArray?
+            let attrs = AXUIElementCopyAttributeNames(element, &attrsRef) == .success ? (attrsRef as? [String] ?? []) : []
+            let value: String = attribute(element, kAXValueAttribute) ?? ""
+            NSLog("vimouse ruler:   [%d] %@ %@ value: %@ attrs: %@ params: %@", depth, role, f, String(value.prefix(40)), attrs.joined(separator: " "), names.joined(separator: " "))
             guard let parent: AXUIElement = attribute(element, kAXParentAttribute) else { break }
             element = parent
         }
