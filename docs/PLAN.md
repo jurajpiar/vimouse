@@ -120,6 +120,8 @@ Trackpad-like convenience (discussed 2026-10-16). What a trackpad has: modeless,
 
 Next candidates, in suggested order: (1) Phase 2 robustness: permission-revocation handling (poll CGEventTapCreate, tear down), secure-input detection with a badge; (2) a standalone .app bundle with launch at login and a stable signing identity, so the app no longer needs a terminal and the Accessibility grant stops resetting (part of Phase 5, pulled forward); (3) nudge acceleration while a key is held; (4) parked: ruler polish (AX line snapping), half-split keys, expanding-step navigation, mode plugin refactor, system-shortcut passthrough.
 
+2026-10-16 (late): app bundle (`scripts/bundle.sh`, `scripts/install.sh`, Info.plist with LSUIElement, Developer ID signing picked automatically, Launch at login via SMAppService) installed and verified. Phase 2 robustness verified: Accessibility revoked while running tears the tap down and restores it on re-grant (clicks never froze); secure input shows a lock (system password dialogs enable it, a plain `sudo` prompt does not, which is the terminal's call).
+
 Open: none.
 
 ## Sources
