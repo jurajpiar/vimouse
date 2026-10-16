@@ -35,9 +35,10 @@ public protocol Mode: AnyObject {
 
     /// The mode became active (from idle or another mode). `ctx.target` is the pointer.
     func activate(_ ctx: ModeContext)
-    /// The mode stopped being active: another mode took over (`exiting` false; keep
-    /// state a return would want, such as a descent) or the engine went idle (true).
-    func deactivate(_ ctx: ModeContext, exiting: Bool)
+    /// The mode stopped being active. `.switched`: another mode was chosen explicitly
+    /// (keep what a return would want: a descent, a band). `.toggledOff`: its own toggle
+    /// or a hand-back. `.exited`: the engine went idle.
+    func deactivate(_ ctx: ModeContext, reason: LeaveReason)
     /// The session moved to another display; `ctx.target` is already at its centre.
     func screenChanged(_ ctx: ModeContext)
     /// A drag started with this mode active.
@@ -63,6 +64,11 @@ public protocol Mode: AnyObject {
     var manual: String { get }
 }
 
+/// Why a mode stopped being active.
+public enum LeaveReason: Equatable, Sendable {
+    case switched, toggledOff, exited
+}
+
 /// A mode's parsed settings. Each mode defines its own Equatable struct; equality is
 /// type-erased so a whole `Config` can be compared (the template-reproduces-defaults test).
 public protocol ModeSettings {
@@ -78,7 +84,7 @@ public extension Mode {
     var showsDragLine: Bool { false }
     var drawsWhileIdle: Bool { false }
     func activate(_ ctx: ModeContext) {}
-    func deactivate(_ ctx: ModeContext, exiting: Bool) {}
+    func deactivate(_ ctx: ModeContext, reason: LeaveReason) {}
     func screenChanged(_ ctx: ModeContext) {}
     func dragStarted(_ ctx: ModeContext) {}
     func handleRelease(_ key: KeyPress, _ ctx: ModeContext) -> [Effect] { [] }

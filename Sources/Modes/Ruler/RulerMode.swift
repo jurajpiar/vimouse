@@ -81,8 +81,8 @@ public final class RulerMode: Mode {
 
     public var schema: [ConfigEntry] {
         [
-            .init(section: id, key: "toggle", defaultValue: "\"r\"", comment: "Create the reading band / enter or leave Ruler mode, e.g. \"r\"."),
-            .init(section: id, key: "remove", defaultValue: "\"shift+r\"", comment: "Remove the reading band (works in any mode), e.g. \"shift+r\"."),
+            .init(section: id, key: "toggle", defaultValue: "\"r\"", comment: "Enter Ruler mode, creating the band; again removes it and returns to the previous mode, e.g. \"r\"."),
+            .init(section: id, key: "remove", defaultValue: "\"shift+r\"", comment: "Remove a band left behind by switching to another mode (works in any mode), e.g. \"shift+r\"."),
             .init(section: id, key: "height", defaultValue: "32", comment: "Band height in pixels when created without a text line to size to; 20 to 40 covers one or two text lines."),
             .init(section: id, key: "move", defaultValue: "0", comment: "How far the band moves per press when not following text: 0 = its own height, otherwise pixels, e.g. 20. A count multiplies."),
             .init(section: id, key: "fine", defaultValue: "1", comment: "Pixels the band moves or resizes per press while Shift is held (micro-adjustment), e.g. 1, 2."),
@@ -146,6 +146,14 @@ public final class RulerMode: Mode {
     private func follow(_ ctx: ModeContext) {
         guard let r = ruler, r.screenIndex == ctx.screenIndex else { return }
         ctx.target = ctx.clamped(Point(x: ctx.target.x, y: r.y))
+    }
+
+    /// The band survives only a deliberate switch to another mode; its own toggle and
+    /// leaving altogether take it away.
+    public func deactivate(_ ctx: ModeContext, reason: LeaveReason) {
+        guard reason != .switched else { return }
+        ruler = nil
+        snapping = settings.snap
     }
 
     public func handleAnywhere(_ key: KeyPress, count: Int?, _ ctx: ModeContext) -> [Effect]? {
@@ -267,6 +275,6 @@ public final class RulerMode: Mode {
     public var manual: String {
         let s = Settings()
         func keys(_ set: Set<KeyPress>) -> String { set.map(\.label).sorted().joined(separator: ", ") }
-        return "A reading band that dims everything except the line being read. Entering the mode creates it on the line of text under the pointer (sized to the line when the app exposes its text through accessibility, otherwise \(Int(s.height)) px tall); \(keys(s.down)) / \(keys(s.up)) move it a line at a time (or by its height); \(keys(s.shrink)) / \(keys(s.grow)) resize; Shift held makes one-pixel changes; \(keys(s.snapToggle)) toggles following text; \(keys(s.remove)) removes the band from any mode. The band stays when the mode is left."
+        return "A reading band that dims everything except the line being read. Entering the mode creates it on the line of text under the pointer (sized to the line when the app exposes its text through accessibility, otherwise \(Int(s.height)) px tall); \(keys(s.down)) / \(keys(s.up)) move it a line at a time (or by its height); \(keys(s.shrink)) / \(keys(s.grow)) resize; Shift held makes one-pixel changes; \(keys(s.snapToggle)) toggles following text. Leaving with the toggle or exiting removes the band; switching to another mode (Scroll, say, to scroll the text under a fixed band) keeps it, and \(keys(s.remove)) removes it from any mode."
     }
 }

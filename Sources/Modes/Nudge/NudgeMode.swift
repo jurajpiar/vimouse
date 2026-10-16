@@ -60,7 +60,7 @@ public final class NudgeMode: Mode {
     public var toggle: Set<KeyPress> { settings.toggle }
 
     public func activate(_ ctx: ModeContext) { held = [:] }
-    public func deactivate(_ ctx: ModeContext, exiting: Bool) { held = [:] }
+    public func deactivate(_ ctx: ModeContext, reason: LeaveReason) { held = [:] }
 
     public func handle(_ key: KeyPress, count: Int?, _ ctx: ModeContext) -> [Effect]? {
         let n = Double(count ?? 1)

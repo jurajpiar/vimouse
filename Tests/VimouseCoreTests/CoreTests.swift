@@ -678,21 +678,30 @@ final class EngineTests: XCTestCase {
         _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine))
         _ = e.handle(KeyPress(.j))
         XCTAssertEqual(e.ruler?.y, 600)
-        // Escape keeps the ruler and only asks for a redraw, not a hide.
+        // Switching to Scroll keeps the band; Escape from there keeps it too (it was kept on purpose).
+        _ = e.handle(KeyPress(.s))
+        XCTAssertNotNil(e.ruler)
         XCTAssertEqual(e.handle(KeyPress(.escape)), [.redraw])
         XCTAssertFalse(e.isActive)
         XCTAssertTrue(e.needsOverlay)
-        XCTAssertNotNil(e.ruler)
-        // Back in, r returns to the existing ruler, R removes it.
+        // Back in, r returns to the existing band; r again removes it and goes back.
         _ = e.activate(screen: screen)
         _ = e.handle(KeyPress(.r))
         XCTAssertEqual(e.ruler?.y, 600)
         _ = e.handle(KeyPress(.r))
         XCTAssertEqual(e.mode, "pointer")
+        XCTAssertNil(e.ruler)
+        // Escape straight out of Ruler mode removes the band as well.
+        _ = e.handle(KeyPress(.r))
+        XCTAssertEqual(e.handle(KeyPress(.escape)), [.hideOverlay])
+        XCTAssertNil(e.ruler)
+        XCTAssertFalse(e.needsOverlay)
+        // A kept band goes with Shift+r from any mode.
+        _ = e.activate(screen: screen)
+        _ = e.handle(KeyPress(.r)); _ = e.handle(KeyPress(.n))
+        XCTAssertNotNil(e.ruler)
         _ = e.handle(KeyPress(.r, [.shift]))
         XCTAssertNil(e.ruler)
-        XCTAssertEqual(e.handle(KeyPress(.escape)), [.hideOverlay])
-        XCTAssertFalse(e.needsOverlay)
     }
 
     func testEscapeExits() {
@@ -742,7 +751,7 @@ final class PluginTests: XCTestCase {
         XCTAssertNil(s.help)
         XCTAssertEqual(e.scene(showHelp: true)?.help?.first?.title, "POINTER")
         // A ruler stays in the scene after the engine goes idle, dimming its screen.
-        _ = e.handle(KeyPress(.r))
+        _ = e.handle(KeyPress(.r)); _ = e.handle(KeyPress(.s))
         _ = e.handle(KeyPress(.escape))
         let idle = e.scene()!
         XCTAssertNil(idle.modeName)

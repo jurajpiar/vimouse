@@ -116,9 +116,9 @@ public final class PointerEngine {
 
     /// Switch the active mode (for example when a held activation is pinned by the
     /// hotkey, which carries its own start mode). Ignored when idle, unknown or disabled.
-    public func enter(mode id: String) -> [Effect] {
+    public func enter(mode id: String, reason: LeaveReason = .switched) -> [Effect] {
         guard let current = context.activeMode, current != id, enabled.contains(id), let next = mode(id) else { return [] }
-        mode(current)?.deactivate(context, exiting: false)
+        mode(current)?.deactivate(context, reason: reason)
         // Going back to where we came from clears the trail; anything else records it.
         previousMode = id == previousMode ? nil : current
         context.activeMode = id
@@ -136,7 +136,7 @@ public final class PointerEngine {
     /// Leave the active mode, releasing a held drag first. Idle drawings stay.
     public func deactivate() -> [Effect] {
         guard let current = context.activeMode else { return [] }
-        mode(current)?.deactivate(context, exiting: true)
+        mode(current)?.deactivate(context, reason: .exited)
         context.activeMode = nil
         pendingCount = nil
         var fx: [Effect] = []
@@ -185,7 +185,7 @@ public final class PointerEngine {
         for id in enabled {
             guard let m = mode(id), m.toggle.has(key) else { continue }
             if id == currentID {
-                return returnMode == id ? [] : enter(mode: returnMode)
+                return returnMode == id ? [] : enter(mode: returnMode, reason: .toggledOff)
             }
             return enter(mode: id)
         }
@@ -220,7 +220,7 @@ public final class PointerEngine {
     private func requestedSwitch() -> [Effect] {
         guard let request = context.requestedMode else { return [] }
         context.requestedMode = nil
-        return enter(mode: request ?? returnMode)
+        return enter(mode: request ?? returnMode, reason: .toggledOff)
     }
 
     /// A key went up; the active mode may end a held movement.
@@ -252,7 +252,7 @@ public final class PointerEngine {
         } else {
             fx.append(.click(button, count: count, modifiers: mods))
         }
-        activeMode?.deactivate(context, exiting: true)
+        activeMode?.deactivate(context, reason: .exited)
         context.activeMode = nil
         fx.append(needsOverlay ? .redraw : .hideOverlay)
         return fx

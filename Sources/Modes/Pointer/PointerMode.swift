@@ -84,8 +84,8 @@ public final class PointerMode: Mode {
         if session?.root != ctx.screen { session = BisectSession(root: ctx.screen) }
     }
 
-    public func deactivate(_ ctx: ModeContext, exiting: Bool) {
-        guard exiting else { return } // another mode: keep the descent for when we return
+    public func deactivate(_ ctx: ModeContext, reason: LeaveReason) {
+        guard reason != .switched else { return } // another mode: keep the descent for when we return
         session = nil
         snapping = settings.snap
     }

@@ -57,8 +57,8 @@ Ruler (reading band): r creates a band at the pointer's height, dimming the rest
 of the screen, and enters Ruler mode: j/k move it by its own height (or a fixed number of pixels
 via `[ruler] move`), [ ] change its height, Shift with any of those moves or
 resizes by one pixel, s goes to
-Scroll mode (scroll the text under a fixed band), r back to Pointer. The band stays
-after Escape; Shift+r removes it from any mode. With `[ruler] snap = true` (the default) the band
+Scroll mode (scroll the text under a fixed band) and keeps the band; r again or
+Escape removes it; Shift+r removes a kept band from any mode. With `[ruler] snap = true` (the default) the band
 reads the lines of text under the pointer's column through the accessibility API: it
 is created on the line under the pointer, sized to it (plus `[ruler] pad`), and j/k
 move it a line at a time, falling back to height steps where no text is found; a
