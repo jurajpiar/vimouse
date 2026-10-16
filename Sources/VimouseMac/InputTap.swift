@@ -10,7 +10,8 @@ final class InputTap {
         var description: String { "CGEvent.tapCreate returned nil (Accessibility permission missing?)" }
     }
 
-    typealias Handler = (_ key: KeyPress, _ isKeyDown: Bool, _ isRepeat: Bool) -> Bool
+    /// `isModifier` is true for a modifier key going down or up (a flagsChanged event).
+    typealias Handler = (_ key: KeyPress, _ isKeyDown: Bool, _ isRepeat: Bool, _ isModifier: Bool) -> Bool
     var handler: Handler?
 
     private var port: CFMachPort?
@@ -19,6 +20,7 @@ final class InputTap {
     func start() throws {
         guard port == nil else { return }
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
+            | (1 << CGEventType.flagsChanged.rawValue)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
         guard let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -60,10 +62,34 @@ final class InputTap {
             let code = KeyCode(rawValue: UInt16(event.getIntegerValueField(.keyboardEventKeycode)))
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             let key = KeyPress(code, InputTap.modifiers(from: event.flags))
-            let swallow = tap.handler?(key, type == .keyDown, isRepeat) ?? false
+            let swallow = tap.handler?(key, type == .keyDown, isRepeat, false) ?? false
+            return swallow ? nil : Unmanaged.passUnretained(event)
+        case .flagsChanged:
+            let code = KeyCode(rawValue: UInt16(event.getIntegerValueField(.keyboardEventKeycode)))
+            // Down or up is read from the resulting flags: the key's own bit is set after a press.
+            let isDown: Bool
+            if let bit = code.modifierBit {
+                isDown = event.flags.contains(InputTap.cgMask(bit))
+            } else if code == .function {
+                isDown = event.flags.contains(.maskSecondaryFn)
+            } else {
+                return Unmanaged.passUnretained(event)
+            }
+            let key = KeyPress(code, InputTap.modifiers(from: event.flags))
+            let swallow = tap.handler?(key, isDown, false, true) ?? false
             return swallow ? nil : Unmanaged.passUnretained(event)
         default:
             return Unmanaged.passUnretained(event)
+        }
+    }
+
+    private static func cgMask(_ m: Modifiers) -> CGEventFlags {
+        switch m {
+        case .shift: return .maskShift
+        case .control: return .maskControl
+        case .option: return .maskAlternate
+        case .command: return .maskCommand
+        default: return []
         }
     }
 

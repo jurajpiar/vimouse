@@ -165,6 +165,21 @@ final class ConfigTests: XCTestCase {
         XCTAssertFalse(ConfigSchema.migrate(t).changed)
     }
 
+    func testHoldKey() throws {
+        XCTAssertNil(Config().keymap.hold)
+        XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"right_cmd\"").keymap.hold, .rightCommand)
+        XCTAssertEqual(try Config.parse("[hotkey]\nhold = \"fn\"").keymap.hold, .function)
+        XCTAssertNil(try Config.parse("[hotkey]\nhold = \"\"").keymap.hold)
+        XCTAssertThrowsError(try Config.parse("[hotkey]\nhold = \"space\""))
+        XCTAssertEqual(KeyCode.rightCommand.modifierBit, .command)
+        var k = KeyMap.default
+        k.hold = .rightCommand
+        let e = PointerEngine(keymap: k)
+        e.heldActivation = true
+        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
+        XCTAssertTrue(e.hints.contains { $0.key == "release ⌘" })
+    }
+
     func testConfigUpdateSwitch() throws {
         XCTAssertTrue(Config().autoUpdate)
         XCTAssertFalse(try Config.parse("[config]\nupdate = false").autoUpdate)

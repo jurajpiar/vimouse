@@ -28,8 +28,9 @@ final class Controller {
     }
 
     func start() throws {
-        tap.handler = { [weak self] key, isDown, isRepeat in
+        tap.handler = { [weak self] key, isDown, isRepeat, isModifier in
             guard let self else { return false }
+            if isModifier { return self.handleModifier(key, isDown: isDown) }
             return self.handleKey(key, isDown: isDown, isRepeat: isRepeat)
         }
         try tap.start()
@@ -44,12 +45,34 @@ final class Controller {
         activate()
     }
 
-    // Runs on the event-tap callback (main run loop). Must be fast.
-    private func handleKey(_ key: KeyPress, isDown: Bool, isRepeat: Bool) -> Bool {
-        if !engine.isActive {
-            guard key == engine.keymap.activate, isDown, !isRepeat else { return false }
+    /// Quasi-mode: the hold key enters Pointer mode on press and leaves on release.
+    /// Other modifier changes pass through.
+    private func handleModifier(_ key: KeyPress, isDown: Bool) -> Bool {
+        guard let hold = engine.keymap.hold, key.code == hold else { return false }
+        if isDown {
+            guard !engine.isActive else { return true }
+            engine.heldActivation = true
             activate()
             return true
+        }
+        guard engine.isActive, engine.heldActivation else { return false }
+        engine.heldActivation = false
+        apply(engine.deactivate())
+        return true
+    }
+
+    // Runs on the event-tap callback (main run loop). Must be fast.
+    private func handleKey(_ rawKey: KeyPress, isDown: Bool, isRepeat: Bool) -> Bool {
+        var key = rawKey
+        if !engine.isActive {
+            guard key == engine.keymap.activate, isDown, !isRepeat else { return false }
+            engine.heldActivation = false
+            activate()
+            return true
+        }
+        // While the hold key is down, its own modifier is not part of what the user typed.
+        if engine.heldActivation, let bit = engine.keymap.hold?.modifierBit {
+            key = KeyPress(key.code, key.modifiers.subtracting(bit))
         }
         // Active: swallow everything so the focused app sees nothing.
         // The help key works on hold: shown on key down, hidden on key up.

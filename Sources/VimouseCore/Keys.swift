@@ -51,6 +51,26 @@ public extension KeyCode {
     static let nine = KeyCode(rawValue: 25)
     static let zero = KeyCode(rawValue: 29)
     static let leftBracket = KeyCode(rawValue: 33)
+    static let leftCommand = KeyCode(rawValue: 55)
+    static let rightCommand = KeyCode(rawValue: 54)
+    static let leftShift = KeyCode(rawValue: 56)
+    static let rightShift = KeyCode(rawValue: 60)
+    static let leftOption = KeyCode(rawValue: 58)
+    static let rightOption = KeyCode(rawValue: 61)
+    static let leftControl = KeyCode(rawValue: 59)
+    static let rightControl = KeyCode(rawValue: 62)
+    static let function = KeyCode(rawValue: 63)
+
+    /// The modifier bit a modifier key sets, for stripping it while it is used as a hold key.
+    var modifierBit: Modifiers? {
+        switch self {
+        case .leftCommand, .rightCommand: return .command
+        case .leftShift, .rightShift: return .shift
+        case .leftOption, .rightOption: return .option
+        case .leftControl, .rightControl: return .control
+        default: return nil
+        }
+    }
     static let rightBracket = KeyCode(rawValue: 30)
 }
 
@@ -78,6 +98,8 @@ public struct KeyPress: Hashable, Sendable {
 /// defaults match docs/PLAN.md.
 public struct KeyMap: Sendable, Equatable {
     public var activate: KeyPress
+    /// A modifier key that enters Pointer mode while held (quasi-mode); nil when unused.
+    public var hold: KeyCode?
     public var quadrants: [KeyPress: Quadrant]
     public var up: Set<KeyPress>
     /// Back to the whole screen (root of the descent).

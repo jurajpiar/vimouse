@@ -50,6 +50,7 @@ public enum ConfigSchema {
         .init(section: "config", key: "update", defaultValue: "true", comment: "On start, add new settings to this file and retire old ones in place (true), or leave this file alone and only refresh config.example.toml (false)."),
 
         .init(section: "hotkey", key: "activate", defaultValue: "\"cmd+shift+space\"", comment: "Global hotkey that enters Pointer mode, e.g. \"cmd+shift+space\", \"ctrl+alt+m\"."),
+        .init(section: "hotkey", key: "hold", defaultValue: "\"\"", comment: "Quasi-mode: a modifier key that enters Pointer mode while held and leaves it on release; its own modifier is ignored on the keys you type meanwhile. One of left_cmd, right_cmd, left_alt, right_alt, left_ctrl, right_ctrl, left_shift, right_shift, fn, or \"\" for none."),
 
         .init(section: "global", key: "exit", defaultValue: "\"escape\"", comment: "Leave Pointer mode (releases a drag; keeps a ruler), e.g. \"escape\", \"ctrl+c\"."),
         .init(section: "global", key: "next_screen", defaultValue: "\"tab\"", comment: "Next display; with a count, that display (2 then tab = display 2), e.g. \"tab\"."),

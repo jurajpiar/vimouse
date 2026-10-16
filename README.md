@@ -14,7 +14,8 @@ swift test            # VimouseCore unit tests
 swift run vimouse     # menu bar item "vm" appears
 ```
 
-Press ⌘⇧Space to enter Pointer mode. The status strip at the screen edge lists the
+Press ⌘⇧Space to enter Pointer mode, or set `[hotkey] hold = "right_cmd"` (or
+another modifier) to be in Pointer mode only while that key is held. The status strip at the screen edge lists the
 keys valid at any moment. Defaults:
 
 Pointer: i/o/j/k pick a quadrant, Backspace or u goes up a level, Shift+u or

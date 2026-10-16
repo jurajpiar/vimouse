@@ -78,6 +78,17 @@ public struct Config: Equatable {
             c.autoUpdate = b
         }
         if let p = try one("hotkey", "activate") { k.activate = p }
+        if let v = t["hotkey"]?["hold"] {
+            guard let name = v.string else { throw ParseError(description: "[hotkey] hold: expected a modifier key name or \"\"") }
+            if name.isEmpty {
+                k.hold = nil
+            } else {
+                guard let code = KeyCode.named(name.lowercased()), code.modifierBit != nil || code == .function else {
+                    throw ParseError(description: "[hotkey] hold: expected one of left_cmd, right_cmd, left_alt, right_alt, left_ctrl, right_ctrl, left_shift, right_shift, fn")
+                }
+                k.hold = code
+            }
+        }
 
         var quadrants: [KeyPress: Quadrant] = [:]
         let qNames: [(String, Quadrant)] = [("top_left", .topLeft), ("top_right", .topRight), ("bottom_left", .bottomLeft), ("bottom_right", .bottomRight)]
@@ -235,6 +246,15 @@ public extension KeyCode {
         case "right", "arrowright": return .rightArrow
         case "up", "arrowup": return .upArrow
         case "down", "arrowdown": return .downArrow
+        case "left_cmd", "lcmd": return .leftCommand
+        case "right_cmd", "rcmd": return .rightCommand
+        case "left_shift", "lshift": return .leftShift
+        case "right_shift", "rshift": return .rightShift
+        case "left_alt", "lalt", "left_option": return .leftOption
+        case "right_alt", "ralt", "right_option": return .rightOption
+        case "left_ctrl", "lctrl": return .leftControl
+        case "right_ctrl", "rctrl": return .rightControl
+        case "fn": return .function
         case "pageup": return .pageUp
         case "pagedown": return .pageDown
         case "home": return .home
@@ -258,6 +278,8 @@ public extension KeyCode {
         m[.minus] = "-"; m[.equal] = "="
         m[.leftArrow] = "←"; m[.rightArrow] = "→"; m[.upArrow] = "↑"; m[.downArrow] = "↓"
         m[.pageUp] = "⇞"; m[.pageDown] = "⇟"; m[.home] = "↖"; m[.end] = "↘"
+        m[.leftCommand] = "⌘"; m[.rightCommand] = "⌘"; m[.leftShift] = "⇧"; m[.rightShift] = "⇧"
+        m[.leftOption] = "⌥"; m[.rightOption] = "⌥"; m[.leftControl] = "⌃"; m[.rightControl] = "⌃"; m[.function] = "fn"
         return m
     }()
 

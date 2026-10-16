@@ -66,6 +66,8 @@ public final class PointerEngine {
     public private(set) var dragOrigin: Point?
     /// vi-style count prefix typed so far; nil when none. Consumed by the next command.
     public private(set) var pendingCount: Int?
+    /// True when the current activation came from the hold key (quasi-mode).
+    public var heldActivation = false
     /// The reading band, if one is shown. Survives deactivation.
     public private(set) var ruler: Ruler?
 
@@ -397,7 +399,12 @@ public final class PointerEngine {
         }
         if screens.count > 1 { h.append((l(k.nextScreen) + " / n" + l(k.nextScreen), "screen")) }
         h.append((l(k.help), "help"))
-        h.append((l(k.exit), pendingCount != nil ? "cancel count" : (dragging ? "cancel drag" : "exit")))
+        if let hold = k.hold, heldActivation {
+            h.append(("release " + hold.label, dragging ? "drop+exit" : "exit"))
+            h.append((l(k.exit), pendingCount != nil ? "cancel count" : (dragging ? "cancel drag" : "exit")))
+        } else {
+            h.append((l(k.exit), pendingCount != nil ? "cancel count" : (dragging ? "cancel drag" : "exit")))
+        }
         return h
     }
 

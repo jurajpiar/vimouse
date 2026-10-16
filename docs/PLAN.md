@@ -114,6 +114,8 @@ Mode plugins. Modes behind a `Mode` protocol (keys handled, effects, hints, help
 
 2026-10-16: config migration no longer annotates inline (renames silent, retired block at the end); `[config] update` switch; `config.example.toml` and a generated man page `vimouse.1` rewritten on every start. Before the v1 release: delete the pre-release renames and superseded entries from ConfigSchema (and the Deprecations section they feed), since no released config ever had them.
 
+Trackpad-like convenience (discussed 2026-10-16). What a trackpad has: modeless, analogue, inertial. Planned, in order: (1) trackpad-style scrolling: continuous scroll events with scroll and momentum phases, acceleration while a key is held, momentum tail on release (technique used by Mos and LinearMouse); (2) quasi-mode: hold a modifier (`[hotkey] hold`) to be in Pointer mode, release to leave, its modifier bit stripped from typed keys; (3) nudge acceleration while a key is held; (4) optional passthrough of system shortcuts (Spaces, Mission Control, zoom) from inside Pointer mode. Not attempted: synthesising multitouch gestures or magnify/swipe events (private APIs only). Shan's extension idea for the quasi-mode: a reverse quadrant search, or a non-linear expanding step in a chosen direction (2, 4, 8, 16 px or a doubling rectangle), as a navigation plugin alongside the half-split.
+
 Open: none.
 
 ## Sources
