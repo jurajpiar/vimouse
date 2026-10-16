@@ -26,7 +26,8 @@ keys valid at any moment. Defaults:
 Modes are plugins (`docs/PLUGINS.md`); `[modes] enabled` in the config picks which
 are available and which is the default. The standard four:
 
-Pointer: i/o/j/k pick a quadrant, Backspace or u goes up a level, Shift+u or
+Pointer: i/o/j/k pick a quadrant, the arrow keys keep one half of the current
+rectangle along their axis (mix the two freely), Backspace or u goes up a level, Shift+u or
 Shift+Backspace back to the whole screen. Return or m
 left-clicks and exits, Space clicks and stays, x double-clicks, . right-clicks,
 , middle-clicks. Hold Shift, Cmd or Option with any click key to pass the modifier

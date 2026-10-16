@@ -419,6 +419,20 @@ final class EngineTests: XCTestCase {
         XCTAssertFalse(e.isActive)
     }
 
+    func testHalfSplitMixesWithQuadrants() {
+        let e = PointerEngine()
+        _ = e.activate(screen: screen)
+        XCTAssertEqual(e.handle(KeyPress(.leftArrow)), [.warp(Point(x: 250, y: 300)), .redraw])  // left half (0,0,500,600)
+        XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.warp(Point(x: 250, y: 450)), .redraw])  // its bottom half (0,300,500,300)
+        XCTAssertEqual(e.handle(KeyPress(.o)), [.warp(Point(x: 375, y: 375)), .redraw])          // then a quadrant
+        XCTAssertEqual(e.session?.depth, 3)
+        _ = e.handle(KeyPress(.delete))
+        XCTAssertEqual(e.session?.current, Rect(x: 0, y: 300, width: 500, height: 300))
+        _ = e.handle(KeyPress(.two))
+        XCTAssertEqual(e.handle(KeyPress(.rightArrow)), [.warp(Point(x: 437.5, y: 450)), .redraw]) // count: twice
+        XCTAssertTrue(e.hints.contains { $0.action == "halve" })
+    }
+
     func testUnboundKeyIsSwallowedSilently() {
         let e = PointerEngine()
         _ = e.activate(screen: screen)

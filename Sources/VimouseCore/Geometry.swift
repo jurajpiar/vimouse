@@ -16,6 +16,11 @@ public enum Quadrant: CaseIterable, Hashable, Sendable {
     case topLeft, topRight, bottomLeft, bottomRight
 }
 
+/// One half of a rectangle, along one axis.
+public enum Half: CaseIterable, Hashable, Sendable {
+    case left, right, top, bottom
+}
+
 public struct Rect: Equatable, Sendable {
     public var x: Double
     public var y: Double
@@ -51,6 +56,15 @@ public struct Rect: Equatable, Sendable {
     }
 
     /// Splits the rectangle into four equal quadrants.
+    public func half(_ h: Half) -> Rect {
+        switch h {
+        case .left: return Rect(x: x, y: y, width: width / 2, height: height)
+        case .right: return Rect(x: x + width / 2, y: y, width: width / 2, height: height)
+        case .top: return Rect(x: x, y: y, width: width, height: height / 2)
+        case .bottom: return Rect(x: x, y: y + height / 2, width: width, height: height / 2)
+        }
+    }
+
     public func subdivided() -> [Quadrant: Rect] {
         let w = width / 2
         let h = height / 2

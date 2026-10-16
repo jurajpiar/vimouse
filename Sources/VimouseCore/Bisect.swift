@@ -17,6 +17,11 @@ public struct BisectSession: Equatable, Sendable {
         stack.append(current.subdivided()[quadrant]!)
     }
 
+    /// Narrow to one half along one axis; `up()` undoes it like a quadrant pick.
+    public mutating func select(_ half: Half) {
+        stack.append(current.half(half))
+    }
+
     /// Returns false when already at the root.
     @discardableResult
     public mutating func up() -> Bool {
