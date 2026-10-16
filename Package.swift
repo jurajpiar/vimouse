@@ -4,7 +4,7 @@ import PackageDescription
 // Modes are plugins: one target each, depending only on VimouseCore. To add one, add a
 // target here and register it in Sources/VimouseMac/main.swift (and in the tests'
 // `standardModes` if it should be covered there). To drop one, remove it from both.
-let modes = ["Pointer", "Nudge", "Scroll", "Ruler"]
+let modes = ["Pointer", "Half", "Nudge", "Scroll", "Ruler"]
 
 let package = Package(
     name: "vimouse",

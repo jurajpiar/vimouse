@@ -26,8 +26,7 @@ keys valid at any moment. Defaults:
 Modes are plugins (`docs/PLUGINS.md`); `[modes] enabled` in the config picks which
 are available and which is the default. The standard four:
 
-Pointer: i/o/j/k pick a quadrant, the arrow keys keep one half of the current
-rectangle along their axis (mix the two freely), Backspace or u goes up a level, Shift+u or
+Pointer: i/o/j/k pick a quadrant, Backspace or u goes up a level, Shift+u or
 Shift+Backspace back to the whole screen. Return or m
 left-clicks and exits, Space clicks and stays, x double-clicks, . right-clicks,
 , middle-clicks. Hold Shift, Cmd or Option with any click key to pass the modifier
@@ -38,6 +37,11 @@ where the button went down. s enters Scroll mode. a toggles snapping: when on (`
 step sends the pointer to the nearest clickable element inside the chosen rectangle
 (read from the frontmost app's accessibility tree) instead of its centre; a pink
 ring marks the snap target. Escape exits (releasing any drag).
+
+Half: b enters a second way of narrowing down, starting from the whole screen:
+h/j/k/l or the arrows keep the left/bottom/top/right half of the current rectangle,
+Backspace or u go up a level, Shift+u back to the whole screen, b back to Pointer
+(whose descent is kept).
 
 Nudge: n from Pointer mode, then h/j/k/l or the arrows move the pointer (a tap is
 one step, a hold accelerates, release stops, a horizontal and a vertical key held

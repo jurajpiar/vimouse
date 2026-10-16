@@ -1,12 +1,13 @@
 import XCTest
 @testable import VimouseCore
 import PointerMode
+import HalfMode
 import NudgeMode
 import ScrollMode
 import RulerMode
 
 /// The modes the app ships, fresh for each test.
-func standardModes() -> [Mode] { [PointerMode(), NudgeMode(), ScrollMode(), RulerMode()] }
+func standardModes() -> [Mode] { [PointerMode(), HalfMode(), NudgeMode(), ScrollMode(), RulerMode()] }
 
 let standardCursors: [CursorStyle] = [RingCursor(), CrosshairCursor(), DotCursor()]
 
@@ -419,18 +420,23 @@ final class EngineTests: XCTestCase {
         XCTAssertFalse(e.isActive)
     }
 
-    func testHalfSplitMixesWithQuadrants() {
+    func testHalfMode() {
         let e = PointerEngine()
         _ = e.activate(screen: screen)
-        XCTAssertEqual(e.handle(KeyPress(.leftArrow)), [.warp(Point(x: 250, y: 300)), .redraw])  // left half (0,0,500,600)
+        _ = e.handle(KeyPress(.i)) // a quadrant descent, kept for later
+        XCTAssertEqual(e.handle(KeyPress(.b)), [.warp(Point(x: 500, y: 300)), .redraw]) // half mode starts from the whole screen
+        XCTAssertEqual(e.mode, "half")
+        XCTAssertEqual(e.handle(KeyPress(.h)), [.warp(Point(x: 250, y: 300)), .redraw])          // left half (0,0,500,600)
         XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.warp(Point(x: 250, y: 450)), .redraw])  // its bottom half (0,300,500,300)
-        XCTAssertEqual(e.handle(KeyPress(.o)), [.warp(Point(x: 375, y: 375)), .redraw])          // then a quadrant
-        XCTAssertEqual(e.session?.depth, 3)
-        _ = e.handle(KeyPress(.delete))
-        XCTAssertEqual(e.session?.current, Rect(x: 0, y: 300, width: 500, height: 300))
+        XCTAssertEqual(e.handle(KeyPress(.i)), [])                                               // quadrant keys are Pointer's
         _ = e.handle(KeyPress(.two))
-        XCTAssertEqual(e.handle(KeyPress(.rightArrow)), [.warp(Point(x: 437.5, y: 450)), .redraw]) // count: twice
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 437.5, y: 450)), .redraw])        // count: right half twice
+        XCTAssertEqual(e.handle(KeyPress(.delete)), [.warp(Point(x: 375, y: 450)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.u, [.shift])), [.warp(Point(x: 500, y: 300)), .redraw])
         XCTAssertTrue(e.hints.contains { $0.action == "halve" })
+        XCTAssertEqual(e.handle(KeyPress(.b)), [.redraw])
+        XCTAssertEqual(e.mode, "pointer")
+        XCTAssertEqual(e.session?.depth, 1) // the quadrant descent survived the detour
     }
 
     func testUnboundKeyIsSwallowedSilently() {

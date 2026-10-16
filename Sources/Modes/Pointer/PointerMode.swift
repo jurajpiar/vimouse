@@ -8,10 +8,6 @@ public final class PointerMode: Mode {
         public var quadrants: [KeyPress: Quadrant] = [
             KeyPress(.i): .topLeft, KeyPress(.o): .topRight, KeyPress(.j): .bottomLeft, KeyPress(.k): .bottomRight,
         ]
-        /// Halving along one axis: keep the left, right, top or bottom half.
-        public var halves: [Half: Set<KeyPress>] = [
-            .left: [KeyPress(.leftArrow)], .right: [KeyPress(.rightArrow)], .top: [KeyPress(.upArrow)], .bottom: [KeyPress(.downArrow)],
-        ]
         public var up: Set<KeyPress> = [KeyPress(.delete), KeyPress(.u)]
         public var top: Set<KeyPress> = [KeyPress(.u, [.shift]), KeyPress(.delete, [.shift])]
         public var snapToggle: Set<KeyPress> = [KeyPress(.a)]
@@ -22,10 +18,6 @@ public final class PointerMode: Mode {
 
         public func quadrant(for event: KeyPress) -> Quadrant? {
             quadrants.first { $0.key.matches(event: event) }?.value
-        }
-
-        public func half(for event: KeyPress) -> Half? {
-            halves.first { $0.value.has(event) }?.key
         }
 
         /// Label shown inside each quadrant.
@@ -51,10 +43,6 @@ public final class PointerMode: Mode {
             .init(section: id, key: "top_right", defaultValue: "\"o\"", comment: "Pick the top-right quadrant, e.g. \"o\", \"right\"."),
             .init(section: id, key: "bottom_left", defaultValue: "\"j\"", comment: "Pick the bottom-left quadrant, e.g. \"j\", \"left\"."),
             .init(section: id, key: "bottom_right", defaultValue: "\"k\"", comment: "Pick the bottom-right quadrant, e.g. \"k\", \"down\"."),
-            .init(section: id, key: "half_left", defaultValue: "\"left\"", comment: "Keep the left half of the rectangle (halving mixes with quadrant picks), e.g. \"left\", \"shift+j\"."),
-            .init(section: id, key: "half_right", defaultValue: "\"right\"", comment: "Keep the right half, e.g. \"right\"."),
-            .init(section: id, key: "half_up", defaultValue: "\"up\"", comment: "Keep the top half, e.g. \"up\"."),
-            .init(section: id, key: "half_down", defaultValue: "\"down\"", comment: "Keep the bottom half, e.g. \"down\"."),
             .init(section: id, key: "up", defaultValue: "[\"backspace\", \"u\"]", comment: "Go up one level in the quadrant descent; a count repeats, e.g. [\"backspace\", \"u\"]."),
             .init(section: id, key: "top", defaultValue: "[\"shift+u\", \"shift+backspace\"]", comment: "Restart the quadrant search from the whole screen, e.g. [\"shift+u\", \"shift+backspace\"]."),
             .init(section: id, key: "snap", defaultValue: "true", comment: "Snap the pointer to the nearest clickable element in the chosen rectangle (read from the accessibility tree): true or false."),
@@ -73,9 +61,6 @@ public final class PointerMode: Mode {
         if !quadrants.isEmpty {
             guard quadrants.count == 4 else { throw Config.ParseError(description: "[\(id)]: all four quadrant keys must be set and distinct") }
             s.quadrants = quadrants
-        }
-        for (name, h) in [("half_left", Half.left), ("half_right", .right), ("half_up", .top), ("half_down", .bottom)] {
-            if let v = try r.keys(name) { s.halves[h] = v }
         }
         if let v = try r.keys("up") { s.up = v }
         if let v = try r.keys("top") { s.top = v }
@@ -133,10 +118,6 @@ public final class PointerMode: Mode {
             for _ in 0..<(count ?? 1) { s.select(q) }
             return [.warp(aim(s.current, ctx)), .redraw]
         }
-        if let h = settings.half(for: key) {
-            for _ in 0..<(count ?? 1) { s.select(h) }
-            return [.warp(aim(s.current, ctx)), .redraw]
-        }
         if settings.top.has(key) {
             guard s.depth > 0 else { return [] }
             s.reset()
@@ -157,8 +138,6 @@ public final class PointerMode: Mode {
     public func hints(_ ctx: ModeContext) -> [(key: String, action: String)] {
         let quads = [Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { settings.label(for: $0) }.joined()
         var h: [(key: String, action: String)] = [(quads, "pick")]
-        let halves = [Half.left, .bottom, .top, .right].compactMap { settings.halves[$0] }.filter { !$0.isEmpty }
-        if !halves.isEmpty { h.append((halves.map { KeyMap.label(of: $0) }.joined(), "halve")) }
         if let s = session, s.depth > 0 {
             h.append((KeyMap.label(of: settings.up), "up"))
             h.append((KeyMap.label(of: settings.top), "top"))
@@ -171,7 +150,6 @@ public final class PointerMode: Mode {
         func all(_ set: Set<KeyPress>) -> String { set.map(\.label).sorted().joined(separator: " ") }
         return [
             ([Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { settings.label(for: $0) }.joined(separator: " "), "pick top-left, top-right, bottom-left, bottom-right quadrant"),
-            ([Half.left, .right, .top, .bottom].map { all(settings.halves[$0] ?? []) }.joined(separator: " "), "keep the left, right, top, bottom half"),
             (all(settings.up), "up one level (count: several)"),
             (all(settings.top), "back to the whole screen"),
             (all(settings.snapToggle), "toggle snapping to UI elements"),
@@ -204,6 +182,6 @@ public final class PointerMode: Mode {
     public var manual: String {
         let s = Settings()
         func keys(_ set: Set<KeyPress>) -> String { set.map(\.label).sorted().joined(separator: ", ") }
-        return "Quadrant navigation. Keys: \([Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { s.label(for: $0) }.joined(separator: " ")) pick a quadrant; \([Half.left, .right, .top, .bottom].map { keys(s.halves[$0] ?? []) }.joined(separator: " / ")) keep the left / right / top / bottom half; \(keys(s.up)) up one level; \(keys(s.top)) back to the whole screen; \(keys(s.snapToggle)) toggles snapping to UI elements."
+        return "Quadrant navigation. Keys: \([Quadrant.topLeft, .topRight, .bottomLeft, .bottomRight].map { s.label(for: $0) }.joined(separator: " ")) pick a quadrant; \(keys(s.up)) up one level; \(keys(s.top)) back to the whole screen; \(keys(s.snapToggle)) toggles snapping to UI elements."
     }
 }
