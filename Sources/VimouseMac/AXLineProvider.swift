@@ -38,8 +38,12 @@ final class AXLineProvider: LineProvider {
         var webLine: Int?
         /// A marker at the start of this line, for walking line by line (Chromium, WebKit).
         var lineStart: AnyObject?
-        /// Lines derived from character rectangles (Chromium text nodes without line APIs).
+        /// Lines derived from character rectangles (Chromium text nodes without line APIs):
+        /// the row's first and last character indices and the text length.
         var charBounds = false
+        var rowStart = 0
+        var rowEnd = 0
+        var textLength = 0
         /// Whether the web area's marker bounds come flipped (Cocoa) or not.
         var flipped = true
     }
@@ -97,12 +101,15 @@ final class AXLineProvider: LineProvider {
                     i += direction
                 }
             } else if cur.charBounds {
-                // Chromium text node: the row just past this one, from character rectangles.
-                let py = sign > 0 ? cur.rect.maxY + cur.rect.height / 2 : cur.rect.y - cur.rect.height / 2
-                if let f = lineFromCharBounds(cur.element, x: x, y: py, deadline: deadline),
-                   sign > 0 ? f.rect.midY > cur.rect.midY : f.rect.midY < cur.rect.midY {
+                // Chromium text node: the row that starts after (or ends before) this one.
+                let text = CharText(element: cur.element, length: cur.textLength)
+                let anchor = sign > 0 ? cur.rowEnd + 1 : cur.rowStart - 1
+                if anchor >= 0, anchor < cur.textLength, Date() < deadline,
+                   let row = text.row(around: anchor, deadline: deadline),
+                   sign > 0 ? row.rect.midY > cur.rect.midY : row.rect.midY < cur.rect.midY {
+                    let f = Found(element: cur.element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: cur.textLength)
                     last = widened(f, deadline: deadline)
-                    log("next by character rows: \(last!.rect)")
+                    log("next by character rows [\(row.start)..\(row.end)]: \(last!.rect)")
                     return last!.rect
                 }
             } else if let host = cur.markerHost, let start = cur.lineStart {
@@ -377,6 +384,8 @@ final class AXLineProvider: LineProvider {
     /// segments found just left and right of this one at the same height.
     private func widened(_ f: Found, deadline: Date) -> Found {
         guard f.charBounds || f.textAPI, f.line == nil else { return f }
+        // A row already spanning most of its element has nothing to gain.
+        if let ef = frame(of: f.element), f.rect.width >= ef.width * 0.7 { return f }
         var out = f
         for sign in [-1.0, 1.0] {
             for _ in 0..<4 {
@@ -393,14 +402,12 @@ final class AXLineProvider: LineProvider {
         return out
     }
 
-    /// Lines from character rectangles: `AXBoundsForRange` over single characters, whose
-    /// y is monotonic through the text. Binary searches find the character under `y`,
-    /// then the first and last characters on its row; one call over that span is the line.
-    private func lineFromCharBounds(_ element: AXUIElement, x: Double, y: Double, deadline: Date) -> Found? {
-        guard let frame = frame(of: element), y >= frame.y - 2, y <= frame.maxY + 2,
-              let text: String = attribute(element, kAXValueAttribute) else { return nil }
-        let n = text.utf16.count
-        guard n > 0 else { return nil }
+    /// A text node addressed by character index: `AXBoundsForRange` over single characters,
+    /// whose y is monotonic through the text (Chromium).
+    private struct CharText {
+        let element: AXUIElement
+        let length: Int
+
         func rect(_ i: Int, _ len: Int = 1) -> Rect? {
             var cf = CFRange(location: i, length: len)
             guard let rv = AXValueCreate(.cfRange, &cf) else { return nil }
@@ -412,16 +419,50 @@ final class AXLineProvider: LineProvider {
             guard AXValueGetValue(v as! AXValue, .cgRect, &r), r.height > 0, r.height <= 120 else { return nil }
             return Rect(x: r.minX, y: r.minY, width: r.width, height: r.height)
         }
+
         /// The rectangle of character `i`, or of the next one with a rectangle (whitespace may have none).
         func charRect(_ i: Int) -> Rect? {
-            for j in i..<min(n, i + 4) { if let r = rect(j) { return r } }
+            for j in i..<min(length, i + 4) { if let r = rect(j) { return r } }
             return nil
         }
-        guard let first = charRect(0) else { log("char route: no rectangle for character 0 of \(n)"); return nil }
+
+        /// The row containing character `i`: its first and last indices and its rectangle.
+        func row(around i: Int, deadline: Date) -> (start: Int, end: Int, rect: Rect)? {
+            guard let on = charRect(i) else { return nil }
+            var a = 0, b = i
+            while a < b {
+                guard Date() < deadline else { return nil }
+                let mid = (a + b) / 2
+                guard let r = charRect(mid) else { a = mid + 1; continue }
+                if r.y >= on.y - 2 { b = mid } else { a = mid + 1 }
+            }
+            let start = a
+            a = i; b = length - 1
+            while a < b {
+                guard Date() < deadline else { return nil }
+                let mid = (a + b + 1) / 2
+                guard let r = charRect(mid) else { b = mid - 1; continue }
+                if r.y <= on.y + 2 { a = mid } else { b = mid - 1 }
+            }
+            let end = a
+            let line = rect(start, end - start + 1) ?? Rect(x: on.x, y: on.y, width: on.width, height: on.height)
+            return (start, end, line)
+        }
+    }
+
+    /// Lines from character rectangles: a binary search finds the character under `y`,
+    /// then its row.
+    private func lineFromCharBounds(_ element: AXUIElement, x: Double, y: Double, deadline: Date) -> Found? {
+        guard let frame = frame(of: element), y >= frame.y - 2, y <= frame.maxY + 2,
+              let value: String = attribute(element, kAXValueAttribute) else { return nil }
+        let n = value.utf16.count
+        guard n > 0 else { return nil }
+        let text = CharText(element: element, length: n)
+        guard let first = text.charRect(0) else { log("char route: no rectangle for character 0 of \(n)"); return nil }
         guard y >= first.y - 1 else { return nil }
         // WebKit answers index ranges with one glyph's geometry whatever the range; Chromium
         // returns the union. A span of twenty characters no wider than a few glyphs is a lie.
-        if n >= 20, let span = rect(0, 20), span.width < first.width * 4 {
+        if n >= 20, let span = text.rect(0, 20), span.width < first.width * 4 {
             log("char route: not trustworthy here (20 characters span \(Int(span.width)) px)")
             return nil
         }
@@ -430,32 +471,16 @@ final class AXLineProvider: LineProvider {
         while lo < hi {
             guard Date() < deadline else { return nil }
             let mid = (lo + hi) / 2
-            guard let r = charRect(mid) else { lo = mid + 1; continue }
+            guard let r = text.charRect(mid) else { lo = mid + 1; continue }
             if r.maxY > y { hi = mid } else { lo = mid + 1 }
         }
-        guard let under = charRect(lo), y >= under.y - 1, y < under.maxY + 1 else {
-            log("char route: search ended at \(lo) with \(charRect(lo).map { "\($0)" } ?? "no rectangle"), y \(Int(y))")
+        guard let under = text.charRect(lo), y >= under.y - 1, y < under.maxY + 1 else {
+            log("char route: search ended at \(lo) with \(text.charRect(lo).map { "\($0)" } ?? "no rectangle"), y \(Int(y))")
             return nil
         }
-        // Row start: the first character at (or above, to a tolerance) this row's top.
-        var a = 0, b = lo
-        while a < b {
-            let mid = (a + b) / 2
-            guard let r = charRect(mid) else { a = mid + 1; continue }
-            if r.y >= under.y - 2 { b = mid } else { a = mid + 1 }
-        }
-        let start = a
-        // Row end: the last character whose top is at this row's top.
-        a = lo; b = n - 1
-        while a < b {
-            let mid = (a + b + 1) / 2
-            guard let r = charRect(mid) else { b = mid - 1; continue }
-            if r.y <= under.y + 2 { a = mid } else { b = mid - 1 }
-        }
-        let end = a
-        let line = rect(start, end - start + 1) ?? Rect(x: frame.x, y: under.y, width: frame.width, height: under.height)
-        log("line by character rows [\(start)..\(end)] of \(n): \(line)")
-        return Found(element: element, line: nil, rect: line, charBounds: true)
+        guard let row = text.row(around: lo, deadline: deadline) else { return nil }
+        log("line by character rows [\(row.start)..\(row.end)] of \(n): \(row.rect)")
+        return Found(element: element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: n)
     }
 
     /// Debug: what the bounds calls return for a line range and for an index range.
