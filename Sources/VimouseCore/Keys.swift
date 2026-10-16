@@ -276,11 +276,12 @@ public struct KeyMap: Sendable, Equatable {
         digits.first { $0.key.matches(event: event) }?.value
     }
 
-    /// One representative key for a binding, for legends: fewest modifiers, then shortest label.
+    /// One representative key for a binding, for the strip and in-rectangle labels:
+    /// fewest modifiers, then shortest label; modifier sides are not shown (see help).
     public static func label(of keys: some Collection<KeyPress>) -> String {
         keys.min { a, b in
-            if a.modifiers.rawValue != b.modifiers.rawValue { return a.modifiers.rawValue < b.modifiers.rawValue }
-            return a.label.count < b.label.count || (a.label.count == b.label.count && a.label < b.label)
-        }?.label ?? "?"
+            if a.modifiers.generic.rawValue != b.modifiers.generic.rawValue { return a.modifiers.generic.rawValue < b.modifiers.generic.rawValue }
+            return a.shortLabel.count < b.shortLabel.count || (a.shortLabel.count == b.shortLabel.count && a.shortLabel < b.shortLabel)
+        }?.shortLabel ?? "?"
     }
 }

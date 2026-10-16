@@ -317,6 +317,8 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(any.matches(event: KeyPress(.r, [.shift, .rightShift])))
         XCTAssertFalse(any.matches(event: KeyPress(.r, [.shift, .command, .leftCommand, .leftShift])))
         XCTAssertEqual(rs.label, "R⇧r")
+        XCTAssertEqual(rs.shortLabel, "R")
+        XCTAssertEqual(KeyMap.label(of: [rs]), "R")
         // Config: a sided binding and a sided hotkey.
         let c = try Config.parse("[ruler]\nremove = \"right_shift+r\"\n[hotkey]\nactivate = \"cmd+left_shift+ctrl+space\"")
         XCTAssertTrue(c.rulerRemove.has(KeyPress(.r, [.shift, .rightShift])))

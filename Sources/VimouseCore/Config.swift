@@ -216,6 +216,10 @@ public extension KeyPress {
         return s + code.label
     }
 
+    /// The strip form: sides dropped, so a right-shift r shows as "R"; the help panel's
+    /// `label` keeps the side.
+    var shortLabel: String { KeyPress(code, modifiers.generic).label }
+
     /// Parses "cmd+shift+space", "shift+r", "leftbracket", "a".
     static func parse(_ spec: String) -> KeyPress? {
         let parts = spec.lowercased().split(separator: "+").map { $0.trimmingCharacters(in: .whitespaces) }
