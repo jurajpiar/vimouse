@@ -23,6 +23,10 @@ public enum Effect: Equatable, Sendable {
     case scrollStop
     /// Flick: launch a coast in this direction without a hold.
     case scrollFlick(dx: Double, dy: Double, multiplier: Double)
+    /// A nudge key went down: unit direction and count multiplier. The platform moves
+    /// one step, accelerates while held and stops on release.
+    case nudgeStart(dx: Double, dy: Double, multiplier: Double)
+    case nudgeStop
 }
 
 public enum Mode: String, Equatable, Sendable, CaseIterable {
@@ -312,18 +316,24 @@ public final class PointerEngine {
             let fine = key.modifiers.contains(.shift)
             let base = KeyPress(key.code, key.modifiers.subtracting(.shift))
             func hit(_ set: Set<KeyPress>) -> Bool { set.has(key) || (fine && set.has(base)) }
-            let d = (fine ? 1 : nudgeStep) * n
-            var p = target
-            if hit(keymap.nudgeLeft) { p.x -= d }
-            else if hit(keymap.nudgeRight) { p.x += d }
-            else if hit(keymap.nudgeUp) { p.y -= d }
-            else if hit(keymap.nudgeDown) { p.y += d }
+            var dir = (dx: 0.0, dy: 0.0)
+            if hit(keymap.nudgeLeft) { dir.dx = -1 }
+            else if hit(keymap.nudgeRight) { dir.dx = 1 }
+            else if hit(keymap.nudgeUp) { dir.dy = -1 }
+            else if hit(keymap.nudgeDown) { dir.dy = 1 }
             else { break }
-            let screen = screens[screenIndex]
-            p.x = min(max(p.x, screen.x), screen.maxX - 1)
-            p.y = min(max(p.y, screen.y), screen.maxY - 1)
-            target = p
-            return [.warp(p), .redraw]
+            if fine {
+                // One pixel per press (key repeat gives a slow, exact crawl).
+                var p = target
+                p.x += dir.dx * n
+                p.y += dir.dy * n
+                let screen = screens[screenIndex]
+                p.x = min(max(p.x, screen.x), screen.maxX - 1)
+                p.y = min(max(p.y, screen.y), screen.maxY - 1)
+                target = p
+                return [.warp(p), .redraw]
+            }
+            return [.nudgeStart(dx: dir.dx, dy: dir.dy, multiplier: n)]
         case .ruler:
             guard var r = ruler else { break }
             let screen = screens[r.screenIndex]
@@ -345,12 +355,24 @@ public final class PointerEngine {
         return count == nil ? [] : [.redraw]
     }
 
-    /// A key went up. Only scroll keys care (the held scroll ends); everything else is ignored.
+    /// A key went up. Scroll and nudge keys end their held movement; everything else is ignored.
     public func handleRelease(_ key: KeyPress) -> [Effect] {
-        guard case .active(.scroll, _) = state else { return [] }
         let bare = KeyPress(key.code)
-        let scrollKeys = keymap.scrollDown.union(keymap.scrollUp).union(keymap.scrollLeft).union(keymap.scrollRight)
-        return scrollKeys.has(bare) || scrollKeys.has(key) ? [.scrollStop] : []
+        switch state {
+        case .active(.scroll, _):
+            let keys = keymap.scrollDown.union(keymap.scrollUp).union(keymap.scrollLeft).union(keymap.scrollRight)
+            return keys.has(bare) || keys.has(key) ? [.scrollStop] : []
+        case .active(.nudge, _):
+            let keys = keymap.nudgeDown.union(keymap.nudgeUp).union(keymap.nudgeLeft).union(keymap.nudgeRight)
+            return keys.has(bare) || keys.has(key) ? [.nudgeStop] : []
+        default:
+            return []
+        }
+    }
+
+    /// The platform moved the pointer on its own (a held nudge); keep the target in step.
+    public func pointerMoved(to p: Point) {
+        target = p
     }
 
     /// Click keys match on key code only; held modifiers are passed into the click.
@@ -416,7 +438,7 @@ public final class PointerEngine {
             h.append((l(k.rulerToggle), "ruler"))
             if snapProvider != nil { h.append((l(k.snapToggle), snapping ? "snap on" : "snap off")) }
         case .nudge:
-            h.append((l(k.nudgeLeft) + l(k.nudgeDown) + l(k.nudgeUp) + l(k.nudgeRight), "move \(Int(nudgeStep))px"))
+            h.append((l(k.nudgeLeft) + l(k.nudgeDown) + l(k.nudgeUp) + l(k.nudgeRight), "move (hold: faster)"))
             h.append(("⇧", "1px"))
             h.append((l(k.leftClick), "click"))
             h.append((l(k.clickStay), "click+stay"))

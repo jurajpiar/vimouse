@@ -9,6 +9,7 @@ final class Controller {
     private let tap = InputTap()
     private let overlay = Overlay()
     private let scroller = ScrollDriver()
+    private let nudger = NudgeDriver()
     private var rulerDim: Double = Config().rulerDim
     private var colours = Colours()
     private var dragRamp = false
@@ -40,6 +41,9 @@ final class Controller {
         scroller.flick = config.scrollFlick
         scroller.friction = config.scrollFriction
         scroller.doubleTapFlicks = config.flickDoubleTapEnabled
+        nudger.step = config.nudgeStep
+        nudger.speed = config.nudgeSpeed
+        nudger.acceleration = config.nudgeAcceleration
         colours = config.colours
         dragRamp = config.dragRamp
         activateMode = config.activateMode
@@ -50,6 +54,11 @@ final class Controller {
     /// Starts the event tap if allowed; either way the health monitor runs and will
     /// start (or restart) the tap once Accessibility access is there.
     func start() {
+        nudger.onMove = { [weak self] p in
+            guard let self else { return }
+            engine.pointerMoved(to: p)
+            overlay.render(model())
+        }
         tap.handler = { [weak self] key, isDown, isRepeat, isModifier, bothSides in
             guard let self else { return false }
             if isModifier { return self.handleModifier(key, isDown: isDown) }
@@ -187,14 +196,15 @@ final class Controller {
             return true
         }
         guard isDown else {
-            // A held scroll key must end its gesture whatever mode we are in by now.
+            // A held scroll or nudge key must end its movement whatever mode we are in by now.
             if scroller.isHeld { scroller.stop() }
+            if nudger.isHeld { nudger.stop() }
             apply(engine.handleRelease(key))
             return true
         }
         // Key repeat is useful for nudging and moving the ruler, not for picking quadrants;
         // a held scroll key is driven by the scroller, not by repeats.
-        if isRepeat, engine.mode == .pointer || (engine.mode == .scroll && scroller.smooth) { return true }
+        if isRepeat, engine.mode == .pointer || (engine.mode == .scroll && scroller.smooth) || nudger.isHeld { return true }
         apply(engine.handle(key))
         return true
     }
@@ -241,9 +251,14 @@ final class Controller {
                 scroller.stop()
             case .scrollFlick(let dx, let dy, let multiplier):
                 scroller.flickNow(dx: dx, dy: dy, multiplier: multiplier)
+            case .nudgeStart(let dx, let dy, let multiplier):
+                nudger.start(dx: dx, dy: dy, multiplier: multiplier, from: engine.target,
+                             within: engine.screens[engine.screenIndex], dragging: engine.dragging)
+            case .nudgeStop:
+                nudger.stop()
             }
         }
-        if !engine.isActive, scroller.isHeld { scroller.stop() }
+        if !engine.isActive { if scroller.isHeld { scroller.stop() }; nudger.stop() }
     }
 
     /// nil when there is nothing to draw.

@@ -34,8 +34,9 @@ step sends the pointer to the nearest clickable element inside the chosen rectan
 (read from the frontmost app's accessibility tree) instead of its centre; a pink
 ring marks the snap target. Escape exits (releasing any drag).
 
-Nudge: n from Pointer mode, then h/j/k/l or the arrows move the pointer 5 px
-(Shift: 1 px, counts multiply), n back to the quadrants.
+Nudge: n from Pointer mode, then h/j/k/l or the arrows move the pointer (a tap is
+one step, a hold accelerates, release stops; Shift: one pixel per repeat; counts
+multiply), n back to the quadrants.
 
 Scroll: j/k/h/l scroll at the pointer (a tap is one step, a hold accelerates,
 release coasts, a double tap flicks the page at speed, a tap during a coast

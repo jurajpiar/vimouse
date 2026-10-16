@@ -76,7 +76,9 @@ public enum ConfigSchema {
         .init(section: "pointer", key: "top", defaultValue: "[\"shift+u\", \"shift+backspace\"]", comment: "Restart the quadrant search from the whole screen, e.g. [\"shift+u\", \"shift+backspace\"]."),
         .init(section: "pointer", key: "snap_toggle", defaultValue: "\"a\"", comment: "Toggle snapping to UI elements for this session, e.g. \"a\"."),
 
-        .init(section: "nudge", key: "step", defaultValue: "5", comment: "Pixels the pointer moves per press; Shift held moves one pixel; a count multiplies, e.g. 5, 10."),
+        .init(section: "nudge", key: "step", defaultValue: "5", comment: "Pixels the pointer moves on a tap; Shift held moves one pixel per repeat; a count multiplies, e.g. 5, 10."),
+        .init(section: "nudge", key: "speed", defaultValue: "600", comment: "Full speed while a nudge key is held, in pixels per second, e.g. 300 (careful), 600, 1500 (sweeping)."),
+        .init(section: "nudge", key: "acceleration", defaultValue: "0.6", comment: "Seconds from the start of a hold to full speed, e.g. 0.3, 0.6, 1.0."),
         .init(section: "nudge", key: "toggle", defaultValue: "\"n\"", comment: "Enter or leave Nudge mode from Pointer mode, e.g. \"n\"."),
         .init(section: "nudge", key: "left", defaultValue: "[\"h\", \"left\"]", comment: "Move the pointer left, e.g. [\"h\", \"left\"]."),
         .init(section: "nudge", key: "right", defaultValue: "[\"l\", \"right\"]", comment: "Move the pointer right, e.g. [\"l\", \"right\"]."),

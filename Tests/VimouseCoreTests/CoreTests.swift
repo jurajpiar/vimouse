@@ -526,14 +526,16 @@ final class EngineTests: XCTestCase {
         _ = e.handle(KeyPress(.i)) // target (250,150)
         XCTAssertEqual(e.handle(KeyPress(.n)), [.redraw])
         XCTAssertEqual(e.mode, .nudge)
-        XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 255, y: 150)), .redraw])
-        XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.warp(Point(x: 255, y: 155)), .redraw])
-        XCTAssertEqual(e.handle(KeyPress(.h, [.shift])), [.warp(Point(x: 254, y: 155)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.l)), [.nudgeStart(dx: 1, dy: 0, multiplier: 1)])
+        XCTAssertEqual(e.handleRelease(KeyPress(.l)), [.nudgeStop])
+        XCTAssertEqual(e.handle(KeyPress(.downArrow)), [.nudgeStart(dx: 0, dy: 1, multiplier: 1)])
+        e.pointerMoved(to: Point(x: 255, y: 155)) // the platform moved it
+        XCTAssertEqual(e.handle(KeyPress(.h, [.shift])), [.warp(Point(x: 254, y: 155)), .redraw]) // fine: one pixel
         _ = e.handle(KeyPress(.four))
-        XCTAssertEqual(e.handle(KeyPress(.k)), [.warp(Point(x: 254, y: 135)), .redraw])
+        XCTAssertEqual(e.handle(KeyPress(.k)), [.nudgeStart(dx: 0, dy: -1, multiplier: 4)])
         XCTAssertEqual(e.handle(KeyPress(.i)), []) // quadrant keys inactive here
         _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine))
-        XCTAssertEqual(e.handle(KeyPress(.l)), [.warp(Point(x: 999, y: 135)), .redraw]) // clamped to the screen
+        XCTAssertEqual(e.handle(KeyPress(.l, [.shift])), [.warp(Point(x: 999, y: 155)), .redraw]) // fine, clamped to the screen
         XCTAssertEqual(e.handle(KeyPress(.n)), [.redraw])
         XCTAssertEqual(e.mode, .pointer)
         XCTAssertEqual(e.session?.depth, 1) // the descent is untouched

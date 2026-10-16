@@ -50,6 +50,9 @@ public struct Config: Equatable {
     public var rulerDim: Double = 0.35
     public var snapEnabled: Bool = true
     public var nudgeStep: Double = 5
+    /// Full speed while a nudge key is held, px/s; seconds to reach it.
+    public var nudgeSpeed: Double = 600
+    public var nudgeAcceleration: Double = 0.6
     public var dragRestartsSearch: Bool = true
     public var dragRamp: Bool = false
 
@@ -183,6 +186,8 @@ public struct Config: Equatable {
 
         if let v = try keys("global", "help") { k.help = v }
         if let v = try number("nudge", "step") { c.nudgeStep = max(1, v) }
+        if let v = try number("nudge", "speed") { c.nudgeSpeed = max(20, v) }
+        if let v = try number("nudge", "acceleration") { c.nudgeAcceleration = max(0.05, v) }
         if let v = try keys("nudge", "toggle") { k.nudgeToggle = v }
         if let v = try keys("nudge", "left") { k.nudgeLeft = v }
         if let v = try keys("nudge", "right") { k.nudgeRight = v }
