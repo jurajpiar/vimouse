@@ -38,6 +38,8 @@ final class AXLineProvider: LineProvider {
         var webLine: Int?
         /// A marker at the start of this line, for walking line by line (Chromium, WebKit).
         var lineStart: AnyObject?
+        /// Lines derived from character rectangles (Chromium text nodes without line APIs).
+        var charBounds = false
         /// Whether the web area's marker bounds come flipped (Cocoa) or not.
         var flipped = true
     }
@@ -93,6 +95,15 @@ final class AXLineProvider: LineProvider {
                         return r
                     }
                     i += direction
+                }
+            } else if cur.charBounds {
+                // Chromium text node: the row just past this one, from character rectangles.
+                let py = sign > 0 ? cur.rect.maxY + cur.rect.height / 2 : cur.rect.y - cur.rect.height / 2
+                if let f = lineFromCharBounds(cur.element, x: x, y: py, deadline: deadline),
+                   sign > 0 ? f.rect.midY > cur.rect.midY : f.rect.midY < cur.rect.midY {
+                    last = f
+                    log("next by character rows: \(f.rect)")
+                    return f.rect
                 }
             } else if let host = cur.markerHost, let start = cur.lineStart {
                 // Walk the element's lines by marker: line end -> next character -> its line.
@@ -212,7 +223,9 @@ final class AXLineProvider: LineProvider {
                 element = parent
             }
         }
-        // Web content: a text node carries its own start marker; walk its lines from there.
+        // Chromium text nodes: no line API, but character rectangles by index.
+        if let f = lineFromCharBounds(hit, x: x, y: y, deadline: deadline) { return f }
+        // WebKit text nodes: walk the lines from the element's own start marker.
         element = hit
         for _ in 0..<3 {
             if Date() > deadline { return nil }
@@ -355,6 +368,62 @@ final class AXLineProvider: LineProvider {
         }
         log("no line under y \(Int(y)) by start marker")
         return nil
+    }
+
+    /// Lines from character rectangles: `AXBoundsForRange` over single characters, whose
+    /// y is monotonic through the text. Binary searches find the character under `y`,
+    /// then the first and last characters on its row; one call over that span is the line.
+    private func lineFromCharBounds(_ element: AXUIElement, x: Double, y: Double, deadline: Date) -> Found? {
+        guard let frame = frame(of: element), y >= frame.y - 2, y <= frame.maxY + 2,
+              let text: String = attribute(element, kAXValueAttribute) else { return nil }
+        let n = text.utf16.count
+        guard n > 0 else { return nil }
+        func rect(_ i: Int, _ len: Int = 1) -> Rect? {
+            var cf = CFRange(location: i, length: len)
+            guard let rv = AXValueCreate(.cfRange, &cf) else { return nil }
+            var out: CFTypeRef?
+            guard AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString, rv, &out) == .success,
+                  let v = out, CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
+            var r = CGRect.zero
+            // swiftlint:disable:next force_cast
+            guard AXValueGetValue(v as! AXValue, .cgRect, &r), r.height > 0, r.height <= 120 else { return nil }
+            return Rect(x: r.minX, y: r.minY, width: r.width, height: r.height)
+        }
+        /// The rectangle of character `i`, or of the next one with a rectangle (whitespace may have none).
+        func charRect(_ i: Int) -> Rect? {
+            for j in i..<min(n, i + 4) { if let r = rect(j) { return r } }
+            return nil
+        }
+        guard let first = charRect(0) else { return nil }
+        guard y >= first.y - 1 else { return nil }
+        // The first character whose row ends below y.
+        var lo = 0, hi = n - 1
+        while lo < hi {
+            guard Date() < deadline else { return nil }
+            let mid = (lo + hi) / 2
+            guard let r = charRect(mid) else { lo = mid + 1; continue }
+            if r.maxY > y { hi = mid } else { lo = mid + 1 }
+        }
+        guard let under = charRect(lo), y >= under.y - 1, y < under.maxY + 1 else { return nil }
+        // Row start: the first character at (or above, to a tolerance) this row's top.
+        var a = 0, b = lo
+        while a < b {
+            let mid = (a + b) / 2
+            guard let r = charRect(mid) else { a = mid + 1; continue }
+            if r.y >= under.y - 2 { b = mid } else { a = mid + 1 }
+        }
+        let start = a
+        // Row end: the last character whose top is at this row's top.
+        a = lo; b = n - 1
+        while a < b {
+            let mid = (a + b + 1) / 2
+            guard let r = charRect(mid) else { b = mid - 1; continue }
+            if r.y <= under.y + 2 { a = mid } else { b = mid - 1 }
+        }
+        let end = a
+        let line = rect(start, end - start + 1) ?? Rect(x: frame.x, y: under.y, width: frame.width, height: under.height)
+        log("line by character rows [\(start)..\(end)] of \(n): \(line)")
+        return Found(element: element, line: nil, rect: line, charBounds: true)
     }
 
     /// Debug: what the bounds calls return for a line range and for an index range.
