@@ -104,6 +104,10 @@ Accessibility permission flow and revocation hang (mitigation in section 4). Sec
 
 Phase 1 remaining: Nudge sub-mode, hold-? key map, config file. Phase 3 (ruler) may be pulled forward since it serves the reading goal directly.
 
+2026-10-16: vi-style count prefix (digits scale/repeat the next command; n⇥ picks a screen) and AX snapping ('a' toggles, on by default) implemented.
+
+AX snapping, to verify on real apps: native (Finder, System Settings), Safari/Chrome (large trees; walk capped at 1500 elements / 150 ms so heavy pages may be partly covered), Electron (VS Code, Slack). Watch for activation lag (the walk runs on ⌘⇧Space; fix is a background walk applied when done) and for the pink ring landing on non-targets (a role to drop from AXSnapper.clickableRoles). Known side effect: setting AXEnhancedUserInterface on Chromium apps can disable their window animations while vimouse runs, as with Homerow and Vimac.
+
 Open: none.
 
 ## Sources
