@@ -232,13 +232,17 @@ final class AXLineProvider: LineProvider {
         }
     }
 
+    /// The text-marker attributes are WebKit/Chromium extensions: the accessibility
+    /// server passes their values through, so points and rectangles are in Cocoa screen
+    /// coordinates (origin at the bottom left of the primary display), unlike the
+    /// standard attributes, which it flips for us.
     private func lineFromMarkers(_ element: AXUIElement, x: Double, y: Double) -> Found? {
-        var point = CGPoint(x: x, y: y)
-        guard let pointValue = AXValueCreate(.cgPoint, &point),
-              let marker = markerValue(element, Marker.forPosition, pointValue),
-              let range = markerValue(element, Marker.lineRange, marker),
-              let b = markerBounds(element, range), b.width > 0
-        else { return nil }
+        let p = Coordinates.appKitPoint(fromCG: Point(x: x, y: y))
+        var point = CGPoint(x: p.x, y: p.y)
+        guard let pointValue = AXValueCreate(.cgPoint, &point) else { return nil }
+        guard let marker = markerValue(element, Marker.forPosition, pointValue) else { log("no marker at (\(Int(x)),\(Int(y)))"); return nil }
+        guard let range = markerValue(element, Marker.lineRange, marker) else { log("no line range for the marker"); return nil }
+        guard let b = markerBounds(element, range), b.width > 0 else { log("no bounds for the line range"); return nil }
         guard abs(b.midY - y) <= b.height * 1.5 + 4 else { log("marker line \(b) is not under y \(Int(y))"); return nil }
         return Found(element: element, line: nil, rect: b, markerRange: range, markerHost: element)
     }
@@ -257,7 +261,7 @@ final class AXLineProvider: LineProvider {
         var r = CGRect.zero
         // swiftlint:disable:next force_cast
         guard AXValueGetValue(v as! AXValue, .cgRect, &r), r.height > 0, r.height <= 120 else { return nil }
-        return Rect(x: r.minX, y: r.minY, width: r.width, height: r.height)
+        return Coordinates.cgRect(fromAppKit: NSRect(x: r.minX, y: r.minY, width: r.width, height: r.height))
     }
 
     /// Bounds of line `n` of an element that exposes lines; nil past the last line.
