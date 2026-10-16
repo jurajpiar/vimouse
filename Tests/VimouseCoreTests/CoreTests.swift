@@ -202,8 +202,8 @@ final class ConfigTests: XCTestCase {
         let e2 = PointerEngine(keymap: c2.keymap)
         _ = e2.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
         _ = e2.handle(KeyPress(.s))
-        XCTAssertEqual(e2.handle(KeyPress(.downArrow, [.option, .rightOption])), [.scrollFlick(dx: 0, dy: 1, multiplier: 1)])
-        XCTAssertEqual(e2.handle(KeyPress(.downArrow, [.option, .leftOption])), []) // wrong side: nothing
+        XCTAssertEqual(e2.handle(KeyPress(.j, [.option, .rightOption])), [.scrollFlick(dx: 0, dy: 1, multiplier: 1)])
+        XCTAssertEqual(e2.handle(KeyPress(.j, [.option, .leftOption])), []) // wrong side: nothing
         XCTAssertEqual(e.handle(KeyPress(.j)), [.scrollStart(dx: 0, dy: 1, multiplier: 1)])
     }
 
