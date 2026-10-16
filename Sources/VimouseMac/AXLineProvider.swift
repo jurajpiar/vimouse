@@ -103,7 +103,9 @@ final class AXLineProvider: LineProvider {
             } else if cur.charBounds {
                 // Chromium text node: the row that starts after (or ends before) this one.
                 let text = CharText(element: cur.element, length: cur.textLength)
-                let anchor = sign > 0 ? cur.rowEnd + 1 : cur.rowStart - 1
+                var anchor = sign > 0 ? cur.rowEnd + 1 : cur.rowStart - 1
+                // Going up, the character before the row is often a space without a rectangle.
+                while sign < 0, anchor > 0, anchor > cur.rowStart - 5, text.rect(anchor) == nil { anchor -= 1 }
                 if anchor >= 0, anchor < cur.textLength, Date() < deadline,
                    let row = text.row(around: anchor, deadline: deadline),
                    sign > 0 ? row.rect.midY > cur.rect.midY : row.rect.midY < cur.rect.midY {
