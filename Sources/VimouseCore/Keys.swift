@@ -144,6 +144,8 @@ public struct KeyMap: Sendable, Equatable {
     public var scrollRight: Set<KeyPress>
     public var scrollHalfDown: Set<KeyPress>
     public var scrollHalfUp: Set<KeyPress>
+    /// Modifiers that turn a scroll key into a flick; nil for none.
+    public var flickWith: Modifiers?
     public var snapToggle: Set<KeyPress>
     public var rulerToggle: Set<KeyPress>
     public var rulerRemove: Set<KeyPress>

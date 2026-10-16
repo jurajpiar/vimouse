@@ -34,6 +34,8 @@ public struct Config: Equatable {
     public var scrollSmooth: Bool = true
     /// Speed launched by a double tap, px/s; 0 disables.
     public var scrollFlick: Double = 4000
+    /// Double tap of a scroll key flicks.
+    public var scrollFlickDoubleTap: Bool = true
     /// Fraction of speed lost per second while coasting.
     public var scrollFriction: Double = 0.85
     public var rulerHeight: Double = 32
@@ -141,6 +143,16 @@ public struct Config: Equatable {
         if let v = try number("scroll", "speed") { c.scrollSpeed = max(50, v) }
         if let v = try number("scroll", "acceleration") { c.scrollAcceleration = max(0.05, v) }
         if let v = try number("scroll", "flick") { c.scrollFlick = max(0, v) }
+        if let v = t["scroll"]?["flick_double_tap"] {
+            guard let b = v.bool else { throw ParseError(description: "[scroll] flick_double_tap: expected true or false") }
+            c.scrollFlickDoubleTap = b
+        }
+        if let v = t["scroll"]?["flick_with"] {
+            guard let s = v.string else { throw ParseError(description: "[scroll] flick_with: expected modifiers like \"alt\" or \"\"") }
+            if s.isEmpty { k.flickWith = nil }
+            else if let m = Modifiers.parse(s) { k.flickWith = m }
+            else { throw ParseError(description: "[scroll] flick_with: expected modifiers like \"alt\", \"cmd+shift\" or \"\"") }
+        }
         if let v = try number("scroll", "friction") { c.scrollFriction = min(max(v, 0.01), 0.999) }
         for (name, set) in [("momentum", { (c: inout Config, b: Bool) in c.scrollMomentum = b }), ("smooth", { (c: inout Config, b: Bool) in c.scrollSmooth = b })] {
             if let v = t["scroll"]?[name] {

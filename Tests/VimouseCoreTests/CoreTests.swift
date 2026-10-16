@@ -184,6 +184,18 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(e.hints.contains { $0.key == "release ⌘" })
     }
 
+    func testFlickModifier() throws {
+        let c = try Config.parse("[scroll]\nflick_with = \"alt\"\nflick_double_tap = false")
+        XCTAssertEqual(c.keymap.flickWith, [.option])
+        XCTAssertFalse(c.scrollFlickDoubleTap)
+        XCTAssertThrowsError(try Config.parse("[scroll]\nflick_with = \"j\""))
+        let e = PointerEngine(keymap: c.keymap)
+        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100))
+        _ = e.handle(KeyPress(.s))
+        XCTAssertEqual(e.handle(KeyPress(.j, [.option])), [.scrollFlick(dx: 0, dy: 1, multiplier: 1)])
+        XCTAssertEqual(e.handle(KeyPress(.j)), [.scrollStart(dx: 0, dy: 1, multiplier: 1)])
+    }
+
     func testStartModes() throws {
         let c = try Config.parse("[hotkey]\nactivate_mode = \"scroll\"\nhold_mode = \"Ruler\"")
         XCTAssertEqual(c.activateMode, .scroll)

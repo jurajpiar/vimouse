@@ -32,6 +32,7 @@ final class Controller {
         scroller.smooth = config.scrollSmooth
         scroller.flick = config.scrollFlick
         scroller.friction = config.scrollFriction
+        scroller.doubleTapFlicks = config.scrollFlickDoubleTap
         colours = config.colours
         dragRamp = config.dragRamp
         activateMode = config.activateMode
@@ -173,6 +174,8 @@ final class Controller {
                 scroller.start(dx: dx, dy: dy, multiplier: multiplier)
             case .scrollStop:
                 scroller.stop()
+            case .scrollFlick(let dx, let dy, let multiplier):
+                scroller.flickNow(dx: dx, dy: dy, multiplier: multiplier)
             }
         }
         if !engine.isActive, scroller.isHeld { scroller.stop() }

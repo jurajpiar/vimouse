@@ -15,6 +15,8 @@ final class ScrollDriver {
     var flick: Double = 4000
     /// Fraction of speed lost per second while coasting, 0 to 1.
     var friction: Double = 0.85
+    /// Double tap of a scroll key flicks.
+    var doubleTapFlicks = true
 
     /// A press shorter than this is a tap (one step); longer is a hold.
     private let tapWindow: TimeInterval = 0.15
@@ -46,18 +48,10 @@ final class ScrollDriver {
             finish()
         }
         // A second tap of the same key within the window is a flick: launch and coast.
-        if smooth, momentum, flick > 0, !braking, let last = lastTap,
+        if doubleTapFlicks, !braking, let last = lastTap,
            last.dx == dx, last.dy == dy, Date().timeIntervalSince(last.at) < flickWindow {
             lastTap = nil
-            direction = (dx, dy)
-            carry = (0, 0)
-            post(0, 0, phase: .began)
-            post(0, 0, phase: .ended)
-            velocity = flick * multiplier
-            coasting = true
-            post(0, 0, momentum: .begin)
-            timer = Timer.scheduledTimer(withTimeInterval: frame, repeats: true) { [weak self] _ in self?.tick() }
-            RunLoop.main.add(timer!, forMode: .common)
+            launch(dx: dx, dy: dy, multiplier: multiplier)
             return
         }
         direction = (dx, dy)
@@ -76,6 +70,31 @@ final class ScrollDriver {
             post(dx * step * multiplier, dy * step * multiplier, phase: .began)
             begun = true
         }
+        timer = Timer.scheduledTimer(withTimeInterval: frame, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(timer!, forMode: .common)
+    }
+
+    /// Flick on request (the flick modifier): launch a coast from a standing start.
+    func flickNow(dx: Double, dy: Double, multiplier: Double) {
+        if timer != nil {
+            if coasting { post(0, 0, momentum: .end) } else { post(0, 0, phase: .ended) }
+            finish()
+        }
+        launch(dx: dx, dy: dy, multiplier: multiplier)
+    }
+
+    private func launch(dx: Double, dy: Double, multiplier: Double) {
+        guard smooth, momentum, flick > 0 else {
+            Pointer.scroll(dx: dx * step * multiplier * 4, dy: dy * step * multiplier * 4)
+            return
+        }
+        direction = (dx, dy)
+        carry = (0, 0)
+        post(0, 0, phase: .began)
+        post(0, 0, phase: .ended)
+        velocity = flick * multiplier
+        coasting = true
+        post(0, 0, momentum: .begin)
         timer = Timer.scheduledTimer(withTimeInterval: frame, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(timer!, forMode: .common)
     }

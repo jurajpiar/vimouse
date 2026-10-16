@@ -21,6 +21,8 @@ public enum Effect: Equatable, Sendable {
     case scrollStart(dx: Double, dy: Double, multiplier: Double)
     /// The scroll key went up.
     case scrollStop
+    /// Flick: launch a coast in this direction without a hold.
+    case scrollFlick(dx: Double, dy: Double, multiplier: Double)
 }
 
 public enum Mode: String, Equatable, Sendable, CaseIterable {
@@ -281,6 +283,14 @@ public final class PointerEngine {
             }
         case .scroll:
             let half = screens[screenIndex].height / 2
+            // A scroll key with the flick modifier held flicks instead of scrolling.
+            if let fm = keymap.flickWith, key.modifiers.isSuperset(of: fm) {
+                let bare = KeyPress(key.code, key.modifiers.subtracting(fm))
+                if keymap.scrollDown.contains(bare) { return [.scrollFlick(dx: 0, dy: 1, multiplier: n)] }
+                if keymap.scrollUp.contains(bare) { return [.scrollFlick(dx: 0, dy: -1, multiplier: n)] }
+                if keymap.scrollLeft.contains(bare) { return [.scrollFlick(dx: -1, dy: 0, multiplier: n)] }
+                if keymap.scrollRight.contains(bare) { return [.scrollFlick(dx: 1, dy: 0, multiplier: n)] }
+            }
             if keymap.scrollDown.contains(key) { return [.scrollStart(dx: 0, dy: 1, multiplier: n)] }
             if keymap.scrollUp.contains(key) { return [.scrollStart(dx: 0, dy: -1, multiplier: n)] }
             if keymap.scrollLeft.contains(key) { return [.scrollStart(dx: -1, dy: 0, multiplier: n)] }
@@ -404,6 +414,7 @@ public final class PointerEngine {
         case .scroll:
             h.append((l(k.scrollDown) + l(k.scrollUp) + " " + l(k.scrollLeft) + l(k.scrollRight), "scroll"))
             h.append((l(k.scrollHalfDown) + " " + l(k.scrollHalfUp), "half page"))
+            if let fm = k.flickWith { h.append((KeyPress(.space, fm).label.replacingOccurrences(of: "␣", with: "") + "+" + l(k.scrollDown), "flick")) }
             h.append((l(k.leftClick), "click"))
             h.append((l(k.scrollToggle), "pointer"))
             h.append((l(k.rulerToggle), "ruler"))
