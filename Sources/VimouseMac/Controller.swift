@@ -12,6 +12,8 @@ final class Controller {
     private var rulerDim: Double = Config().rulerDim
     private var colours = Colours()
     private var dragRamp = false
+    private var activateMode: Mode = .pointer
+    private var holdMode: Mode = .pointer
     /// True while the help key is held.
     private var helpShown = false
 
@@ -32,6 +34,8 @@ final class Controller {
         scroller.friction = config.scrollFriction
         colours = config.colours
         dragRamp = config.dragRamp
+        activateMode = config.activateMode
+        holdMode = config.holdMode
         overlay.render(model())
     }
 
@@ -125,7 +129,8 @@ final class Controller {
         apply(engine.activate(
             screens: screens.map { Coordinates.cgRect(fromAppKit: $0.frame) },
             index: index,
-            pointer: Coordinates.cgPoint(fromAppKit: mouse)
+            pointer: Coordinates.cgPoint(fromAppKit: mouse),
+            mode: engine.heldActivation ? holdMode : activateMode
         ))
     }
 

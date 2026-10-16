@@ -23,7 +23,7 @@ public enum Effect: Equatable, Sendable {
     case scrollStop
 }
 
-public enum Mode: Equatable, Sendable {
+public enum Mode: String, Equatable, Sendable, CaseIterable {
     case pointer, scroll, ruler, nudge
 }
 
@@ -135,21 +135,24 @@ public final class PointerEngine {
 
     /// Enter Pointer mode over `screens[index]` (CG coordinates). The pointer stays
     /// where it is (`pointer`); the first quadrant pick moves it.
-    public func activate(screens: [Rect], index: Int, pointer: Point? = nil) -> [Effect] {
+    public func activate(screens: [Rect], index: Int, pointer: Point? = nil, mode: Mode = .pointer) -> [Effect] {
         precondition(!screens.isEmpty && screens.indices.contains(index))
         self.screens = screens
         screenIndex = index
         let s = BisectSession(root: screens[index])
-        state = .active(mode: .pointer, session: s)
         pendingCount = nil
         snapProvider?.prepare(screen: screens[index])
         target = pointer ?? s.current.center
+        if mode == .ruler, ruler == nil {
+            ruler = Ruler(screenIndex: screenIndex, y: target.y, height: rulerDefaultHeight)
+        }
+        state = .active(mode: mode, session: s)
         return [.showOverlay]
     }
 
     /// Convenience for a single screen.
-    public func activate(screen: Rect, pointer: Point? = nil) -> [Effect] {
-        activate(screens: [screen], index: 0, pointer: pointer)
+    public func activate(screen: Rect, pointer: Point? = nil, mode: Mode = .pointer) -> [Effect] {
+        activate(screens: [screen], index: 0, pointer: pointer, mode: mode)
     }
 
     /// Leave the active mode, releasing a held drag first. A ruler stays on screen.

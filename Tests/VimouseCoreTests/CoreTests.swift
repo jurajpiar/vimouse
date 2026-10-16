@@ -184,6 +184,17 @@ final class ConfigTests: XCTestCase {
         XCTAssertTrue(e.hints.contains { $0.key == "release ⌘" })
     }
 
+    func testStartModes() throws {
+        let c = try Config.parse("[hotkey]\nactivate_mode = \"scroll\"\nhold_mode = \"Ruler\"")
+        XCTAssertEqual(c.activateMode, .scroll)
+        XCTAssertEqual(c.holdMode, .ruler)
+        XCTAssertThrowsError(try Config.parse("[hotkey]\nactivate_mode = \"flying\""))
+        let e = PointerEngine()
+        _ = e.activate(screen: Rect(x: 0, y: 0, width: 100, height: 100), pointer: Point(x: 10, y: 20), mode: .ruler)
+        XCTAssertEqual(e.mode, .ruler)
+        XCTAssertEqual(e.ruler?.y, 20)
+    }
+
     func testConfigUpdateSwitch() throws {
         XCTAssertTrue(Config().autoUpdate)
         XCTAssertFalse(try Config.parse("[config]\nupdate = false").autoUpdate)

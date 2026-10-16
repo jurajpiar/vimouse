@@ -20,6 +20,9 @@ public struct Colours: Equatable {
 
 public struct Config: Equatable {
     public var keymap: KeyMap = .default
+    /// Mode entered by the hotkey and by the hold key.
+    public var activateMode: Mode = .pointer
+    public var holdMode: Mode = .pointer
     public var colours = Colours()
     /// Whether the app may rewrite config.toml on start (migration).
     public var autoUpdate: Bool = true
@@ -87,6 +90,15 @@ public struct Config: Equatable {
             c.autoUpdate = b
         }
         if let p = try one("hotkey", "activate") { k.activate = p }
+        func mode(_ name: String) throws -> Mode? {
+            guard let v = t["hotkey"]?[name] else { return nil }
+            guard let s = v.string, let m = Mode(rawValue: s.lowercased()) else {
+                throw ParseError(description: "[hotkey] \(name): expected one of \(Mode.allCases.map(\.rawValue).joined(separator: ", "))")
+            }
+            return m
+        }
+        if let m = try mode("activate_mode") { c.activateMode = m }
+        if let m = try mode("hold_mode") { c.holdMode = m }
         if let v = t["hotkey"]?["hold"] {
             guard let name = v.string else { throw ParseError(description: "[hotkey] hold: expected a modifier key name or \"\"") }
             if name.isEmpty {
