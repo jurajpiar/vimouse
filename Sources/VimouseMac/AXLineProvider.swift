@@ -280,7 +280,8 @@ final class AXLineProvider: LineProvider {
             container = child
         }
         // Chromium containers whose children carry useless frames: try their text by rows.
-        if let f = rowInDescendants(of: hit, x: x, y: y, depth: 0, budget: 24, deadline: deadline) { return f }
+        var budget = 300
+        if let f = rowInDescendants(of: hit, x: x, y: y, depth: 0, budget: &budget, deadline: deadline) { return f }
         if debug, dumpedChildren < 3 {
             dumpedChildren += 1
             let role: String = attribute(hit, kAXRoleAttribute) ?? "?"
@@ -424,21 +425,24 @@ final class AXLineProvider: LineProvider {
     }
 
     /// A row under the point in a descendant text node whose frame cannot be trusted
-    /// (height under four pixels); a bounded search in document order.
-    private func rowInDescendants(of element: AXUIElement, x: Double, y: Double, depth: Int, budget: Int, deadline: Date) -> Found? {
-        guard depth < 3, budget > 0, Date() < deadline,
+    /// (height under four pixels): a bounded search in document order, each node's text
+    /// checked against y by its first and last character rectangles before sampling it.
+    private func rowInDescendants(of element: AXUIElement, x: Double, y: Double, depth: Int, budget: inout Int, deadline: Date) -> Found? {
+        guard depth < 6, budget > 0, Date() < deadline,
               let children: [AXUIElement] = attribute(element, kAXChildrenAttribute) else { return nil }
-        var left = budget
-        for c in children.prefix(budget) {
-            left -= 1
+        for c in children {
+            guard budget > 0, Date() < deadline else { return nil }
+            budget -= 1
             guard let f = frame(of: c) else { continue }
-            if f.height >= 4 { if !f.contains(Point(x: x, y: y)) { continue } }
-            if let v: String = attribute(c, kAXValueAttribute), !v.isEmpty,
-               let r = lineFromCharBounds(c, x: x, y: y, deadline: deadline), r.rect.contains(Point(x: x, y: r.rect.midY)) {
-                return r
+            if f.height >= 4, f.width >= 4, !f.contains(Point(x: x, y: y)) { continue }
+            if let v: String = attribute(c, kAXValueAttribute), !v.isEmpty {
+                let text = CharText(element: c, length: v.utf16.count)
+                guard let first = text.charRect(0), let lastChar = text.charRect(text.length - 1),
+                      y >= first.y - 1, y <= lastChar.maxY + 1 else { continue }
+                if let r = lineFromCharBounds(c, x: x, y: y, deadline: deadline), x >= r.rect.x - 2, x <= r.rect.maxX + 2 { return r }
+                continue
             }
-            if let r = rowInDescendants(of: c, x: x, y: y, depth: depth + 1, budget: left, deadline: deadline) { return r }
-            if left <= 0 { break }
+            if let r = rowInDescendants(of: c, x: x, y: y, depth: depth + 1, budget: &budget, deadline: deadline) { return r }
         }
         return nil
     }
