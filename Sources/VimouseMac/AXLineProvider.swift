@@ -469,25 +469,32 @@ final class AXLineProvider: LineProvider {
         func row(around i: Int, deadline: Date) -> (start: Int, end: Int, rect: Rect)? {
             guard let on = charRect(i) else { return nil }
             func sameRow(_ r: Rect) -> Bool { abs(r.y - on.y) <= 2 }
-            // Walk outwards: the search stays local, so holes cost a few calls rather than a wrong row.
-            var start = i
-            var misses = 0
-            var j = i - 1
-            while j >= 0, misses < 24, Date() < deadline {
-                if let r = rect(j) {
-                    if sameRow(r) { start = j; misses = 0 } else { break }
-                } else { misses += 1 }
-                j -= 1
+            // Gallop outwards in shrinking strides; a character without a rectangle is
+            // read from its neighbours. The search stays local, so a hole costs a few
+            // calls rather than a wrong row.
+            func rectNear(_ j: Int, _ dir: Int) -> Rect? {
+                for k in 0..<4 {
+                    let idx = j + dir * k
+                    guard idx >= 0, idx < length else { return nil }
+                    if let r = rect(idx) { return r }
+                }
+                return nil
             }
-            var end = i
-            misses = 0
-            j = i + 1
-            while j < length, misses < 24, Date() < deadline {
-                if let r = rect(j) {
-                    if sameRow(r) { end = j; misses = 0 } else { break }
-                } else { misses += 1 }
-                j += 1
+            func extend(from i: Int, _ dir: Int) -> Int {
+                var pos = i
+                var stride = 16
+                while stride >= 1, Date() < deadline {
+                    let cand = pos + dir * stride
+                    if cand >= 0, cand < length, let r = rectNear(cand, dir), sameRow(r) {
+                        pos = cand
+                    } else {
+                        stride /= 2
+                    }
+                }
+                return pos
             }
+            let start = extend(from: i, -1)
+            let end = extend(from: i, 1)
             let line = rect(start, end - start + 1) ?? Rect(x: on.x, y: on.y, width: on.width, height: on.height)
             return (start, end, line)
         }
