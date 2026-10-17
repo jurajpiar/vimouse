@@ -240,6 +240,14 @@ final class AXLineProvider: LineProvider {
         }
         // Chromium text nodes: no line API, but character rectangles by index.
         if let f = lineFromCharBounds(hit, x: x, y: y, deadline: deadline) { return f }
+        // The hit test may answer with a parent whose own text is elsewhere while a nested
+        // block (a list inside a paragraph) holds the row under the point: look inside.
+        var container = hit
+        for _ in 0..<4 {
+            guard Date() < deadline, let child = child(of: container, containing: Point(x: x, y: y)) else { break }
+            if let f = lineFromCharBounds(child, x: x, y: y, deadline: deadline) { return f }
+            container = child
+        }
         // WebKit text nodes: walk the lines from the element's own start marker.
         var pid: pid_t = 0
         AXUIElementGetPid(hit, &pid)
@@ -298,6 +306,15 @@ final class AXLineProvider: LineProvider {
         // Without line indexing the bounds are one character's; take the element's width.
         if lineNo == nil, let f = frame(of: element) { r.x = f.x; r.width = f.width }
         return Found(element: element, line: lineNo, rect: r)
+    }
+
+    /// The child of `element` whose frame contains `p`, if any.
+    private func child(of element: AXUIElement, containing p: Point) -> AXUIElement? {
+        guard let children: [AXUIElement] = attribute(element, kAXChildrenAttribute) else { return nil }
+        for c in children.prefix(60) {
+            if let f = frame(of: c), f.contains(p) { return c }
+        }
+        return nil
     }
 
     /// Debug: the hit element and its ancestors, with the parameterised attributes each offers.
