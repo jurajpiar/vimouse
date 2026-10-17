@@ -45,6 +45,45 @@ node's frame for the next text node. A row shared by several nodes (a link insid
 sentence) is merged by hit-testing left and right of the found segment at the same
 height.
 
+More Chromium findings (2026-10-17, unattended run with `vimouse --probe`, see
+`scripts/autotest.sh`):
+
+- Index ranges can have holes: characters that belong to inline children (links,
+  code) return no rectangle from the parent node. A binary search that treats "no
+  rectangle" as "move forward" slides to the last row. Sampling every twelfth
+  character and then galloping outwards from a sample on the wanted row is robust
+  to holes and costs a few dozen calls.
+- Reported frames (`AXPosition`/`AXSize`) of text nodes and lists do not always
+  match where their text is drawn: a paragraph's frame extended 150 px below its
+  last row over the list that followed, and the list's frame started 140 px below
+  its first row. Hit-testing by point in that region returns the wrong node. At the
+  end of a node's text the provider therefore continues with the next text node in
+  document order (next sibling, descending to its first text, climbing when
+  siblings run out), which is also the order a reader wants.
+- A row with inline code is exposed twice: the containing text node and a second
+  node for the code span, a few pixels offset. Document order then yields the same
+  row twice; a step skips a candidate on the row it is leaving, and rows of
+  document-order neighbours on the same row are merged.
+- Per step, once a node is known: about 1 to 5 ms.
+
+WebKit findings (Markdown Preview, 2026-10-17):
+
+- The index-based `AXBoundsForRange` answers with one glyph's geometry whatever
+  the range (a 20-character span 50 px wide; every index on the first row). The
+  provider detects this (a span narrower than seven glyphs, or a whole text on one
+  row of a tall element) and uses the marker route instead.
+- The marker route works: `AXStartTextMarker` on the text node, then
+  `AXLineTextMarkerRangeForTextMarker` and `AXBoundsForTextMarkerRange` per line,
+  `AXNextLineEndTextMarkerForTextMarker` then `AXNextTextMarkerForTextMarker` to
+  step down. Bounds come in top-left coordinates here (the earlier assumption that
+  marker values are Cocoa-flipped was wrong for WebKit; the code checks which
+  reading lands inside the element and prefers unflipped when it fits).
+- Going up: `AXPreviousLineStartTextMarkerForTextMarker` from a line's start is
+  the line above; from the end of a block it is the block's first line, so the
+  former is tried first and the result must be above the current line.
+- A text node's start marker can precede the node (the walk from it began at the
+  heading above); the walk simply continues until the row under the point.
+
 Web area climb. In Electron apps the `AXWebArea` can be twenty-plus parents above
 the hit element and each parent lookup takes a millisecond or more, so the climb
 must be bounded, cached and done once; the first attempt timed out at 120 ms with

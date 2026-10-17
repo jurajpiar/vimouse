@@ -132,6 +132,8 @@ Next candidates, in suggested order: (1) Phase 2 robustness: permission-revocati
 
 2026-10-17 (parked): ruler line snapping across web engines. State: Claude desktop (Chromium/Electron) followed lines well at 9a945e7 via the character-rectangle route; Markdown Preview (WebKit) partly via the marker walk; Brave (Chromium, a page of short text nodes) hopped node to node. The two commits after (2c6a8bd stricter trust tests, 196bec0 skipping hollow marker routes per process) made all three worse by Shan's report, without a debug log to show why. Parked on Shan's call; next step when resumed is a debug run per app from 196bec0, or reverting those two commits first. Findings so far are in docs/PLATFORM-NOTES.md.
 
+2026-10-17 (overnight): ruler line snapping resumed with an unattended loop: `vimouse --probe <apps>` (headless: finds a paragraph per app through accessibility, takes the line under a point, ten steps down and ten back, checks order, overlap and retrace, prints ms per step) driven by `scripts/autotest.sh`, which rebuilds and re-probes on every commit and writes `build/probe.log` for Claude to read. Eight rounds later Markdown Preview (WebKit), Brave (Chromium) and Claude desktop (Electron) all retrace cleanly at 1 to 5 ms per step. Findings in docs/PLATFORM-NOTES.md. Still to confirm by hand: feel in the real app (extend/collapse, counts), TextEdit or Notes (AppKit route, not in the probe set), and Safari. The debug dumps and the dead web-area index route are still in the provider and can be trimmed.
+
 Open: delete pre-release deprecations at v1; first notarised release and a `homebrew-vimouse` tap; Half and Expand behaviour to be decided by use; `AXLineProvider` and hints untested on Chromium content until Shan reports.
 
 ## Sources
