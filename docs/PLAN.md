@@ -134,7 +134,7 @@ Next candidates, in suggested order: (1) Phase 2 robustness: permission-revocati
 
 2026-10-17 (overnight): ruler line snapping resumed with an unattended loop: `vimouse --probe <apps>` (headless: finds a paragraph per app through accessibility, takes the line under a point, ten steps down and ten back, checks order, overlap and retrace, prints ms per step) driven by `scripts/autotest.sh`, which rebuilds and re-probes on every commit and writes `build/probe.log` for Claude to read. Eight rounds later Markdown Preview (WebKit), Brave (Chromium) and Claude desktop (Electron) all retrace cleanly at 1 to 5 ms per step. Findings in docs/PLATFORM-NOTES.md. Still to confirm by hand: feel in the real app (extend/collapse, counts), TextEdit or Notes (AppKit route, not in the probe set), and Safari. The debug dumps and the dead web-area index route are still in the provider and can be trimmed.
 
-Open: delete pre-release deprecations at v1; first notarised release and a `homebrew-vimouse` tap; Half and Expand behaviour to be decided by use; `AXLineProvider` and hints untested on Chromium content until Shan reports.
+Open: delete pre-release deprecations at v1; first notarised release and a `homebrew-vimouse` tap; Half and Expand behaviour to be decided by use; hints untested on Chromium content until Shan reports.
 
 ## Sources
 
