@@ -80,11 +80,17 @@ final class AXLineProvider: LineProvider {
     func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
         let deadline = Date().addingTimeInterval(timeBudget)
         // The caller moves from the line we last returned; reuse it rather than hit-testing.
+        // Matched by y alone: the pointer's x may lie past the end of a short line.
         let current: Found?
-        if let l = last, abs(l.rect.midY - y) < 1, x >= l.rect.x - 2, x <= l.rect.maxX + 2 {
+        if let l = last, abs(l.rect.midY - y) < 1 {
             current = l
+        } else if let f = locate(x: x, y: y, deadline: deadline) {
+            current = f
+        } else if let l = last, abs(l.rect.midY - y) < l.rect.height * 3 {
+            // Nothing under the pointer's column (a short line); try inside the text.
+            current = locate(x: l.rect.x + min(12, l.rect.width / 2), y: y, deadline: deadline)
         } else {
-            current = locate(x: x, y: y, deadline: deadline)
+            current = nil
         }
         if direction == 0 {
             last = current.map { widened($0, deadline: deadline) }
@@ -220,10 +226,13 @@ final class AXLineProvider: LineProvider {
     private func probe(x: Double, from start: Double, sign: Double, avoiding: Rect?, on screen: Rect, deadline: Date) -> Rect? {
         var py = start
         let limit = sign > 0 ? min(screen.maxY, start + probeReach) : max(screen.y, start - probeReach)
+        // Probe in the pointer's column and, when a line is known, near its left edge too,
+        // so a short line is not stepped over.
+        let columns = [x] + (avoiding.map { [$0.x + min(12, $0.width / 2)] } ?? []).filter { abs($0 - x) > 20 }
         while Date() < deadline {
             py += sign * probeStep
             if sign > 0 ? py > limit : py < limit { return nil }
-            guard let found = locate(x: x, y: py, deadline: deadline) else { continue }
+            guard let found = columns.lazy.compactMap({ self.locate(x: $0, y: py, deadline: deadline) }).first else { continue }
             if let a = avoiding, found.rect.intersects(a) { continue }
             if sign > 0 ? found.rect.midY <= start : found.rect.midY >= start { continue }
             last = widened(found, deadline: deadline)
