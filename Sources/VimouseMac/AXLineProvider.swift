@@ -119,6 +119,14 @@ final class AXLineProvider: LineProvider {
                     log("next by character rows [\(row.start)..\(row.end)]: \(last!.rect)")
                     return last!.rect
                 }
+                // The node's text is exhausted: the next text node in document order. Frames
+                // and hit tests are unreliable in Chromium here; the tree order is what a
+                // reader wants anyway.
+                if let f = edgeRow(ofTextNodeAfter: cur.element, direction: direction, deadline: deadline) {
+                    last = widened(f, deadline: deadline)
+                    log("next text node in document order: \(last!.rect)")
+                    return last!.rect
+                }
             } else if let host = cur.markerHost, let start = cur.lineStart {
                 // Walk the element's lines by marker: line end -> next character -> its line.
                 if let m = sign > 0 ? nextLineStart(host, from: start) : previousLineStart(host, from: start),
@@ -329,6 +337,52 @@ final class AXLineProvider: LineProvider {
         // Without line indexing the bounds are one character's; take the element's width.
         if lineNo == nil, let f = frame(of: element) { r.x = f.x; r.width = f.width }
         return Found(element: element, line: lineNo, rect: r)
+    }
+
+    /// The first (direction 1) or last (direction -1) row of the next text node after
+    /// `element` in document order: siblings first, descending into their text, then the
+    /// parent's siblings, a few levels up.
+    private func edgeRow(ofTextNodeAfter element: AXUIElement, direction: Int, deadline: Date) -> Found? {
+        var node = element
+        for _ in 0..<6 {
+            guard Date() < deadline, let parent: AXUIElement = attribute(node, kAXParentAttribute),
+                  let siblings: [AXUIElement] = attribute(parent, kAXChildrenAttribute),
+                  let i = siblings.firstIndex(where: { CFEqual($0, node) }) else { return nil }
+            let rest = direction > 0 ? Array(siblings[(i + 1)...]) : Array(siblings[..<i].reversed())
+            for s in rest {
+                if let t = firstTextNode(in: s, direction: direction, depth: 0, deadline: deadline),
+                   let f = edgeRow(of: t, direction: direction, deadline: deadline) { return f }
+            }
+            node = parent
+        }
+        return nil
+    }
+
+    /// Depth-first: the first (or last) descendant with text and a character rectangle.
+    private func firstTextNode(in element: AXUIElement, direction: Int, depth: Int, deadline: Date) -> AXUIElement? {
+        guard depth < 8, Date() < deadline else { return nil }
+        let role: String = attribute(element, kAXRoleAttribute) ?? ""
+        if role != "AXListMarker", let v: String = attribute(element, kAXValueAttribute), !v.isEmpty,
+           CharText(element: element, length: v.utf16.count).charRect(0) != nil {
+            return element
+        }
+        guard let children: [AXUIElement] = attribute(element, kAXChildrenAttribute) else { return nil }
+        for c in (direction > 0 ? children : children.reversed()).prefix(40) {
+            if let t = firstTextNode(in: c, direction: direction, depth: depth + 1, deadline: deadline) { return t }
+        }
+        return nil
+    }
+
+    /// The topmost (direction 1) or bottommost (direction -1) row of a text node.
+    private func edgeRow(of element: AXUIElement, direction: Int, deadline: Date) -> Found? {
+        guard let v: String = attribute(element, kAXValueAttribute) else { return nil }
+        let text = CharText(element: element, length: v.utf16.count)
+        let samples = text.samples(step: 12, deadline: deadline)
+        guard let s = direction > 0 ? samples.min(by: { $0.1.y < $1.1.y }) : samples.max(by: { $0.1.y < $1.1.y }),
+              let row = text.row(around: s.0, deadline: deadline) else { return nil }
+        var f = Found(element: element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: text.length)
+        f.samples = samples
+        return f
     }
 
     /// The child of `element` whose frame contains `p`, if any.
