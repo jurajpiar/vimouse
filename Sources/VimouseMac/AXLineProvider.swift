@@ -79,13 +79,20 @@ final class AXLineProvider: LineProvider {
 
     func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
         guard let r = line(at: x, y: y, direction: direction, on: screen) else { return nil }
-        // Text scrolled out of view still has bounds; a line off the screen is no line.
-        guard r.midY >= screen.y, r.midY <= screen.maxY else {
-            log("line \(r) is off the screen")
+        // Text scrolled out of view still has bounds; a line outside its window (or the
+        // screen) is no line.
+        let bounds = last.flatMap { windowFrame(of: $0.element) } ?? screen
+        guard r.midY >= max(bounds.y, screen.y), r.midY <= min(bounds.maxY, screen.maxY) else {
+            log("line \(r) is outside its window \(bounds)")
             last = nil
             return nil
         }
         return r
+    }
+
+    private func windowFrame(of element: AXUIElement) -> Rect? {
+        guard let w: AXUIElement = attribute(element, kAXWindowAttribute) else { return nil }
+        return frame(of: w)
     }
 
     private func line(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
