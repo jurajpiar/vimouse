@@ -429,23 +429,35 @@ final class AXLineProvider: LineProvider {
         return f
     }
 
-    /// A row under the point in a descendant text node whose frame cannot be trusted
-    /// (height under four pixels): a bounded search in document order, each node's text
-    /// checked against y by its first and last character rectangles before sampling it.
+    /// A row under the point in a descendant text node, found without trusting frames
+    /// (Chromium reports frames that do not match the drawn text): text nodes in document
+    /// order run down the page, so the children are binary-searched by the y of their
+    /// first character, then the chosen child is tried and entered.
     private func rowInDescendants(of element: AXUIElement, x: Double, y: Double, depth: Int, budget: inout Int, deadline: Date) -> Found? {
-        guard depth < 6, budget > 0, Date() < deadline,
-              let children: [AXUIElement] = attribute(element, kAXChildrenAttribute) else { return nil }
-        for c in children {
-            guard budget > 0, Date() < deadline else { return nil }
+        guard depth < 8, budget > 0, Date() < deadline,
+              let children: [AXUIElement] = attribute(element, kAXChildrenAttribute), !children.isEmpty else { return nil }
+        func top(_ i: Int) -> Double? {
             budget -= 1
-            guard let f = frame(of: c) else { continue }
-            if f.height >= 4, f.width >= 4, !f.contains(Point(x: x, y: y)) { continue }
+            guard let t = firstTextNode(in: children[i], direction: 1, depth: 0, deadline: deadline),
+                  let v: String = attribute(t, kAXValueAttribute) else { return nil }
+            return CharText(element: t, length: v.utf16.count).charRect(0)?.y
+        }
+        // The last child starting at or above y; children without text are stepped over.
+        var lo = 0, hi = children.count - 1, pick = -1
+        while lo <= hi, budget > 0, Date() < deadline {
+            let mid = (lo + hi) / 2
+            var m = mid
+            var t = top(m)
+            while t == nil, m > lo { m -= 1; t = top(m) }
+            guard let ty = t else { lo = mid + 1; continue }
+            if ty <= y + 1 { pick = m; lo = mid + 1 } else { hi = m - 1 }
+        }
+        guard pick >= 0 else { return nil }
+        for i in [pick, pick - 1] where i >= 0 {
+            let c = children[i]
             if let v: String = attribute(c, kAXValueAttribute), !v.isEmpty {
-                let text = CharText(element: c, length: v.utf16.count)
-                guard let first = text.charRect(0), let lastChar = text.charRect(text.length - 1),
-                      y >= first.y - 1, y <= lastChar.maxY + 1 else { continue }
+                budget -= 1
                 if let r = lineFromCharBounds(c, x: x, y: y, deadline: deadline), x >= r.rect.x - 2, x <= r.rect.maxX + 2 { return r }
-                continue
             }
             if let r = rowInDescendants(of: c, x: x, y: y, depth: depth + 1, budget: &budget, deadline: deadline) { return r }
         }
