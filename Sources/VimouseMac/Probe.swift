@@ -40,22 +40,33 @@ enum Probe {
             print("line 0: \(first)")
             var lines = [first]
             y = first.midY
-            for i in 1...3 {
+            let steps = 10
+            let t0 = Date()
+            for i in 1...steps {
                 guard let l = provider.textLine(at: p.x, y: y, direction: 1, on: screen) else { print("FAIL: no line \(i) below"); failures += 1; break }
                 print("line +\(i): \(l)")
                 lines.append(l)
                 y = l.midY
             }
-            for i in 1...2 {
+            var back: [Rect] = []
+            for i in 1...(lines.count - 1) {
                 guard let l = provider.textLine(at: p.x, y: y, direction: -1, on: screen) else { print("FAIL: no line \(i) back up"); failures += 1; break }
                 print("line back \(i): \(l)")
+                back.append(l)
                 y = l.midY
             }
-            // Sanity: consecutive, non-overlapping, similar heights.
+            print(String(format: "%.0f ms per step", Date().timeIntervalSince(t0) * 1000 / Double(lines.count - 1 + back.count)))
+            // Sanity: downwards and consecutive, no overlap, similar heights, and the way
+            // back retraces the way down.
             for (a, b) in zip(lines, lines.dropFirst()) {
+                if b.midY <= a.midY { print("WARN: not below: \(a) then \(b)"); failures += 1 }
                 if b.y < a.maxY - 2 { print("WARN: overlap between \(a) and \(b)") }
-                if b.y - a.maxY > a.height * 2 { print("WARN: gap of \(Int(b.y - a.maxY)) px between lines (skipped one?)") }
+                if b.y - a.maxY > a.height * 2.5 { print("WARN: gap of \(Int(b.y - a.maxY)) px between lines (skipped one?)") }
                 if abs(b.height - a.height) > a.height * 0.6 { print("WARN: height jump \(a.height) -> \(b.height)") }
+            }
+            let expected = Array(lines.dropLast().reversed())
+            for (i, (down, up)) in zip(expected, back).enumerated() where abs(down.midY - up.midY) > 2 {
+                print("WARN: back step \(i + 1) landed at y \(Int(up.midY)), expected \(Int(down.midY))"); failures += 1
             }
         }
         return failures == 0 ? 0 : 1
