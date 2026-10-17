@@ -651,6 +651,7 @@ final class EngineTests: XCTestCase {
         let e = PointerEngine()
         let fake = FakeLines()
         e.context.services.lines = fake
+        e.rulerMode.settings.snap = true // off by default
         _ = e.activate(screen: screen)
         _ = e.handle(KeyPress(.i)) // (250,150): on the line at y 148..168
         XCTAssertEqual(e.handle(KeyPress(.r)), [.warp(Point(x: 250, y: 158)), .redraw]) // seated on the line, pointer with it
@@ -696,6 +697,7 @@ final class EngineTests: XCTestCase {
         // No text under the column: plain steps from the start.
         let e2 = PointerEngine()
         e2.context.services.lines = fake
+        e2.rulerMode.settings.snap = true
         _ = e2.activate(screen: screen)
         _ = e2.handle(KeyPress(.o)) // (750,150)
         _ = e2.handle(KeyPress(.r))

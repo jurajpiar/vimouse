@@ -64,7 +64,9 @@ public final class RulerMode: Mode {
         public var fine: Double = 1
         public var dim: Double = 0.35
         /// The band follows lines of text found via accessibility; pixels added above and below.
-        public var snap = true
+        public var snap = false
+        /// Reconstruct lines in Chromium and Electron apps from character rectangles.
+        public var snapTricks = false
         public var pad: Double = 2
         public var toggle: Set<KeyPress> = [KeyPress(.r)]
         public var remove: Set<KeyPress> = [KeyPress(.r, [.shift])]
@@ -87,7 +89,7 @@ public final class RulerMode: Mode {
     /// The band, if one is shown. Survives the engine going idle.
     public private(set) var ruler: Ruler?
     /// Following lines of text this session. Toggled with a key.
-    public private(set) var snapping = true
+    public private(set) var snapping = false
     /// Whether the band currently sits on a line of text found through accessibility.
     public private(set) var onLine = false
 
@@ -101,7 +103,8 @@ public final class RulerMode: Mode {
             .init(section: id, key: "move", defaultValue: "0", comment: "How far the band moves per press when not following text: 0 = its own height, otherwise pixels, e.g. 20. A count multiplies."),
             .init(section: id, key: "fine", defaultValue: "1", comment: "Pixels the band moves or resizes per press while Shift is held (micro-adjustment), e.g. 1, 2."),
             .init(section: id, key: "height_step", defaultValue: "4", comment: "Pixels added or removed from the band height per press, e.g. 2, 4, 8."),
-            .init(section: id, key: "snap", defaultValue: "true", comment: "Follow lines of text: the band is created on the line under the pointer and down/up move it a line at a time (read via accessibility; falls back to `move` where no text is found)."),
+            .init(section: id, key: "snap", defaultValue: "false", comment: "Follow lines of text: the band is created on the line under the pointer and down/up move it a line at a time (read via accessibility; falls back to `move` where no text is found). Reliable where the app reports its lines (AppKit text views, Safari and other WebKit views); off by default."),
+            .init(section: id, key: "snap_tricks", defaultValue: "false", comment: "Also follow lines in apps that do not report them (Chromium browsers, Electron apps such as Claude or VS Code), reconstructed from character rectangles; works line by line but can pick the wrong line."),
             .init(section: id, key: "pad", defaultValue: "2", comment: "Pixels added above and below a line the band snapped to, e.g. 0, 2, 4."),
             .init(section: id, key: "snap_toggle", defaultValue: "\"a\"", comment: "Toggle following lines of text in Ruler mode, e.g. \"a\"."),
             .init(section: id, key: "extend", defaultValue: "\"e\"", comment: "Extend the band to take in the next line below (reading in blocks); again for another line, e.g. \"e\"."),
@@ -124,6 +127,7 @@ public final class RulerMode: Mode {
         if let v = try r.number("fine") { s.fine = max(0.5, v) }
         if let v = try r.number("dim") { s.dim = min(max(v, 0), 1) }
         if let v = try r.bool("snap") { s.snap = v }
+        if let v = try r.bool("snap_tricks") { s.snapTricks = v }
         if let v = try r.number("pad") { s.pad = max(0, v) }
         if let v = try r.keys("toggle") { s.toggle = v }
         if let v = try r.keys("remove") { s.remove = v }
@@ -151,7 +155,9 @@ public final class RulerMode: Mode {
     public var drawsWhileIdle: Bool { ruler != nil }
 
     public func activate(_ ctx: ModeContext) {
+        ctx.services.lines?.configure(tricks: settings.snapTricks)
         if ruler == nil {
+            snapping = settings.snap
             var r = Ruler(screenIndex: ctx.screenIndex, x: ctx.target.x, y: ctx.target.y, height: settings.height)
             seat(&r, on: snappedLine(for: r, direction: 0, ctx), ctx)
             ruler = r

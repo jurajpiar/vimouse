@@ -73,8 +73,17 @@ final class AXLineProvider: LineProvider {
     /// (Chromium without a screen reader): the marker routes are skipped for them.
     private var hollowMarkers: Set<pid_t> = []
 
+    /// Whether the Chromium routes (character rectangles, container searches, document
+    /// order) are used, or only apps that report their lines are answered.
+    private var tricks = false
+
     init() {
         AXUIElementSetMessagingTimeout(systemWide, 0.05)
+    }
+
+    func configure(tricks: Bool) {
+        if tricks != self.tricks { last = nil }
+        self.tricks = tricks
     }
 
     func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
@@ -291,17 +300,17 @@ final class AXLineProvider: LineProvider {
             }
         }
         // Chromium text nodes: no line API, but character rectangles by index.
-        if let f = lineFromCharBounds(hit, x: x, y: y, deadline: deadline) { return f }
+        if tricks, let f = lineFromCharBounds(hit, x: x, y: y, deadline: deadline) { return f }
         // The hit test may answer with a parent whose own text is elsewhere while a nested
         // block (a list inside a paragraph) holds the row under the point: look inside.
         var container = hit
-        for _ in 0..<4 {
+        for _ in 0..<(tricks ? 4 : 0) {
             guard Date() < deadline, let child = child(of: container, containing: Point(x: x, y: y)) else { break }
             if let f = lineFromCharBounds(child, x: x, y: y, deadline: deadline) { return f }
             container = child
         }
         // Chromium containers whose children carry useless frames: try their text by rows.
-        var budget = 300
+        var budget = tricks ? 300 : 0
         if let f = rowInDescendants(of: hit, x: x, y: y, depth: 0, budget: &budget, deadline: deadline) { return f }
         if debug {
             let role: String = attribute(hit, kAXRoleAttribute) ?? "?"

@@ -77,11 +77,14 @@ of the screen, and enters Ruler mode: j/k move it by its own height (or a fixed 
 via `[ruler] move`), [ ] change its height, Shift with any of those moves or
 resizes by one pixel, s goes to
 Scroll mode (scroll the text under a fixed band) and keeps the band; r again or
-Escape removes it; Shift+r removes a kept band from any mode. With `[ruler] snap = true` (the default) the band
+Escape removes it; Shift+r removes a kept band from any mode. With `[ruler] snap = true` (off by default) the band
 reads the lines of text under the pointer's column through the accessibility API: it
 is created on the line under the pointer, sized to it (plus `[ruler] pad`), and j/k
 move it a line at a time, falling back to height steps where no text is found; a
-toggles this in Ruler mode. e extends the band over the next line below (reading
+toggles this in Ruler mode, and the legend greys "lines" while no text is under the
+band. Only apps that report their lines are followed (AppKit text views, WebKit);
+`[ruler] snap_tricks = true` adds Chromium browsers and Electron apps, where lines are
+reconstructed from character rectangles and can be picked wrongly. e extends the band over the next line below (reading
 in blocks), c collapses it back to the last line taken in; moving an extended band
 collapses it first. The band and the dimming span the window holding the
 text (`[ruler] width = "window"`), the whole display (`"screen"`) or the line

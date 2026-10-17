@@ -151,10 +151,14 @@ public protocol LineProvider: AnyObject {
     func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect?
     /// The frame of the window under (x, y), if any.
     func window(at x: Double, y: Double) -> Rect?
+    /// Whether to reconstruct lines in apps that do not report them (Chromium and
+    /// Electron, from character rectangles) or to answer only where lines are reported.
+    func configure(tricks: Bool)
 }
 
 public extension LineProvider {
     func window(at x: Double, y: Double) -> Rect? { nil }
+    func configure(tricks: Bool) {}
 }
 
 /// What the engine shares with modes: the session's geometry, the pointer target, the
