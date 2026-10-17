@@ -440,7 +440,9 @@ final class AXLineProvider: LineProvider {
             budget -= 1
             guard let t = firstTextNode(in: children[i], direction: 1, depth: 0, deadline: deadline),
                   let v: String = attribute(t, kAXValueAttribute) else { return nil }
-            return CharText(element: t, length: v.utf16.count).charRect(0)?.y
+            let ty = CharText(element: t, length: v.utf16.count).charRect(0)?.y
+            if debug, depth == 0 { log("   child \(i) of \(children.count): first text y \(ty.map { "\(Int($0))" } ?? "none") \"\(v.prefix(20))\"") }
+            return ty
         }
         // The last child starting at or above y; children without text are stepped over.
         var lo = 0, hi = children.count - 1, pick = -1
