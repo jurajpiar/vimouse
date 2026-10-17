@@ -520,9 +520,24 @@ final class AXLineProvider: LineProvider {
     /// segments found just left and right of this one at the same height.
     private func widened(_ f: Found, deadline: Date) -> Found {
         guard f.charBounds || f.textAPI, f.line == nil else { return f }
-        // A row already spanning most of its element has nothing to gain.
-        if let ef = frame(of: f.element), f.rect.width >= ef.width * 0.7 { return f }
         var out = f
+        // Rows split across nodes (inline code, links): take in document-order neighbours
+        // on the same row, a couple each way.
+        if f.charBounds {
+            for dir in [1, -1] {
+                var from = f.element
+                for _ in 0..<2 {
+                    guard Date() < deadline, let n = edgeRow(ofTextNodeAfter: from, direction: dir, deadline: deadline),
+                          abs(n.rect.midY - f.rect.midY) < f.rect.height / 2 else { break }
+                    let minX = min(out.rect.x, n.rect.x), maxX = max(out.rect.maxX, n.rect.maxX)
+                    let minY = min(out.rect.y, n.rect.y), maxY = max(out.rect.maxY, n.rect.maxY)
+                    out.rect = Rect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+                    from = n.element
+                }
+            }
+        }
+        // A row already spanning most of its element has nothing to gain from hit tests.
+        if let ef = frame(of: f.element), out.rect.width >= ef.width * 0.7 { return out }
         for sign in [-1.0, 1.0] {
             for _ in 0..<4 {
                 guard Date() < deadline else { return out }

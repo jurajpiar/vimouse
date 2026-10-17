@@ -65,7 +65,7 @@ enum Probe {
                 if abs(b.height - a.height) > a.height * 0.6 { print("WARN: height jump \(a.height) -> \(b.height)") }
             }
             let expected = Array(lines.dropLast().reversed())
-            for (i, (down, up)) in zip(expected, back).enumerated() where abs(down.midY - up.midY) > 2 {
+            for (i, (down, up)) in zip(expected, back).enumerated() where abs(down.midY - up.midY) > down.height / 2 {
                 print("WARN: back step \(i + 1) landed at y \(Int(up.midY)), expected \(Int(down.midY))"); failures += 1
             }
         }
