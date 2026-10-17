@@ -171,11 +171,12 @@ final class AXLineProvider: LineProvider {
                     py += sign * max(4, cur.rect.height / 2)
                 }
             }
-            // At the element's edge: look just beyond its frame for the next one.
-            let edge = frame(of: cur.element) ?? cur.rect
-            let start = sign > 0 ? max(edge.maxY, cur.rect.maxY) : min(edge.y, cur.rect.y)
+            // Past the element's own text: look just beyond this row for the next node. Not
+            // beyond the element's frame: a parent may hold nested blocks whose text is not
+            // its own (a list inside a paragraph), and those rows must not be skipped.
+            let start = sign > 0 ? cur.rect.maxY : cur.rect.y
             let r = probe(x: x, from: start, sign: sign, avoiding: cur.rect, on: screen, deadline: deadline)
-            log("past element edge (\(Int(start))): \(r.map { "\($0)" } ?? "nothing (fallback step)")")
+            log("past the row (\(Int(start))): \(r.map { "\($0)" } ?? "nothing (fallback step)")")
             return r
         }
         let r = probe(x: x, from: y, sign: sign, avoiding: nil, on: screen, deadline: deadline)
