@@ -44,6 +44,8 @@ final class AXLineProvider: LineProvider {
         var rowStart = 0
         var rowEnd = 0
         var textLength = 0
+        /// Character rectangles sampled through the text (index, rect), for finding rows.
+        var samples: [(Int, Rect)] = []
         /// Whether the web area's marker bounds come flipped (Cocoa) or not.
         var flipped = true
     }
@@ -104,15 +106,15 @@ final class AXLineProvider: LineProvider {
                     i += direction
                 }
             } else if cur.charBounds {
-                // Chromium text node: the row that starts after (or ends before) this one.
+                // Chromium text node: the nearest sampled row past this one.
                 let text = CharText(element: cur.element, length: cur.textLength)
-                var anchor = sign > 0 ? cur.rowEnd + 1 : cur.rowStart - 1
-                // Going up, the character before the row is often a space without a rectangle.
-                while sign < 0, anchor > 0, anchor > cur.rowStart - 5, text.rect(anchor) == nil { anchor -= 1 }
-                if anchor >= 0, anchor < cur.textLength, Date() < deadline,
-                   let row = text.row(around: anchor, deadline: deadline),
+                let beyond = cur.samples.filter { sign > 0 ? $0.1.y > cur.rect.maxY - 2 : $0.1.maxY < cur.rect.y + 2 }
+                let pick = sign > 0 ? beyond.min { $0.1.y < $1.1.y || ($0.1.y == $1.1.y && $0.0 < $1.0) }
+                                    : beyond.max { $0.1.y < $1.1.y || ($0.1.y == $1.1.y && $0.0 > $1.0) }
+                if let s = pick, Date() < deadline, let row = text.row(around: s.0, deadline: deadline),
                    sign > 0 ? row.rect.midY > cur.rect.midY : row.rect.midY < cur.rect.midY {
-                    let f = Found(element: cur.element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: cur.textLength)
+                    var f = Found(element: cur.element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: cur.textLength)
+                    f.samples = cur.samples
                     last = widened(f, deadline: deadline)
                     log("next by character rows [\(row.start)..\(row.end)]: \(last!.rect)")
                     return last!.rect
@@ -450,25 +452,42 @@ final class AXLineProvider: LineProvider {
             return nil
         }
 
+        /// Rectangles at every `step`th character; characters without one drop out.
+        func samples(step: Int, deadline: Date) -> [(Int, Rect)] {
+            var out: [(Int, Rect)] = []
+            var i = 0
+            while i < length, Date() < deadline {
+                if let r = rect(i) { out.append((i, r)) }
+                i += step
+            }
+            if (length - 1) % step != 0, let r = rect(length - 1) { out.append((length - 1, r)) }
+            return out
+        }
+
         /// The row containing character `i`: its first and last indices and its rectangle.
+        /// Characters without a rectangle (inline children, whitespace) are stepped over.
         func row(around i: Int, deadline: Date) -> (start: Int, end: Int, rect: Rect)? {
             guard let on = charRect(i) else { return nil }
-            var a = 0, b = i
-            while a < b {
-                guard Date() < deadline else { return nil }
-                let mid = (a + b) / 2
-                guard let r = charRect(mid) else { a = mid + 1; continue }
-                if r.y >= on.y - 2 { b = mid } else { a = mid + 1 }
+            func sameRow(_ r: Rect) -> Bool { abs(r.y - on.y) <= 2 }
+            // Walk outwards: the search stays local, so holes cost a few calls rather than a wrong row.
+            var start = i
+            var misses = 0
+            var j = i - 1
+            while j >= 0, misses < 24, Date() < deadline {
+                if let r = rect(j) {
+                    if sameRow(r) { start = j; misses = 0 } else { break }
+                } else { misses += 1 }
+                j -= 1
             }
-            let start = a
-            a = i; b = length - 1
-            while a < b {
-                guard Date() < deadline else { return nil }
-                let mid = (a + b + 1) / 2
-                guard let r = charRect(mid) else { b = mid - 1; continue }
-                if r.y <= on.y + 2 { a = mid } else { b = mid - 1 }
+            var end = i
+            misses = 0
+            j = i + 1
+            while j < length, misses < 24, Date() < deadline {
+                if let r = rect(j) {
+                    if sameRow(r) { end = j; misses = 0 } else { break }
+                } else { misses += 1 }
+                j += 1
             }
-            let end = a
             let line = rect(start, end - start + 1) ?? Rect(x: on.x, y: on.y, width: on.width, height: on.height)
             return (start, end, line)
         }
@@ -490,26 +509,24 @@ final class AXLineProvider: LineProvider {
             log("char route: not trustworthy here (20 characters span \(Int(span.width)) px)")
             return nil
         }
-        // The first character whose row ends below y.
-        var lo = 0, hi = n - 1
-        while lo < hi {
-            guard Date() < deadline else { return nil }
-            let mid = (lo + hi) / 2
-            guard let r = text.charRect(mid) else { lo = mid + 1; continue }
-            if r.maxY > y { hi = mid } else { lo = mid + 1 }
-        }
-        guard let under = text.charRect(lo), y >= under.y - 1, y < under.maxY + 1 else {
-            log("char route: search ended at \(lo) with \(text.charRect(lo).map { "\($0)" } ?? "no rectangle"), y \(Int(y))")
+        // Sample the text, then take the sample on the row under y (holes drop out).
+        let samples = text.samples(step: 12, deadline: deadline)
+        guard let s = samples.first(where: { y >= $0.1.y - 1 && y < $0.1.maxY + 1 })
+                ?? samples.filter({ abs($0.1.midY - y) < $0.1.height }).min(by: { abs($0.1.midY - y) < abs($1.1.midY - y) })
+        else {
+            log("char route: no sampled row under y \(Int(y)) (\(samples.count) samples of \(n))")
             return nil
         }
-        guard let row = text.row(around: lo, deadline: deadline) else { return nil }
+        guard let row = text.row(around: s.0, deadline: deadline) else { return nil }
         // The whole text on one row inside an element several rows tall: also a lie.
         if row.start == 0, row.end == n - 1, frame.height > row.rect.height * 1.8 {
             log("char route: not trustworthy here (all \(n) characters on one row of a \(Int(frame.height)) px element)")
             return nil
         }
         log("line by character rows [\(row.start)..\(row.end)] of \(n): \(row.rect)")
-        return Found(element: element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: n)
+        var f = Found(element: element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: n)
+        f.samples = samples
+        return f
     }
 
     /// Debug: what the bounds calls return for a line range and for an index range.
