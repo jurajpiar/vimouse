@@ -88,6 +88,8 @@ public final class RulerMode: Mode {
     public private(set) var ruler: Ruler?
     /// Following lines of text this session. Toggled with a key.
     public private(set) var snapping = true
+    /// Whether the band currently sits on a line of text found through accessibility.
+    public private(set) var onLine = false
 
     public init() {}
 
@@ -186,6 +188,7 @@ public final class RulerMode: Mode {
         let s = settings
         if s.snapToggle.has(key) {
             snapping.toggle()
+            onLine = false
             if snapping, var r = ruler, let line = snappedLine(for: r, direction: 0, ctx) {
                 seat(&r, on: line, ctx)
                 ruler = r
@@ -270,6 +273,7 @@ public final class RulerMode: Mode {
     /// Place the band on a found line (or keep its position when nil) and work out how
     /// wide it and its dimming are, per `[ruler] width`.
     private func seat(_ r: inout Ruler, on line: (y: Double, height: Double, rect: Rect)?, _ ctx: ModeContext) {
+        onLine = line != nil
         if let line { r.y = line.y; r.height = line.height; r.lastLine = nil }
         let window = settings.width == .screen ? nil : ctx.services.lines?.window(at: r.x, y: r.y)
         r.dimBounds = window
@@ -311,7 +315,10 @@ public final class RulerMode: Mode {
             Hint(l(s.extend), "extend", "⤵"),
         ]
         if ruler?.isExtended == true { h.append(Hint(l(s.collapse), "collapse", "⤒")) }
-        if ctx.services.lines != nil { h.append(Hint(l(s.snapToggle), snapping ? "☑ lines" : "☐ lines", snapping ? "☑☰" : "☐☰")) }
+        if ctx.services.lines != nil {
+            // Greyed when following is on but no text is under the band: the band steps by its height.
+            h.append(Hint(l(s.snapToggle), snapping ? "☑ lines" : "☐ lines", snapping ? "☑☰" : "☐☰", unavailable: snapping && !onLine))
+        }
         h.append(Hint(l(s.remove), "remove", "☰✕"))
         return h
     }

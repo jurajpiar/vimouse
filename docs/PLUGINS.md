@@ -29,7 +29,9 @@ accessibility snapper and line finder, colours).
    `Settings` struct and `parseSettings`/`apply`, a `toggle` key, and `handle`.
    Optional hooks: `handleRelease`, `handleAnywhere` (a binding that works in
    every mode), `activate`/`deactivate(exiting:)`, `screenChanged`,
-   `dragStarted`, `hints`, `help`, `draw`, `manual`.
+   `dragStarted`, `hints`, `help`, `draw`, `manual`. A `Hint` with
+   `unavailable: true` is drawn greyed in the legend: the key is bound but can do
+   nothing just now (Ruler's line following when no text is under the band).
 2. Add the name to the `modes` list in `Package.swift`.
 3. Register it in `Sources/VimouseMac/main.swift` (import and one line in the
    `modes` array) and in `standardModes()` in the tests.

@@ -93,10 +93,14 @@ public struct Hint: Equatable, Sendable {
     public var key: String
     public var action: String
     public var symbol: String?
-    public init(_ key: String, _ action: String, _ symbol: String? = nil) {
+    /// Shown greyed: the key is bound but cannot do anything just now (no text under
+    /// the band to follow, say).
+    public var unavailable = false
+    public init(_ key: String, _ action: String, _ symbol: String? = nil, unavailable: Bool = false) {
         self.key = key
         self.action = action
         self.symbol = symbol
+        self.unavailable = unavailable
     }
 }
 

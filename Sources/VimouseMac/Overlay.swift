@@ -205,10 +205,16 @@ final class OverlayView: NSView {
             ]))
         }
         text.append(NSAttributedString(string: "   ", attributes: keyAttrs))
+        let dimKeyAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold), .foregroundColor: NSColor.white.withAlphaComponent(0.35),
+        ]
+        let dimActionAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.white.withAlphaComponent(0.3),
+        ]
         for (i, h) in m.hints.enumerated() {
-            text.append(NSAttributedString(string: h.key + " ", attributes: keyAttrs))
+            text.append(NSAttributedString(string: h.key + " ", attributes: h.unavailable ? dimKeyAttrs : keyAttrs))
             let shown = m.legendSymbols ? (h.symbol ?? h.action) : h.action
-            text.append(NSAttributedString(string: shown + (i == m.hints.count - 1 ? "" : "   "), attributes: actionAttrs))
+            text.append(NSAttributedString(string: shown + (i == m.hints.count - 1 ? "" : "   "), attributes: h.unavailable ? dimActionAttrs : actionAttrs))
         }
 
         let sz = text.size()
