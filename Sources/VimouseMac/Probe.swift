@@ -15,6 +15,7 @@ enum Probe {
             print("probe: no Accessibility access for this process (grant it to the terminal running it)")
             return 2
         }
+        setlinebuf(stdout)
         var failures = 0
         for name in apps {
             print("=== \(name)")
@@ -57,6 +58,7 @@ enum Probe {
             while lines.count < 300, let l = provider.textLine(at: column, y: y, direction: 1, on: screen) {
                 steps += 1
                 if l.midY <= y { print("FAIL: step down from y \(Int(y)) went to \(l)"); failures += 1; break }
+                if l.maxY > screen.maxY - 40 { break }
                 lines.append(l)
                 y = l.midY
             }

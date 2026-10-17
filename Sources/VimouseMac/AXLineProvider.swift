@@ -113,16 +113,9 @@ final class AXLineProvider: LineProvider {
                 }
             } else if cur.charBounds {
                 // Chromium text node: the nearest sampled row past this one.
-                let text = CharText(element: cur.element, length: cur.textLength)
-                let beyond = cur.samples.filter { sign > 0 ? $0.1.y > cur.rect.maxY - 2 : $0.1.maxY < cur.rect.y + 2 }
-                let pick = sign > 0 ? beyond.min { $0.1.y < $1.1.y || ($0.1.y == $1.1.y && $0.0 < $1.0) }
-                                    : beyond.max { $0.1.y < $1.1.y || ($0.1.y == $1.1.y && $0.0 > $1.0) }
-                if let s = pick, Date() < deadline, let row = text.row(around: s.0, deadline: deadline),
-                   sign > 0 ? row.rect.midY > cur.rect.midY : row.rect.midY < cur.rect.midY {
-                    var f = Found(element: cur.element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: cur.textLength)
-                    f.samples = cur.samples
+                if let f = rowBeyond(cur.rect, in: cur, sign: sign, deadline: deadline) {
                     last = widened(f, deadline: deadline)
-                    log("next by character rows [\(row.start)..\(row.end)]: \(last!.rect)")
+                    log("next by character rows [\(f.rowStart)..\(f.rowEnd)]: \(last!.rect)")
                     return last!.rect
                 }
                 // The node's text is exhausted: the next text node in document order. Frames
@@ -131,8 +124,15 @@ final class AXLineProvider: LineProvider {
                 var from = cur.element
                 for _ in 0..<4 {
                     guard let f = edgeRow(ofTextNodeAfter: from, direction: direction, deadline: deadline) else { break }
-                    // The same row again (inline code is exposed twice) or the wrong way: keep going.
+                    // The next node starts on this row (text after inline code, or the code
+                    // exposed twice) or the wrong way: its own further rows come first, else
+                    // keep going.
                     if abs(f.rect.midY - cur.rect.midY) < cur.rect.height / 2 || (sign > 0 ? f.rect.midY < cur.rect.midY : f.rect.midY > cur.rect.midY) {
+                        if let n = rowBeyond(cur.rect, in: f, sign: sign, deadline: deadline) {
+                            last = widened(n, deadline: deadline)
+                            log("next text node continues past this row: \(last!.rect)")
+                            return last!.rect
+                        }
                         from = f.element
                         continue
                     }
@@ -279,6 +279,8 @@ final class AXLineProvider: LineProvider {
             if let f = lineFromCharBounds(child, x: x, y: y, deadline: deadline) { return f }
             container = child
         }
+        // Chromium containers whose children carry useless frames: try their text by rows.
+        if let f = rowInDescendants(of: hit, x: x, y: y, depth: 0, budget: 24, deadline: deadline) { return f }
         if debug, dumpedChildren < 3 {
             dumpedChildren += 1
             let role: String = attribute(hit, kAXRoleAttribute) ?? "?"
@@ -365,6 +367,19 @@ final class AXLineProvider: LineProvider {
     /// The first (direction 1) or last (direction -1) row of the next text node after
     /// `element` in document order: siblings first, descending into their text, then the
     /// parent's siblings, a few levels up.
+    /// The nearest sampled row of a character-addressed node past `rect` in the given direction.
+    private func rowBeyond(_ rect: Rect, in node: Found, sign: Double, deadline: Date) -> Found? {
+        let text = CharText(element: node.element, length: node.textLength)
+        let beyond = node.samples.filter { sign > 0 ? $0.1.y > rect.maxY - 2 : $0.1.maxY < rect.y + 2 }
+        let pick = sign > 0 ? beyond.min { $0.1.y < $1.1.y || ($0.1.y == $1.1.y && $0.0 < $1.0) }
+                            : beyond.max { $0.1.y < $1.1.y || ($0.1.y == $1.1.y && $0.0 > $1.0) }
+        guard let s = pick, Date() < deadline, let row = text.row(around: s.0, deadline: deadline),
+              sign > 0 ? row.rect.midY > rect.midY : row.rect.midY < rect.midY else { return nil }
+        var f = Found(element: node.element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: node.textLength)
+        f.samples = node.samples
+        return f
+    }
+
     private func edgeRow(ofTextNodeAfter element: AXUIElement, direction: Int, deadline: Date) -> Found? {
         var node = element
         for _ in 0..<6 {
@@ -406,6 +421,26 @@ final class AXLineProvider: LineProvider {
         var f = Found(element: element, line: nil, rect: row.rect, charBounds: true, rowStart: row.start, rowEnd: row.end, textLength: text.length)
         f.samples = samples
         return f
+    }
+
+    /// A row under the point in a descendant text node whose frame cannot be trusted
+    /// (height under four pixels); a bounded search in document order.
+    private func rowInDescendants(of element: AXUIElement, x: Double, y: Double, depth: Int, budget: Int, deadline: Date) -> Found? {
+        guard depth < 3, budget > 0, Date() < deadline,
+              let children: [AXUIElement] = attribute(element, kAXChildrenAttribute) else { return nil }
+        var left = budget
+        for c in children.prefix(budget) {
+            left -= 1
+            guard let f = frame(of: c) else { continue }
+            if f.height >= 4 { if !f.contains(Point(x: x, y: y)) { continue } }
+            if let v: String = attribute(c, kAXValueAttribute), !v.isEmpty,
+               let r = lineFromCharBounds(c, x: x, y: y, deadline: deadline), r.rect.contains(Point(x: x, y: r.rect.midY)) {
+                return r
+            }
+            if let r = rowInDescendants(of: c, x: x, y: y, depth: depth + 1, budget: left, deadline: deadline) { return r }
+            if left <= 0 { break }
+        }
+        return nil
     }
 
     /// The child of `element` whose frame contains `p`, if any.
@@ -637,8 +672,10 @@ final class AXLineProvider: LineProvider {
     /// Lines from character rectangles: a binary search finds the character under `y`,
     /// then its row.
     private func lineFromCharBounds(_ element: AXUIElement, x: Double, y: Double, deadline: Date) -> Found? {
-        guard let frame = frame(of: element), y >= frame.y - 2, y <= frame.maxY + 2,
-              let value: String = attribute(element, kAXValueAttribute) else { return nil }
+        // The frame is only a cheap filter, and not when it is plainly wrong (Chromium
+        // reports one-pixel frames for some text nodes while their characters have bounds).
+        guard let frame = frame(of: element), let value: String = attribute(element, kAXValueAttribute) else { return nil }
+        if frame.height >= 4, y < frame.y - 2 || y > frame.maxY + 2 { return nil }
         let n = value.utf16.count
         guard n > 0 else { return nil }
         let text = CharText(element: element, length: n)
