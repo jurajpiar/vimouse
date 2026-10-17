@@ -34,6 +34,7 @@ enum Probe {
             let before = failures
             let screen = NSScreen.screens.first.map { Coordinates.cgRect(fromAppKit: $0.frame) } ?? Rect(x: 0, y: 0, width: 3000, height: 2000)
             let provider = AXLineProvider()
+            provider.configure(tricks: true) // the probe exercises the Chromium routes too
             // Ground truth: every line a plain hit test finds in the paragraph's left
             // column, top to bottom of the screen. Then walk down from the first with the
             // stepping routes and check that nothing is skipped, invented or revisited,

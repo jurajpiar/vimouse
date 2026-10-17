@@ -237,8 +237,10 @@ public final class RulerMode: Mode {
         func hit(_ set: Set<KeyPress>) -> Bool { set.has(key) || (fine && set.has(base)) }
         if hit(s.down) { step(1) }
         else if hit(s.up) { step(-1) }
-        else if hit(s.grow) { r.height += resize * n }
-        else if hit(s.shrink) { r.height -= resize * n }
+        // Resizing keeps the top edge where it is: the band grows or shrinks in the
+        // direction of reading.
+        else if hit(s.grow) { r.height += resize * n; r.y += resize * n / 2 }
+        else if hit(s.shrink) { let d = min(resize * n, r.height - 8); r.height -= d; r.y -= d / 2 }
         else { return nil }
         r.height = max(8, r.height)
         r.y = min(max(r.y, screen.y), screen.maxY)
@@ -354,6 +356,6 @@ public final class RulerMode: Mode {
     public var manual: String {
         let s = Settings()
         func keys(_ set: Set<KeyPress>) -> String { set.map(\.label).sorted().joined(separator: ", ") }
-        return "A reading band that dims everything except the line being read. Entering the mode creates it on the line of text under the pointer (sized to the line when the app exposes its text through accessibility, otherwise \(Int(s.height)) px tall); \(keys(s.down)) / \(keys(s.up)) move it a line at a time (or by its height); \(keys(s.shrink)) / \(keys(s.grow)) resize; Shift held makes one-pixel changes; \(keys(s.extend)) extends the band over the next line below, for reading in blocks, and \(keys(s.collapse)) collapses it to the last line taken in; \(keys(s.snapToggle)) toggles following text. Leaving with the toggle or exiting removes the band; switching to another mode (Scroll, say, to scroll the text under a fixed band) keeps it, and \(keys(s.remove)) removes it from any mode."
+        return "A reading band that dims everything except the line being read. Entering the mode creates it on the line of text under the pointer (sized to the line when the app exposes its text through accessibility, otherwise \(Int(s.height)) px tall); \(keys(s.down)) / \(keys(s.up)) move it a line at a time (or by its height); \(keys(s.shrink)) / \(keys(s.grow)) resize from the bottom edge (the top stays put); Shift held makes one-pixel changes; \(keys(s.extend)) extends the band over the next line below, for reading in blocks, and \(keys(s.collapse)) collapses it to the last line taken in; \(keys(s.snapToggle)) toggles following text. Leaving with the toggle or exiting removes the band; switching to another mode (Scroll, say, to scroll the text under a fixed band) keeps it, and \(keys(s.remove)) removes it from any mode."
     }
 }

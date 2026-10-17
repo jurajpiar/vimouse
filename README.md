@@ -74,7 +74,8 @@ A marker is drawn at the pointer while a mode is active: `[cursor] style` picks
 
 Ruler (reading band): r creates a band at the pointer's height, dimming the rest
 of the screen, and enters Ruler mode: j/k move it by its own height (or a fixed number of pixels
-via `[ruler] move`), [ ] change its height, Shift with any of those moves or
+via `[ruler] move`), [ ] change its height (the top edge stays put, so the band grows or shrinks in the
+direction of reading), Shift with any of those moves or
 resizes by one pixel, s goes to
 Scroll mode (scroll the text under a fixed band) and keeps the band; r again or
 Escape removes it; Shift+r removes a kept band from any mode. With `[ruler] snap = true` (off by default) the band

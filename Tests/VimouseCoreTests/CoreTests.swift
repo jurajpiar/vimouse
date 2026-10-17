@@ -719,16 +719,18 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.target, Point(x: 250, y: 310))
         _ = e.handle(KeyPress(.rightBracket))
         XCTAssertEqual(e.ruler?.height, 36)
+        XCTAssertEqual(e.ruler?.y, 312)          // grows downwards: the top edge stays at 294
         _ = e.handle(KeyPress(.k))
-        XCTAssertEqual(e.ruler?.y, 310 - 36)     // and the new height after resizing
+        XCTAssertEqual(e.ruler?.y, 312 - 36)     // and the new height after resizing
         e.rulerMode.settings.move = 10
         _ = e.handle(KeyPress(.k))
-        XCTAssertEqual(e.ruler?.y, 274 - 10)     // explicit pixel step
+        XCTAssertEqual(e.ruler?.y, 276 - 10)     // explicit pixel step
         _ = e.handle(KeyPress(.j, [.shift]))
-        XCTAssertEqual(e.ruler?.y, 265)          // Shift: one pixel
+        XCTAssertEqual(e.ruler?.y, 267)          // Shift: one pixel
         _ = e.handle(KeyPress(.three))
         _ = e.handle(KeyPress(.leftBracket, [.shift]))
         XCTAssertEqual(e.ruler?.height, 33)      // Shift with a count: three pixels
+        XCTAssertEqual(e.ruler?.y, 265.5)        // shrinks from the bottom
         // Clamped to the screen.
         _ = e.handle(KeyPress(.nine)); _ = e.handle(KeyPress(.nine))
         _ = e.handle(KeyPress(.j))
