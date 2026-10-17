@@ -66,6 +66,24 @@ More Chromium findings (2026-10-17, unattended run with `vimouse --probe`, see
   document-order neighbours on the same row are merged.
 - Per step, once a node is known: about 1 to 5 ms.
 
+Findings from a screen recording of real use (2026-10-17; the probe had passed
+while the band still skipped lines), now covered by the probe walking a whole
+column of the screen and comparing with plain hit tests:
+
+- A node that starts on the row being left (text after an inline code span, in
+  Claude desktop) was skipped whole, losing its further rows. The step now looks
+  for that node's next row before moving on in document order.
+- Brave's hit test returns the article container for some regions (a heading and
+  the first rows of the paragraph after it), whose children carry one-pixel or
+  misplaced frames. The container is now searched: its children are binary-searched
+  by the y of their first character (document order runs down the page), and a
+  node's rows are tried without trusting its frame.
+- Text scrolled out of the window still has bounds. Lines outside the element's
+  window (or the screen) are rejected and document-order stepping stops at the
+  window's edge.
+- The pointer's column can lie past the end of a short line; the cached line is
+  matched by y alone and the probe also looks near the line's left edge.
+
 WebKit findings (Markdown Preview, 2026-10-17):
 
 - The index-based `AXBoundsForRange` answers with one glyph's geometry whatever
