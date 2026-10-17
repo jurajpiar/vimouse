@@ -248,6 +248,29 @@ final class AXLineProvider: LineProvider {
             if let f = lineFromCharBounds(child, x: x, y: y, deadline: deadline) { return f }
             container = child
         }
+        if debug, dumpedChildren < 3 {
+            dumpedChildren += 1
+            let role: String = attribute(hit, kAXRoleAttribute) ?? "?"
+            let v: String = attribute(hit, kAXValueAttribute) ?? ""
+            log("no row at (\(Int(x)),\(Int(y))) in hit \(role) \(frame(of: hit).map { "\($0)" } ?? "") value \(v.count) chars; children:")
+            if let children: [AXUIElement] = attribute(hit, kAXChildrenAttribute) {
+                for c in children.prefix(12) {
+                    let r: String = attribute(c, kAXRoleAttribute) ?? "?"
+                    let cv: String = attribute(c, kAXValueAttribute) ?? ""
+                    log("   \(r) \(frame(of: c).map { "\($0)" } ?? "no frame") \(cv.count) chars \"\(cv.prefix(30))\"")
+                }
+            } else {
+                log("   (none)")
+            }
+            if let parent: AXUIElement = attribute(hit, kAXParentAttribute), let children: [AXUIElement] = attribute(parent, kAXChildrenAttribute) {
+                log("   parent's children:")
+                for c in children.prefix(12) {
+                    let r: String = attribute(c, kAXRoleAttribute) ?? "?"
+                    let cv: String = attribute(c, kAXValueAttribute) ?? ""
+                    log("   \(r) \(frame(of: c).map { "\($0)" } ?? "no frame") \(cv.count) chars \"\(cv.prefix(30))\"")
+                }
+            }
+        }
         // WebKit text nodes: walk the lines from the element's own start marker.
         var pid: pid_t = 0
         AXUIElementGetPid(hit, &pid)
@@ -319,6 +342,7 @@ final class AXLineProvider: LineProvider {
 
     /// Debug: the hit element and its ancestors, with the parameterised attributes each offers.
     private var dumped = false
+    private var dumpedChildren = 0
     private func dump(_ hit: AXUIElement, levels: Int) {
         var element = hit
         for depth in 0..<levels {
