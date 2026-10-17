@@ -282,6 +282,11 @@ final class AXLineProvider: LineProvider {
         // Chromium containers whose children carry useless frames: try their text by rows.
         var budget = 300
         if let f = rowInDescendants(of: hit, x: x, y: y, depth: 0, budget: &budget, deadline: deadline) { return f }
+        if debug {
+            let role: String = attribute(hit, kAXRoleAttribute) ?? "?"
+            let n = (attribute(hit, kAXChildrenAttribute) as [AXUIElement]?)?.count ?? 0
+            log("no row at (\(Int(x)),\(Int(y))): hit \(role) \(frame(of: hit).map { "\($0)" } ?? "no frame"), \(n) children, \(300 - budget) descendants searched")
+        }
         if debug, dumpedChildren < 3 {
             dumpedChildren += 1
             let role: String = attribute(hit, kAXRoleAttribute) ?? "?"
