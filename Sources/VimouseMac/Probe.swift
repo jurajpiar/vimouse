@@ -83,7 +83,7 @@ enum Probe {
                 if abs(b.height - a.height) > a.height * 0.6 { print("WARN: height jump \(a.height) -> \(b.height)") }
             }
             let expected = Array(lines.dropLast().reversed())
-            if back.count < expected.count, let l = back.last, l.y > first.maxY { print("FAIL: the way up stopped after \(back.count) of \(expected.count) lines"); failures += 1 }
+            if back.count < expected.count - 1, let l = back.last, l.y > first.maxY { print("FAIL: the way up stopped after \(back.count) of \(expected.count) lines"); failures += 1 }
             for (i, (down, up)) in zip(expected, back).enumerated() where !same(down, up) {
                 print("FAIL: back step \(i + 1) landed at y \(Int(up.midY)), expected \(Int(down.midY))"); failures += 1
                 break

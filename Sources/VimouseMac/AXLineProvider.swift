@@ -140,8 +140,11 @@ final class AXLineProvider: LineProvider {
                 // and hit tests are unreliable in Chromium here; the tree order is what a
                 // reader wants anyway.
                 var from = cur.element
+                let window = windowFrame(of: cur.element) ?? screen
                 for _ in 0..<4 {
                     guard let f = edgeRow(ofTextNodeAfter: from, direction: direction, deadline: deadline) else { break }
+                    // Scrolled out of the window: nothing further this way.
+                    if f.rect.midY < window.y || f.rect.midY > window.maxY { break }
                     // The next node starts on this row (text after inline code, or the code
                     // exposed twice) or the wrong way: its own further rows come first, else
                     // keep going.
