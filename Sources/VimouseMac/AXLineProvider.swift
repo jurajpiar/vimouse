@@ -441,7 +441,6 @@ final class AXLineProvider: LineProvider {
             guard let t = firstTextNode(in: children[i], direction: 1, depth: 0, deadline: deadline),
                   let v: String = attribute(t, kAXValueAttribute) else { return nil }
             let ty = CharText(element: t, length: v.utf16.count).charRect(0)?.y
-            if debug, depth == 0 { log("   child \(i) of \(children.count): first text y \(ty.map { "\(Int($0))" } ?? "none") \"\(v.prefix(20))\"") }
             return ty
         }
         // The last child starting at or above y; children without text are stepped over.
@@ -459,7 +458,7 @@ final class AXLineProvider: LineProvider {
             let c = children[i]
             if let v: String = attribute(c, kAXValueAttribute), !v.isEmpty {
                 budget -= 1
-                if let r = lineFromCharBounds(c, x: x, y: y, deadline: deadline), x >= r.rect.x - 2, x <= r.rect.maxX + 2 { return r }
+                if let r = lineFromCharBounds(c, x: x, y: y, trustFrame: false, deadline: deadline), x >= r.rect.x - 2, x <= r.rect.maxX + 2 { return r }
             }
             if let r = rowInDescendants(of: c, x: x, y: y, depth: depth + 1, budget: &budget, deadline: deadline) { return r }
         }
@@ -694,11 +693,12 @@ final class AXLineProvider: LineProvider {
 
     /// Lines from character rectangles: a binary search finds the character under `y`,
     /// then its row.
-    private func lineFromCharBounds(_ element: AXUIElement, x: Double, y: Double, deadline: Date) -> Found? {
+    private func lineFromCharBounds(_ element: AXUIElement, x: Double, y: Double, trustFrame: Bool = true, deadline: Date) -> Found? {
         // The frame is only a cheap filter, and not when it is plainly wrong (Chromium
-        // reports one-pixel frames for some text nodes while their characters have bounds).
+        // reports one-pixel frames for some text nodes while their characters have bounds,
+        // and frames elsewhere than the text when a container is being searched).
         guard let frame = frame(of: element), let value: String = attribute(element, kAXValueAttribute) else { return nil }
-        if frame.height >= 4, y < frame.y - 2 || y > frame.maxY + 2 { return nil }
+        if trustFrame, frame.height >= 4, y < frame.y - 2 || y > frame.maxY + 2 { return nil }
         let n = value.utf16.count
         guard n > 0 else { return nil }
         let text = CharText(element: element, length: n)
