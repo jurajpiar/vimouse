@@ -156,6 +156,7 @@ public final class RulerMode: Mode {
 
     public func activate(_ ctx: ModeContext) {
         ctx.services.lines?.configure(tricks: settings.snapTricks)
+        resized = false
         if ruler == nil {
             snapping = settings.snap
             var r = Ruler(screenIndex: ctx.screenIndex, x: ctx.target.x, y: ctx.target.y, height: settings.height)
@@ -165,11 +166,15 @@ public final class RulerMode: Mode {
         follow(ctx)
     }
 
+    /// After a resize the pointer sits on the moving (bottom) edge, where reading stopped.
+    private var resized = false
+
     /// The pointer rides on the band's centre line so the marker, clicks and a switch to
-    /// Scroll mode all act where the band is.
+    /// Scroll mode all act where the band is; after a resize, on the bottom edge.
     private func follow(_ ctx: ModeContext) {
         guard let r = ruler, r.screenIndex == ctx.screenIndex else { return }
-        ctx.target = ctx.clamped(Point(x: ctx.target.x, y: r.lastLine?.y ?? r.y))
+        let y = resized ? r.y + r.height / 2 - min(4, r.height / 4) : (r.lastLine?.y ?? r.y)
+        ctx.target = ctx.clamped(Point(x: ctx.target.x, y: y))
     }
 
     /// The band survives only a deliberate switch to another mode; its own toggle and
@@ -192,6 +197,7 @@ public final class RulerMode: Mode {
     public func handle(_ key: KeyPress, count: Int?, _ ctx: ModeContext) -> [Effect]? {
         let n = Double(count ?? 1)
         let s = settings
+        resized = false
         if s.snapToggle.has(key) {
             snapping.toggle()
             onLine = false
@@ -235,6 +241,7 @@ public final class RulerMode: Mode {
             }
         }
         func hit(_ set: Set<KeyPress>) -> Bool { set.has(key) || (fine && set.has(base)) }
+        resized = hit(s.grow) || hit(s.shrink)
         if hit(s.down) { step(1) }
         else if hit(s.up) { step(-1) }
         // Resizing keeps the top edge where it is: the band grows or shrinks in the

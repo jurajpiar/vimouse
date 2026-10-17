@@ -717,7 +717,7 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(e.handle(KeyPress(.j)), [.warp(Point(x: 250, y: 310)), .redraw]) // the pointer rides along
         XCTAssertEqual(e.ruler?.y, 150 + 5 * 32) // moves by its own height
         XCTAssertEqual(e.target, Point(x: 250, y: 310))
-        _ = e.handle(KeyPress(.rightBracket))
+        XCTAssertEqual(e.handle(KeyPress(.rightBracket)), [.warp(Point(x: 250, y: 326)), .redraw]) // pointer on the moving edge
         XCTAssertEqual(e.ruler?.height, 36)
         XCTAssertEqual(e.ruler?.y, 312)          // grows downwards: the top edge stays at 294
         _ = e.handle(KeyPress(.k))
