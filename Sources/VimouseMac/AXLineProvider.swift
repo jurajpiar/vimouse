@@ -122,20 +122,34 @@ final class AXLineProvider: LineProvider {
                 // The node's text is exhausted: the next text node in document order. Frames
                 // and hit tests are unreliable in Chromium here; the tree order is what a
                 // reader wants anyway.
-                if let f = edgeRow(ofTextNodeAfter: cur.element, direction: direction, deadline: deadline) {
+                var from = cur.element
+                for _ in 0..<4 {
+                    guard let f = edgeRow(ofTextNodeAfter: from, direction: direction, deadline: deadline) else { break }
+                    // The same row again (inline code is exposed twice) or the wrong way: keep going.
+                    if abs(f.rect.midY - cur.rect.midY) < cur.rect.height / 2 || (sign > 0 ? f.rect.midY < cur.rect.midY : f.rect.midY > cur.rect.midY) {
+                        from = f.element
+                        continue
+                    }
                     last = widened(f, deadline: deadline)
                     log("next text node in document order: \(last!.rect)")
                     return last!.rect
                 }
             } else if let host = cur.markerHost, let start = cur.lineStart {
-                // Walk the element's lines by marker: line end -> next character -> its line.
-                if let m = sign > 0 ? nextLineStart(host, from: start) : previousLineStart(host, from: start),
-                   let range = markerValue(host, Marker.lineRange, m),
-                   let b = normalisedBounds(host, range, flipped: cur.flipped), b.width > 0,
-                   sign > 0 ? b.midY > cur.rect.midY : b.midY < cur.rect.midY {
-                    last = Found(element: cur.element, line: nil, rect: b, markerHost: host, lineStart: m, flipped: cur.flipped)
-                    log("next by line marker: \(b)")
-                    return b
+                // Walk the lines by marker. Up: WebKit's "previous line start" from the start
+                // of a line is the line above; from a block's end it is the block's first
+                // line, so that is only the fallback.
+                let candidates: [AnyObject?] = sign > 0
+                    ? [nextLineStart(host, from: start)]
+                    : [markerValue(host, Marker.previousLineStart, start), previousLineStart(host, from: start)]
+                for case let m? in candidates {
+                    if let range = markerValue(host, Marker.lineRange, m),
+                       let b = normalisedBounds(host, range, flipped: cur.flipped), b.width > 0,
+                       abs(b.midY - cur.rect.midY) >= cur.rect.height / 2,
+                       sign > 0 ? b.midY > cur.rect.midY : b.midY < cur.rect.midY {
+                        last = Found(element: cur.element, line: nil, rect: b, markerHost: host, lineStart: m, flipped: cur.flipped)
+                        log("next by line marker: \(b)")
+                        return b
+                    }
                 }
                 log("no further line marker in the element")
             } else if let host = cur.markerHost, let n = cur.webLine {
