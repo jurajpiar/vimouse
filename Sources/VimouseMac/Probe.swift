@@ -6,8 +6,9 @@ import VimouseCore
 /// Headless exercise of the line provider against running apps, for unattended
 /// iteration: `vimouse --probe "Markdown Preview" "Brave Browser" Claude`.
 /// For each app it finds a paragraph (a long static text whose centre is actually hit
-/// by a screen point), then asks for the line under that point, three lines down and
-/// two up, printing every rectangle. Run with VIMOUSE_DEBUG=1 for the provider's log.
+/// by a screen point), hit-tests every line in its left column from the top of the
+/// screen down, then walks the lines with the stepping routes and reports anything
+/// skipped, invented or not retraced. Run with VIMOUSE_DEBUG=1 for the provider's log.
 enum Probe {
     static func run(apps: [String]) -> Int32 {
         guard AXIsProcessTrusted() else {
@@ -29,45 +30,63 @@ enum Probe {
                 print("no visible paragraph found (is a document with text showing, uncovered?)"); failures += 1; continue
             }
             print("paragraph \(target.frame) \"\(target.text.prefix(50))\"")
-            let p = Point(x: target.frame.x + min(60, target.frame.width / 3), y: target.frame.y + min(target.frame.height / 2, 30))
+            let before = failures
             let screen = NSScreen.screens.first.map { Coordinates.cgRect(fromAppKit: $0.frame) } ?? Rect(x: 0, y: 0, width: 3000, height: 2000)
             let provider = AXLineProvider()
-            print("point \(p)")
-            var y = p.y
-            guard let first = provider.textLine(at: p.x, y: y, direction: 0, on: screen) else {
-                print("FAIL: no line under the point"); failures += 1; continue
+            // Ground truth: every line a plain hit test finds in the paragraph's left
+            // column, top to bottom of the screen. Then walk down from the first with the
+            // stepping routes and check that nothing is skipped, invented or revisited,
+            // and that the way back up retraces the way down.
+            let column = target.frame.x + min(12, target.frame.width / 2)
+            var scanned: [Rect] = []
+            var y = screen.y + 30
+            while y < screen.maxY {
+                if let l = provider.textLine(at: column, y: y, direction: 0, on: screen),
+                   !scanned.contains(where: { abs($0.midY - l.midY) < 2 }) {
+                    scanned.append(l)
+                }
+                y += 6
             }
-            print("line 0: \(first)")
+            scanned.sort { $0.midY < $1.midY }
+            guard let first = scanned.first else { print("FAIL: no line found in column \(Int(column))"); failures += 1; continue }
+            print("scan found \(scanned.count) lines in column \(Int(column)), y \(Int(first.y)) to \(Int(scanned.last!.maxY))")
             var lines = [first]
             y = first.midY
-            let steps = 10
             let t0 = Date()
-            for i in 1...steps {
-                guard let l = provider.textLine(at: p.x, y: y, direction: 1, on: screen) else { print("FAIL: no line \(i) below"); failures += 1; break }
-                print("line +\(i): \(l)")
+            var steps = 0
+            while lines.count < 300, let l = provider.textLine(at: column, y: y, direction: 1, on: screen) {
+                steps += 1
+                if l.midY <= y { print("FAIL: step down from y \(Int(y)) went to \(l)"); failures += 1; break }
                 lines.append(l)
                 y = l.midY
             }
             var back: [Rect] = []
-            for i in 1...(lines.count - 1) {
-                guard let l = provider.textLine(at: p.x, y: y, direction: -1, on: screen) else { print("FAIL: no line \(i) back up"); failures += 1; break }
-                print("line back \(i): \(l)")
+            while back.count < lines.count, let l = provider.textLine(at: column, y: y, direction: -1, on: screen) {
+                steps += 1
+                if l.midY >= y { print("FAIL: step up from y \(Int(y)) went to \(l)"); failures += 1; break }
                 back.append(l)
                 y = l.midY
             }
-            print(String(format: "%.0f ms per step", Date().timeIntervalSince(t0) * 1000 / Double(lines.count - 1 + back.count)))
-            // Sanity: downwards and consecutive, no overlap, similar heights, and the way
-            // back retraces the way down.
+            print("walked \(lines.count) lines down (\(Int(first.y)) to \(Int(lines.last!.maxY))), \(back.count) back up, " +
+                  String(format: "%.0f ms per step", steps > 0 ? Date().timeIntervalSince(t0) * 1000 / Double(steps) : 0))
+            func same(_ a: Rect, _ b: Rect) -> Bool { abs(a.midY - b.midY) < max(2, min(a.height, b.height) / 2) }
+            for l in scanned where l.midY < lines.last!.midY && !lines.contains(where: { same($0, l) }) {
+                print("FAIL: skipped line at \(l) going down"); failures += 1
+            }
+            for l in lines where !scanned.contains(where: { same($0, l) }) {
+                print("WARN: step landed on \(l), which no hit test in the column found")
+            }
             for (a, b) in zip(lines, lines.dropFirst()) {
-                if b.midY <= a.midY { print("WARN: not below: \(a) then \(b)"); failures += 1 }
                 if b.y < a.maxY - 2 { print("WARN: overlap between \(a) and \(b)") }
-                if b.y - a.maxY > a.height * 2.5 { print("WARN: gap of \(Int(b.y - a.maxY)) px between lines (skipped one?)") }
                 if abs(b.height - a.height) > a.height * 0.6 { print("WARN: height jump \(a.height) -> \(b.height)") }
             }
             let expected = Array(lines.dropLast().reversed())
-            for (i, (down, up)) in zip(expected, back).enumerated() where abs(down.midY - up.midY) > down.height / 2 {
-                print("WARN: back step \(i + 1) landed at y \(Int(up.midY)), expected \(Int(down.midY))"); failures += 1
+            if back.count < expected.count { print("FAIL: the way up stopped after \(back.count) of \(expected.count) lines"); failures += 1 }
+            for (i, (down, up)) in zip(expected, back).enumerated() where !same(down, up) {
+                print("FAIL: back step \(i + 1) landed at y \(Int(up.midY)), expected \(Int(down.midY))"); failures += 1
+                break
             }
+            if failures == before { print("ok") }
         }
         return failures == 0 ? 0 : 1
     }
