@@ -78,6 +78,17 @@ final class AXLineProvider: LineProvider {
     }
 
     func textLine(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
+        guard let r = line(at: x, y: y, direction: direction, on: screen) else { return nil }
+        // Text scrolled out of view still has bounds; a line off the screen is no line.
+        guard r.midY >= screen.y, r.midY <= screen.maxY else {
+            log("line \(r) is off the screen")
+            last = nil
+            return nil
+        }
+        return r
+    }
+
+    private func line(at x: Double, y: Double, direction: Int, on screen: Rect) -> Rect? {
         let deadline = Date().addingTimeInterval(timeBudget)
         // The caller moves from the line we last returned; reuse it rather than hit-testing.
         // Matched by y alone: the pointer's x may lie past the end of a short line.

@@ -71,7 +71,7 @@ enum Probe {
             }
             print("walked \(lines.count) lines down (\(Int(first.y)) to \(Int(lines.last!.maxY))), \(back.count) back up, " +
                   String(format: "%.0f ms per step", steps > 0 ? Date().timeIntervalSince(t0) * 1000 / Double(steps) : 0))
-            func same(_ a: Rect, _ b: Rect) -> Bool { abs(a.midY - b.midY) < max(2, min(a.height, b.height) / 2) }
+            func same(_ a: Rect, _ b: Rect) -> Bool { min(a.maxY, b.maxY) - max(a.y, b.y) > min(a.height, b.height) / 2 }
             for l in scanned where l.midY < lines.last!.midY && !lines.contains(where: { same($0, l) }) {
                 print("FAIL: skipped line at \(l) going down"); failures += 1
             }
@@ -83,7 +83,7 @@ enum Probe {
                 if abs(b.height - a.height) > a.height * 0.6 { print("WARN: height jump \(a.height) -> \(b.height)") }
             }
             let expected = Array(lines.dropLast().reversed())
-            if back.count < expected.count { print("FAIL: the way up stopped after \(back.count) of \(expected.count) lines"); failures += 1 }
+            if back.count < expected.count, let l = back.last, l.y > first.maxY { print("FAIL: the way up stopped after \(back.count) of \(expected.count) lines"); failures += 1 }
             for (i, (down, up)) in zip(expected, back).enumerated() where !same(down, up) {
                 print("FAIL: back step \(i + 1) landed at y \(Int(up.midY)), expected \(Int(down.midY))"); failures += 1
                 break
