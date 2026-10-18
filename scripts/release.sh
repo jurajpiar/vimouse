@@ -17,8 +17,14 @@ PROFILE="${NOTARY_PROFILE:-vimouse-notary}"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" Resources/Info.plist
 sed -i '' "s/public static let version = \"[^\"]*\"/public static let version = \"$VERSION\"/" Sources/VimouseCore/Manual.swift
 
+# bundle.sh prefers the vimouse-dev certificate; a release must use Developer ID.
+if [ -z "${SIGN_IDENTITY:-}" ]; then
+  SIGN_IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -v REVOKED | grep -o '"Developer ID Application[^"]*"' | head -1 | tr -d '"')"
+  [ -n "$SIGN_IDENTITY" ] || { echo "error: no Developer ID Application certificate in the keychain" >&2; exit 1; }
+fi
+export SIGN_IDENTITY
 APP="$(CONFIG=release NOTARISE=1 scripts/bundle.sh | sed 's/ (signed as.*//')"
-case "$(codesign -dv "$APP" 2>&1)" in
+case "$(codesign -dvv "$APP" 2>&1)" in
   *"Developer ID Application"*) ;;
   *) echo "error: $APP is not signed with a Developer ID Application certificate; notarisation needs one" >&2; exit 1 ;;
 esac
