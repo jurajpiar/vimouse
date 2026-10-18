@@ -1,6 +1,6 @@
 cask "vimouse" do
-  version "0.0.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  version "0.1.0"
+  sha256 "634416a4e589c111e2854545934a71a25a4f51aecf0adeb8199f4a28c5a816ef"
 
   url "https://github.com/jurajpiar/vimouse/releases/download/v#{version}/vimouse-#{version}.zip"
   name "vimouse"

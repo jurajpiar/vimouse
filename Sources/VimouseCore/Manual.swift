@@ -3,7 +3,7 @@ import Foundation
 /// The manual, generated from the schema and the default key map so it never drifts
 /// from the code. Rendered as a man page (roff); view with `man <path>`.
 public enum Manual {
-    public static let version = "0.1-dev"
+    public static let version = "0.1.0"
 
     public static func roff(modes: [Mode], cursors: [CursorStyle] = [], date: String = "2026-10") -> String {
         let schema = ConfigSchema(modes: modes, cursors: cursors)
