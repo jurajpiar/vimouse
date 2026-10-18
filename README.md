@@ -113,7 +113,18 @@ the menu) are rewritten on every start. Arrow keys, page up/down, home and end c
 (`down = ["j", "down"]`), and the legend and in-rectangle labels show whatever is
 bound.
 
-## Installing as an app
+## Installing
+
+With Homebrew:
+
+```
+brew install --cask jurajpiar/vimouse/vimouse
+```
+
+Then grant Accessibility access when asked (System Settings > Privacy & Security >
+Accessibility) and start vimouse from /Applications.
+
+## Installing from source
 
 `swift run` is fine for development, but macOS then attributes the Accessibility
 permission to your terminal. For daily use build the bundle:
@@ -158,13 +169,19 @@ and is handled in Phase 2.
 
 ## Releasing
 
-`scripts/release.sh <version>` stamps the version, builds and signs with the
-hardened runtime, notarises through `notarytool` (one-time:
-`xcrun notarytool store-credentials vimouse-notary --apple-id <id> --team-id <team>`),
-staples the ticket, zips the app and fills in `Casks/vimouse.rb`. Tag `v<version>`,
-attach the zip to the GitHub release, and the cask installs with
-`brew install --cask jurajpiar/vimouse/vimouse` once the cask lives in a
-`homebrew-vimouse` tap (or `brew install --cask ./Casks/vimouse.rb` from a checkout).
+Two scripts, both run on a Mac with a "Developer ID Application" certificate and
+`gh` logged in:
+
+```
+scripts/release.sh 0.1.0    # stamps the version, builds, signs (hardened runtime),
+                            # notarises, staples, zips, fills in Casks/vimouse.rb
+scripts/publish.sh 0.1.0    # commits the stamp, tags v0.1.0, pushes, creates the
+                            # GitHub release with the zip, pushes the cask to the
+                            # homebrew-vimouse tap (created on first run)
+```
+
+One-time: `xcrun notarytool store-credentials vimouse-notary --apple-id <id> --team-id <team>`.
+After publishing, `brew audit --cask --online jurajpiar/vimouse/vimouse` checks the cask.
 
 ## Licence
 

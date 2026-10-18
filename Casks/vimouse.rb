@@ -7,13 +7,14 @@ cask "vimouse" do
   desc "Keyboard-driven mouse: quadrant navigation, scrolling, a reading ruler and more"
   homepage "https://github.com/jurajpiar/vimouse"
 
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
   depends_on macos: ">= :sonoma"
 
   app "vimouse.app"
-
-  postflight do
-    system_command "/usr/bin/open", args: ["-a", "#{appdir}/vimouse.app"]
-  end
 
   uninstall quit: "com.jurajpiar.vimouse"
 
@@ -24,5 +25,6 @@ cask "vimouse" do
   caveats <<~EOS
     vimouse needs Accessibility access: System Settings > Privacy & Security >
     Accessibility. Its settings live in ~/.config/vimouse/config.toml.
+    Start it from /Applications; "Launch at login" is in its menu bar menu.
   EOS
 end
